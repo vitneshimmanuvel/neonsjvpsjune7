@@ -1,7 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-// @ts-ignore
-import handler from './api/index.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -21,6 +19,8 @@ export default defineConfig(({ mode }) => {
           server.middlewares.use(async (req, res, next) => {
             if (req.url && req.url.startsWith('/api')) {
               try {
+                // @ts-ignore
+                const { default: handler } = await import('./api/index.js');
                 await handler(req, res);
               } catch (err) {
                 console.error('API Error in dev server:', err);

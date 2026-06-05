@@ -443,6 +443,42 @@ export default async function handler(req, res) {
           data.entryCount !== undefined ? Number(data.entryCount) : 0,
           regId
         ]);
+
+        const entries = data.entries || [];
+        if (entries.length > 0) {
+          const batchSize = 100;
+          for (let i = 0; i < entries.length; i += batchSize) {
+            const batch = entries.slice(i, i + batchSize);
+            const valuePhrases = [];
+            const queryParams = [];
+
+            batch.forEach((entry, idx) => {
+              const offset = idx * 7;
+              valuePhrases.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+              queryParams.push(
+                Number(entry.id),
+                regId,
+                Number(entry.rowNumber || 1),
+                JSON.stringify(entry.cells || {}),
+                entry.cellStyles ? JSON.stringify(entry.cellStyles) : null,
+                Number(entry.pageIndex || 0),
+                entry.createdAt ? new Date(entry.createdAt).toISOString() : new Date().toISOString()
+              );
+            });
+
+            const queryText = `
+              INSERT INTO entries (id, register_id, row_number, cells, cell_styles, page_index, created_at)
+              VALUES ${valuePhrases.join(', ')}
+              ON CONFLICT (id) DO UPDATE SET
+                row_number = EXCLUDED.row_number,
+                cells = EXCLUDED.cells,
+                cell_styles = EXCLUDED.cell_styles,
+                page_index = EXCLUDED.page_index
+            `;
+            await query(queryText, queryParams);
+          }
+        }
+
         return sendJson(res, 200, { message: 'Register updated' });
       }
 
@@ -521,7 +557,29 @@ export default async function handler(req, res) {
 
     // GET /api/activity
     if (pathname === '/api/activity' && method === 'GET') {
-      const result = await query('SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 200');
+      const registerId = url.searchParams.get('registerId');
+      const entryId = url.searchParams.get('entryId');
+
+      let queryText = 'SELECT * FROM activity_logs';
+      const params = [];
+      const conditions = [];
+
+      if (registerId) {
+        params.push(String(registerId));
+        conditions.push(`register_id = $${params.length}`);
+      }
+      if (entryId) {
+        params.push(String(entryId));
+        conditions.push(`entry_id = $${params.length}`);
+      }
+
+      if (conditions.length > 0) {
+        queryText += ' WHERE ' + conditions.join(' AND ');
+      }
+
+      queryText += ' ORDER BY timestamp DESC LIMIT 200';
+
+      const result = await query(queryText, params);
       return sendJson(res, 200, {
         activities: result.rows.map(r => ({
           id: r.id,
@@ -531,7 +589,8 @@ export default async function handler(req, res) {
           details: r.details,
           timestamp: r.timestamp,
           registerId: r.register_id,
-          registerName: r.register_name
+          registerName: r.register_name,
+          entryId: r.entry_id ? Number(r.entry_id) : undefined
         }))
       });
     }
@@ -550,7 +609,8 @@ export default async function handler(req, res) {
           details: r.details,
           timestamp: r.timestamp,
           registerId: r.register_id,
-          registerName: r.register_name
+          registerName: r.register_name,
+          entryId: r.entry_id ? Number(r.entry_id) : undefined
         }))
       });
     }
@@ -560,8 +620,8 @@ export default async function handler(req, res) {
       const data = await getRequestBody(req);
       const id = data.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
       await query(`
-        INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp, register_id, register_name)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO activity_logs (id, user_id, user_name, action, details, timestamp, register_id, register_name, entry_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `, [
         id,
         data.userId || null,
@@ -570,7 +630,8 @@ export default async function handler(req, res) {
         data.details || '',
         parseDate(data.timestamp) || new Date().toISOString(),
         data.registerId ? String(data.registerId) : null,
-        data.registerName || null
+        data.registerName || null,
+        data.entryId ? String(data.entryId) : null
       ]);
       return sendJson(res, 201, { id });
     }

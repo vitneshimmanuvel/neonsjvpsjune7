@@ -2,10 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, ArrowLeft, ArrowRight, Calendar, FileText, Link as LinkIcon, Pencil, Plus, RotateCcw, Settings, Trash2, User } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listBusinesses, type HistoryEntry } from '../lib/api';
+import { listBusinesses, listHistory, type HistoryEntry } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 
 export default function HistoryPage() {
   const navigate = useNavigate();
@@ -20,86 +18,24 @@ export default function HistoryPage() {
   const [isError, setIsError] = React.useState(false);
   const [error, setError] = React.useState<any>(null);
   
-  const [lastDoc, setLastDoc] = React.useState<any>(null);
-  const [hasMore, setHasMore] = React.useState(true);
+  const [hasMore, setHasMore] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
-  const [fallbackData, setFallbackData] = React.useState<HistoryEntry[] | null>(null);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 1000;
 
-  const fetchHistory = async (isFirstPage = false) => {
-    if (isFirstPage) {
-      setIsLoading(true);
-      setIsError(false);
-    } else {
-      setLoadingMore(true);
-    }
+  const fetchHistory = async () => {
+    setIsLoading(true);
+    setIsError(false);
 
     try {
-      if (fallbackData !== null) {
-        const currentCount = isFirstPage ? 0 : history.length;
-        const nextBatch = fallbackData.slice(currentCount, currentCount + PAGE_SIZE);
-        if (isFirstPage) {
-          setHistory(nextBatch);
-        } else {
-          setHistory(prev => [...prev, ...nextBatch]);
-        }
-        setHasMore(currentCount + nextBatch.length < fallbackData.length);
-        setLoadingMore(false);
-        setIsLoading(false);
-        return;
-      }
-
-      const historyColRef = collection(db, 'history');
-      let q = query(
-        historyColRef,
-        where('businessId', '==', businessId),
-        orderBy('timestamp', 'desc'),
-        limit(PAGE_SIZE)
-      );
-
-      if (!isFirstPage && lastDoc) {
-        q = query(
-          historyColRef,
-          where('businessId', '==', businessId),
-          orderBy('timestamp', 'desc'),
-          startAfter(lastDoc),
-          limit(PAGE_SIZE)
-        );
-      }
-
-      const snap = await getDocs(q);
-      const newItems = snap.docs.map(d => d.data() as HistoryEntry);
-      
-      if (isFirstPage) {
-        setHistory(newItems);
-      } else {
-        setHistory(prev => [...prev, ...newItems]);
-      }
-
-      setLastDoc(snap.docs[snap.docs.length - 1] || null);
-      setHasMore(snap.docs.length === PAGE_SIZE);
+      if (!businessId) return;
+      const newItems = await listHistory(businessId);
+      setHistory(newItems || []);
+      setHasMore(false);
     } catch (err: any) {
-      console.warn("Paginated listHistory failed, falling back to full fetch:", err);
-      try {
-        const historyColRef = collection(db, 'history');
-        const q = query(historyColRef, where('businessId', '==', businessId));
-        const snap = await getDocs(q);
-        const allItems = snap.docs
-          .map(d => d.data() as HistoryEntry)
-          .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-        
-        setFallbackData(allItems);
-        
-        const firstBatch = allItems.slice(0, PAGE_SIZE);
-        setHistory(firstBatch);
-        setHasMore(firstBatch.length < allItems.length);
-      } catch (fallbackErr: any) {
-        console.error("Fallback fetch failed:", fallbackErr);
-        setIsError(true);
-        setError(fallbackErr);
-      }
+      console.error("Fetch history failed:", err);
+      setIsError(true);
+      setError(err);
     } finally {
       setIsLoading(false);
       setLoadingMore(false);
@@ -108,19 +44,12 @@ export default function HistoryPage() {
 
   React.useEffect(() => {
     if (businessId) {
-      setFallbackData(null);
-      setLastDoc(null);
-      fetchHistory(true);
+      fetchHistory();
     }
   }, [businessId]);
 
   const handleScroll = () => {
-    if (!containerRef.current || loadingMore || !hasMore || isLoading) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    if (scrollHeight - scrollTop - clientHeight < 100) {
-      fetchHistory(false);
-    }
+    // No-op scroll handler as listHistory loads all/limited records at once
   };
 
   const filteredHistory = React.useMemo(() => {
@@ -143,11 +72,7 @@ export default function HistoryPage() {
   const hasActiveFilters = !isAdmin;
 
   React.useEffect(() => {
-    if (!isLoading && !loadingMore && hasActiveFilters && filteredHistory.length < 15 && hasMore) {
-      if (history.length < 1000) {
-        fetchHistory(false);
-      }
-    }
+    // No-op effect for infinite pagination checks
   }, [filteredHistory.length, isLoading, loadingMore, hasActiveFilters, hasMore, history.length]);
 
   return (

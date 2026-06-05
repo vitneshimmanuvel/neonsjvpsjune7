@@ -475,8 +475,10 @@ export async function createRegister(data: {
   }>;
 }): Promise<RegisterSummary> {
   const columns = (data.columns || []).map((c, i) => ({
+    id: generateId(),
     name: c.name,
     type: c.type,
+    position: i,
     dropdownOptions: c.dropdownOptions,
     formula: c.formula,
     width: c.width,
@@ -961,7 +963,8 @@ export const importExcelData = async (
     };
   });
 
-  const createdReg = await createRegister({ businessId, folderId, name, columns: columns as any }) as RegisterDetail;
+  const summary = await createRegister({ businessId, folderId, name, columns: columns as any });
+  const createdReg = await getRegister(summary.id);
 
   // Clear the 3 default empty rows that createRegister adds, then populate from Excel data.
   // Work with the cached copy directly — no redundant getRegDoc round-trip needed.
@@ -2235,6 +2238,7 @@ export async function logAction(
         details,
         registerId: meta?.registerId,
         registerName: meta?.registerName,
+        entryId: meta?.entryId,
         timestamp: new Date().toISOString()
       })
     });
@@ -2252,8 +2256,10 @@ export async function listHistory(businessId: number): Promise<HistoryEntry[]> {
 }
 
 export async function listRowHistory(registerId: number, entryId: number): Promise<HistoryEntry[]> {
-  const history = await listHistory(1);
-  return history.filter(h => Number(h.registerId) === registerId && Number(h.entryId) === entryId);
+  const res = await fetch(`/api/activity?registerId=${registerId}&entryId=${entryId}`);
+  if (!res.ok) throw new Error('Failed to fetch row history');
+  const data = await res.json();
+  return data.activities;
 }
 
 // ── Bin Management (Rows & Columns) ──────────────────────────────────────────
