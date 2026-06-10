@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { db } from '../../lib/firebase';
-import { collection, getDocs, query, orderBy, limit, startAfter } from 'firebase/firestore';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
+import { listBusinesses, listRegisters } from '../../lib/api';
 import { 
   FileSpreadsheet, User, Calendar, RefreshCw, ChevronDown, 
   Filter, X, Search, Download, ClipboardList, Database, Check, Clock
@@ -78,10 +77,7 @@ export default function AdminActiveReportPage() {
   const [exporting, setExporting] = useState(false);
 
   // Pagination states
-  const [lastDocActivity, setLastDocActivity] = useState<any>(null);
-  const [lastDocHistory, setLastDocHistory] = useState<any>(null);
   const [hasMoreActivity, setHasMoreActivity] = useState(true);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 1000;
@@ -100,10 +96,7 @@ export default function AdminActiveReportPage() {
     if (isFirstPage) {
       setLoading(true);
       // Reset cursors and states
-      setLastDocActivity(null);
-      setLastDocHistory(null);
       setHasMoreActivity(true);
-      setHasMoreHistory(true);
     } else {
       setLoadingMore(true);
     }
@@ -113,78 +106,34 @@ export default function AdminActiveReportPage() {
       let regsList = registers;
 
       if (isFirstPage) {
-        const [userRes, regSnap] = await Promise.all([
+        const [userRes, busList] = await Promise.all([
           firebaseGetUsers(),
-          getDocs(collection(db, 'registers'))
+          listBusinesses()
         ]);
         usersList = (userRes.users || []).map((u: any) => ({ id: u.id, name: u.name, email: u.email }));
         setUsers(usersList);
 
-        const regs: RegisterItem[] = [];
-        regSnap.forEach((doc) => {
-          const data = doc.data();
-          if (data.name && doc.id) {
-            regs.push({ id: doc.id.toString(), name: data.name });
-          }
-        });
-        regsList = regs.sort((a, b) => a.name.localeCompare(b.name));
+        const busId = busList[0]?.id || 1;
+        const summs = await listRegisters(busId);
+        const regs = summs.map((s: any) => ({ id: s.id.toString(), name: s.name }));
+        regsList = regs.sort((a: any, b: any) => a.name.localeCompare(b.name));
         setRegisters(regsList);
       }
 
-      let rawActivities: any[] = [];
-      let historyList: any[] = [];
-      let nextLastDocActivity = isFirstPage ? null : lastDocActivity;
-      let nextHasMoreActivity = isFirstPage ? true : hasMoreActivity;
-      let nextLastDocHistory = isFirstPage ? null : lastDocHistory;
-      let nextHasMoreHistory = isFirstPage ? true : hasMoreHistory;
+      const offset = isFirstPage ? 0 : activities.length;
+      const res = await fetch(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`);
+      if (!res.ok) throw new Error('Failed to fetch activity logs');
+      const data = await res.json();
+      const rawActivities = data.activities || [];
 
-      // 1. Fetch App Activity batch
-      if (isFirstPage || hasMoreActivity) {
-        const actCol = collection(db, 'app_activity');
-        let qAct = query(actCol, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
-        if (!isFirstPage && lastDocActivity) {
-          qAct = query(actCol, orderBy('timestamp', 'desc'), startAfter(lastDocActivity), limit(PAGE_SIZE));
-        }
-        const actSnap = await getDocs(qAct);
-        rawActivities = actSnap.docs.map(d => d.data());
-        nextLastDocActivity = actSnap.docs[actSnap.docs.length - 1] || null;
-        nextHasMoreActivity = actSnap.docs.length === PAGE_SIZE;
-      }
-
-      // 2. Fetch History batch
-      if (isFirstPage || hasMoreHistory) {
-        const histCol = collection(db, 'history');
-        let qHist = query(histCol, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
-        if (!isFirstPage && lastDocHistory) {
-          qHist = query(histCol, orderBy('timestamp', 'desc'), startAfter(lastDocHistory), limit(PAGE_SIZE));
-        }
-        const histSnap = await getDocs(qHist);
-        histSnap.forEach(doc => {
-          const data = doc.data();
-          historyList.push({
-            id: data.id ? data.id.toString() : doc.id,
-            userId: data.userId || '',
-            userName: data.userName || 'User',
-            action: data.action,
-            details: data.details,
-            timestamp: data.timestamp,
-            registerId: data.registerId ? String(data.registerId) : undefined,
-            registerName: data.registerName
-          });
-        });
-        nextLastDocHistory = histSnap.docs[histSnap.docs.length - 1] || null;
-        nextHasMoreHistory = histSnap.docs.length === PAGE_SIZE;
-      }
-
-      // 3. Merge and sort
-      const merged = [...rawActivities, ...historyList];
+      // Merge and sort
       const uniqueMap = new Map<string, any>();
 
       let baseActivities = isFirstPage ? [] : activities;
-      baseActivities.forEach(item => {
+      baseActivities.forEach((item: any) => {
         if (item.id) uniqueMap.set(item.id.toString(), item);
       });
-      merged.forEach(item => {
+      rawActivities.forEach((item: any) => {
         if (item.id) uniqueMap.set(item.id.toString(), item);
       });
 
@@ -199,10 +148,7 @@ export default function AdminActiveReportPage() {
       const filtered = sorted.filter((a: any) => validActions.includes(a.action));
 
       setActivities(filtered);
-      setLastDocActivity(nextLastDocActivity);
-      setLastDocHistory(nextLastDocHistory);
-      setHasMoreActivity(nextHasMoreActivity);
-      setHasMoreHistory(nextHasMoreHistory);
+      setHasMoreActivity(rawActivities.length === PAGE_SIZE);
     } catch (e: any) {
       console.error('Failed to load active report:', e);
       toast.error('Failed to retrieve activity reports');
@@ -213,7 +159,7 @@ export default function AdminActiveReportPage() {
   };
 
   const handleTableScroll = () => {
-    if (!tableContainerRef.current || loading || loadingMore || (!hasMoreActivity && !hasMoreHistory)) return;
+    if (!tableContainerRef.current || loading || loadingMore || !hasMoreActivity) return;
     const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current;
     if (scrollHeight - scrollTop - clientHeight < 100) {
       fetch_(false);
@@ -279,12 +225,12 @@ export default function AdminActiveReportPage() {
   const hasActiveFilters = filterUser !== 'all' || filterRegister !== 'all' || filterAction !== 'all' || !!filterSingleDate || !!filterDateFrom || !!filterDateTo || !!searchQuery.trim();
 
   useEffect(() => {
-    if (!loading && !loadingMore && hasActiveFilters && filteredReport.length < 15 && (hasMoreActivity || hasMoreHistory)) {
+    if (!loading && !loadingMore && hasActiveFilters && filteredReport.length < 15 && hasMoreActivity) {
       if (activities.length < 1000) {
         fetch_(false);
       }
     }
-  }, [filteredReport.length, loading, loadingMore, hasActiveFilters, hasMoreActivity, hasMoreHistory, activities.length]);
+  }, [filteredReport.length, loading, loadingMore, hasActiveFilters, hasMoreActivity, activities.length]);
 
   // Analytics Metrics
   const metrics = useMemo(() => {
@@ -592,7 +538,7 @@ export default function AdminActiveReportPage() {
               Showing <strong style={{ color: 'var(--foreground)' }}>{filteredReport.length}</strong> audited data actions
               {activeFilterCount > 0 && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
             </div>
-            {(hasMoreActivity || hasMoreHistory) && (
+            {hasMoreActivity && (
               <button 
                 onClick={() => fetch_(false)}
                 disabled={loadingMore}
@@ -676,7 +622,7 @@ export default function AdminActiveReportPage() {
                       </td>
                     </tr>
                   )}
-                  {!loadingMore && (hasMoreActivity || hasMoreHistory) && filteredReport.length > 0 && (
+                  {!loadingMore && hasMoreActivity && filteredReport.length > 0 && (
                     <tr>
                       <td colSpan={6} style={{ padding: '12px', textAlign: 'center', background: 'var(--background)' }}>
                         <button 

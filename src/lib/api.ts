@@ -1257,14 +1257,15 @@ export async function addColumn(registerId: number, data: { name: string; type: 
 }
 
 export async function deleteColumn(registerId: number, columnId: number): Promise<RegisterDetail> {
-  return runQueuedMutation(registerId, async () => {
+  const result = await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find(c => c.id.toString() === columnId.toString());
-    if (!col) return reg;
+    if (!col) return { reg };
     if (col.type === 'formula') {
       throw new Error('Formula columns cannot be deleted');
     }
     const colName = col.name;
+    const linkedTo = col.linkedTo;
 
     // Collect cell data for this column before removing
     const columnCellData: Record<string, string> = {};
@@ -1302,8 +1303,24 @@ export async function deleteColumn(registerId: number, columnId: number): Promis
     reg.entries.forEach((e) => { if (e.cells) delete e.cells[columnId.toString()]; });
     await saveRegDocImmediate(reg);
     await logAction(reg.businessId, 'Delete Column', `Deleted column "${colName}" from "${reg.name}"`, { registerId, registerName: reg.name });
-    return reg;
+    return { reg, linkedTo };
   });
+
+  const { reg, linkedTo } = result;
+
+  if (linkedTo) {
+    // Run queued mutation on counterpart register to clear the reference
+    await runQueuedMutation(linkedTo.registerId, async () => {
+      const targetReg = await getRegDoc(linkedTo.registerId);
+      const targetCol = targetReg.columns.find(c => c.id === linkedTo.columnId);
+      if (targetCol) {
+        delete targetCol.linkedTo;
+        await saveRegDocImmediate(targetReg);
+      }
+    }).catch(e => console.error("Failed to clean up counterpart linkedTo on column delete:", e));
+  }
+
+  return reg;
 }
 
 /**
@@ -1342,8 +1359,13 @@ export async function restoreColumn(
   });
 }
 
-export async function renameColumn(registerId: number, columnId: number, newName: string): Promise<RegisterDetail> {
-  return runQueuedMutation(registerId, async () => {
+export async function renameColumn(
+  registerId: number,
+  columnId: number,
+  newName: string,
+  preventSync?: boolean
+): Promise<RegisterDetail> {
+  const result = await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find((c) => c.id.toString() === columnId.toString());
     if (!col) throw new Error('Column not found');
@@ -1365,19 +1387,42 @@ export async function renameColumn(registerId: number, columnId: number, newName
 
     await saveRegDocImmediate(reg);
     await logAction(reg.businessId, 'Rename Column', `Renamed column "${oldName}" to "${finalNewName}" in "${reg.name}"`, { registerId, registerName: reg.name });
-    return reg;
+    return { reg, col, finalNewName };
   });
+
+  const { reg, col, finalNewName } = result;
+
+  if (!preventSync && col.linkedTo) {
+    await renameColumn(col.linkedTo.registerId, col.linkedTo.columnId, finalNewName, true)
+      .catch(e => console.error("Failed to sync column rename change:", e));
+  }
+
+  return reg;
 }
 
-export async function updateColumnDropdownOptions(registerId: number, columnId: number, options: string[]): Promise<RegisterDetail> {
-  return runQueuedMutation(registerId, async () => {
+export async function updateColumnDropdownOptions(
+  registerId: number,
+  columnId: number,
+  options: string[],
+  preventSync?: boolean
+): Promise<RegisterDetail> {
+  const result = await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find((c) => c.id.toString() === columnId.toString());
     if (!col) throw new Error('Column not found');
     col.dropdownOptions = options;
     await saveRegDocImmediate(reg);
-    return reg;
+    return { reg, col };
   });
+
+  const { reg, col } = result;
+
+  if (!preventSync && col.linkedTo) {
+    await updateColumnDropdownOptions(col.linkedTo.registerId, col.linkedTo.columnId, options, true)
+      .catch(e => console.error("Failed to sync column dropdown options change:", e));
+  }
+
+  return reg;
 }
 
 export async function duplicateColumn(registerId: number, columnId: number): Promise<RegisterDetail> {
@@ -1677,10 +1722,20 @@ export async function addEntry(registerId: number, cells: Record<string, string>
   }).join(', ');
   logAction(reg.businessId, 'Add Row', `Added new row to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
 
+  const targetRegIds = new Set<number>();
+  for (const col of reg.columns) {
+    if (col.linkedTo && col.linkedTo.role === 'source') {
+      targetRegIds.add(col.linkedTo.registerId);
+    }
+  }
+  for (const targetRegId of targetRegIds) {
+    await _syncAddRow(targetRegId);
+  }
+
   for (const [colIdStr, value] of Object.entries(cells)) {
     if (value === undefined || value === null) continue;
     const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo) {
+    if (col?.linkedTo && col.linkedTo.role === 'source') {
       await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
     }
   }
@@ -1733,10 +1788,20 @@ export async function insertEntry(registerId: number, cells: Record<string, stri
   }).join(', ');
   await logAction(reg.businessId, 'Insert Row', `Inserted row at position ${atIndex + 1} in "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id });
 
+  const insertTargetRegIds = new Set<number>();
+  for (const col of reg.columns) {
+    if (col.linkedTo && col.linkedTo.role === 'source') {
+      insertTargetRegIds.add(col.linkedTo.registerId);
+    }
+  }
+  for (const targetRegId of insertTargetRegIds) {
+    await _syncInsertRow(targetRegId, atIndex);
+  }
+
   for (const [colIdStr, value] of Object.entries(cells)) {
     if (value === undefined || value === null) continue;
     const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo) {
+    if (col?.linkedTo && col.linkedTo.role === 'source') {
       await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
     }
   }
@@ -1785,7 +1850,7 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
 
   for (const [colIdStr, value] of Object.entries(cells)) {
     const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo) {
+    if (col?.linkedTo && col.linkedTo.role === 'source') {
       await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
     }
   }
@@ -1806,27 +1871,174 @@ export async function updateEntryDirect(
   return updateEntry(registerId, entryId, cells);
 }
 
-// Internal helper to sync
-async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: number, rowNumber: number, value: string) {
-  return runQueuedMutation(targetRegisterId, async () => {
-    const targetReg = await getRegDoc(targetRegisterId);
-    let targetEntry = targetReg.entries.find(e => e.rowNumber === rowNumber);
-    if (!targetEntry) {
-      // Create a new entry to sync the row
-      targetEntry = {
+function ensureTargetRows(targetReg: RegisterDetail, maxRowNumber: number) {
+  targetReg.entries.sort((a, b) => a.rowNumber - b.rowNumber);
+
+  for (let r = 1; r <= maxRowNumber; r++) {
+    const entry = targetReg.entries.find(e => e.rowNumber === r);
+    if (!entry) {
+      const newEntry: Entry = {
         id: generateId(),
-        registerId: targetRegisterId,
-        rowNumber,
+        registerId: targetReg.id,
+        rowNumber: r,
         cells: {},
         createdAt: new Date().toISOString(),
         pageIndex: 0
       };
-      targetReg.entries.push(targetEntry);
-      targetReg.entryCount = targetReg.entries.length;
+      
+      const insertIdx = targetReg.entries.findIndex(e => e.rowNumber > r);
+      if (insertIdx === -1) {
+        targetReg.entries.push(newEntry);
+      } else {
+        targetReg.entries.splice(insertIdx, 0, newEntry);
+      }
     }
-    targetEntry.cells[targetColumnId.toString()] = value;
-    targetReg.updatedAt = new Date().toISOString();
-    await saveRegDocImmediate(targetReg);
+  }
+  renumberRows(targetReg);
+  targetReg.entryCount = targetReg.entries.length;
+}
+
+async function _syncAddRow(targetRegisterId: number) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const reg = await getRegDoc(targetRegisterId);
+    const newRowNumber = reg.entries.length + 1;
+    const newEntry: Entry = {
+      id: generateId(),
+      registerId: targetRegisterId,
+      rowNumber: newRowNumber,
+      cells: {},
+      createdAt: new Date().toISOString(),
+      pageIndex: 0
+    };
+
+    const res = await fetch(`/api/registers/${targetRegisterId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEntry)
+    });
+    if (!res.ok) throw new Error('Failed to add entry in sync');
+
+    reg.entries.push(newEntry);
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    await saveRegDocImmediate(reg);
+  }).catch(e => console.error('Failed to sync add row:', e));
+}
+
+async function _syncInsertRow(targetRegisterId: number, atIndex: number) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const reg = await getRegDoc(targetRegisterId);
+    
+    ensureTargetRows(reg, atIndex);
+
+    const newEntry: Entry = {
+      id: generateId(),
+      registerId: targetRegisterId,
+      rowNumber: atIndex + 1,
+      cells: {},
+      createdAt: new Date().toISOString(),
+      pageIndex: 0
+    };
+
+    const res = await fetch(`/api/registers/${targetRegisterId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEntry)
+    });
+    if (!res.ok) throw new Error('Failed to insert entry in sync');
+
+    reg.entries.splice(atIndex, 0, newEntry);
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    await saveRegDocImmediate(reg);
+  }).catch(e => console.error('Failed to sync insert row:', e));
+}
+
+async function _syncDeleteRow(targetRegisterId: number, rowNumber: number) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const reg = await getRegDoc(targetRegisterId);
+    const entryIndex = reg.entries.findIndex((e) => e.rowNumber === rowNumber);
+    if (entryIndex === -1) return;
+    const entry = reg.entries[entryIndex];
+
+    const res = await fetch(`/api/registers/${targetRegisterId}/entries/${entry.id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) throw new Error('Failed to delete entry in sync');
+
+    reg.entries.splice(entryIndex, 1);
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    await saveRegDocImmediate(reg);
+  }).catch(e => console.error('Failed to sync delete row:', e));
+}
+
+async function _syncBulkDeleteRows(targetRegisterId: number, rowNumbers: number[]) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const reg = await getRegDoc(targetRegisterId);
+    const rowSet = new Set(rowNumbers);
+    
+    const entriesToDelete = reg.entries.filter(e => rowSet.has(e.rowNumber));
+    if (entriesToDelete.length === 0) return;
+
+    for (const entry of entriesToDelete) {
+      await fetch(`/api/registers/${targetRegisterId}/entries/${entry.id}`, {
+        method: 'DELETE'
+      });
+    }
+
+    const idsToDelete = new Set(entriesToDelete.map(e => e.id));
+    reg.entries = reg.entries.filter(e => !idsToDelete.has(e.id));
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    await saveRegDocImmediate(reg);
+  }).catch(e => console.error('Failed to sync bulk delete rows:', e));
+}
+
+async function _syncReorderRows(targetRegisterId: number, originalRowNumbersOrder: number[]) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const reg = await getRegDoc(targetRegisterId);
+    
+    const entryMap = new Map<number, Entry>();
+    reg.entries.forEach(e => {
+      entryMap.set(e.rowNumber, e);
+    });
+
+    const newEntries: Entry[] = [];
+    const usedIds = new Set<number>();
+
+    originalRowNumbersOrder.forEach(rn => {
+      const entry = entryMap.get(rn);
+      if (entry) {
+        newEntries.push(entry);
+        usedIds.add(entry.id);
+      }
+    });
+
+    reg.entries.forEach(entry => {
+      if (!usedIds.has(entry.id)) {
+        newEntries.push(entry);
+      }
+    });
+
+    reg.entries = newEntries;
+    renumberRows(reg);
+    reg.updatedAt = new Date().toISOString();
+    await saveRegDocImmediate(reg);
+  }).catch(e => console.error('Failed to sync reorder rows:', e));
+}
+
+// Internal helper to sync
+async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: number, rowNumber: number, value: string) {
+  return runQueuedMutation(targetRegisterId, async () => {
+    const targetReg = await getRegDoc(targetRegisterId);
+    ensureTargetRows(targetReg, rowNumber);
+    let targetEntry = targetReg.entries.find(e => e.rowNumber === rowNumber);
+    if (targetEntry) {
+      targetEntry.cells[targetColumnId.toString()] = value;
+      targetReg.updatedAt = new Date().toISOString();
+      await saveRegDocImmediate(targetReg);
+    }
   }).catch(e => console.error('Failed to sync linked column:', e));
 }
 
@@ -1841,6 +2053,7 @@ export async function linkColumn(
   let sourceColName = '';
   let sourceColType = '';
   let sourceColDropdownOptions: string[] | undefined;
+  let sourceMaxRowNumber = 0;
   
   await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
@@ -1851,6 +2064,7 @@ export async function linkColumn(
       sourceColName = col.name;
       sourceColType = col.type;
       sourceColDropdownOptions = col.dropdownOptions;
+      sourceMaxRowNumber = reg.entries.length;
       // Gather existing values
       const colIdStr = columnId.toString();
       reg.entries.forEach(e => {
@@ -1874,22 +2088,16 @@ export async function linkColumn(
       if (sourceColType) col.type = sourceColType;
       if (sourceColDropdownOptions) col.dropdownOptions = sourceColDropdownOptions;
       
+      // Ensure target register has contiguous rows up to sourceMaxRowNumber
+      ensureTargetRows(reg, sourceMaxRowNumber);
+
       const targetColIdStr = targetColumnId.toString();
       sourceEntriesData.forEach(({ rowNumber, value }) => {
         let targetEntry = reg.entries.find(e => e.rowNumber === rowNumber);
-        if (!targetEntry) {
-          targetEntry = {
-            id: generateId(),
-            registerId: targetRegisterId,
-            rowNumber,
-            cells: {},
-            createdAt: new Date().toISOString(),
-            pageIndex: 0
-          };
-          reg.entries.push(targetEntry);
+        if (targetEntry) {
+          if (!targetEntry.cells) targetEntry.cells = {};
+          targetEntry.cells[targetColIdStr] = value;
         }
-        if (!targetEntry.cells) targetEntry.cells = {};
-        targetEntry.cells[targetColIdStr] = value;
       });
       
       // Update target register entry count
@@ -1970,11 +2178,29 @@ export async function updateEntryCellStyles(registerId: number, entryId: number,
 export async function updateEntriesOrder(registerId: number, sortedEntries: Entry[]): Promise<void> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
+    
+    // Capture original row numbers of entries in their new sequence
+    const reorderMapping = sortedEntries.map(sortedEntry => {
+      const originalEntry = reg.entries.find(e => e.id === sortedEntry.id);
+      return originalEntry ? originalEntry.rowNumber : null;
+    }).filter((rn): rn is number => rn !== null);
+
     // Overwrite the entire entries array with the new sorted array
     reg.entries = sortedEntries;
     renumberRows(reg); // Update row numbers to match the new order
     reg.updatedAt = new Date().toISOString();
     await saveRegDocImmediate(reg);
+
+    // Sync to target registers
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of targetRegIds) {
+      await _syncReorderRows(targetRegId, reorderMapping);
+    }
   });
 }
 
@@ -2009,6 +2235,17 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
     });
     if (!res.ok) throw new Error('Failed to delete entry');
 
+    // Sync to target registers BEFORE we mutate the source entries array
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of targetRegIds) {
+      await _syncDeleteRow(targetRegId, entry.rowNumber);
+    }
+
     reg.entries = reg.entries.filter((e) => e.id !== entryId);
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
@@ -2024,15 +2261,44 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
 export async function restoreEntry(registerId: number, entry: Entry, originalIndex?: number): Promise<Entry> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
-    // Insert at original position if provided, otherwise append
+    const insertIndex = (originalIndex !== undefined && originalIndex >= 0 && originalIndex <= reg.entries.length)
+      ? originalIndex
+      : reg.entries.length;
+
+    // Sync to target registers first
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of targetRegIds) {
+      if (insertIndex === reg.entries.length) {
+        await _syncAddRow(targetRegId);
+      } else {
+        await _syncInsertRow(targetRegId, insertIndex);
+      }
+    }
+
     if (originalIndex !== undefined && originalIndex >= 0 && originalIndex <= reg.entries.length) {
       reg.entries.splice(originalIndex, 0, entry);
     } else {
       reg.entries.push(entry);
     }
+    renumberRows(reg);
     reg.entryCount = reg.entries.length;
     reg.updatedAt = new Date().toISOString();
     await saveRegDocImmediate(reg);
+
+    // Sync cells
+    for (const [colIdStr, value] of Object.entries(entry.cells)) {
+      if (value === undefined || value === null) continue;
+      const col = reg.columns.find(c => c.id.toString() === colIdStr);
+      if (col?.linkedTo && col.linkedTo.role === 'source') {
+        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
+      }
+    }
+
     return entry;
   });
 }
@@ -2044,15 +2310,40 @@ export async function restoreEntry(registerId: number, entry: Entry, originalInd
 export async function bulkRestoreEntries(registerId: number, entries: { entry: Entry; index: number }[]): Promise<void> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
-    // Sort by index ascending so we insert in the right order
     const sorted = [...entries].sort((a, b) => a.index - b.index);
+
     for (const { entry, index } of sorted) {
+      const targetRegIds = new Set<number>();
+      for (const col of reg.columns) {
+        if (col.linkedTo && col.linkedTo.role === 'source') {
+          targetRegIds.add(col.linkedTo.registerId);
+        }
+      }
+      for (const targetRegId of targetRegIds) {
+        if (index >= 0 && index <= reg.entries.length) {
+          await _syncInsertRow(targetRegId, index);
+        } else {
+          await _syncAddRow(targetRegId);
+        }
+      }
+
       if (index >= 0 && index <= reg.entries.length) {
         reg.entries.splice(index, 0, entry);
       } else {
         reg.entries.push(entry);
       }
+      renumberRows(reg);
+
+      // Sync cells
+      for (const [colIdStr, value] of Object.entries(entry.cells)) {
+        if (value === undefined || value === null) continue;
+        const col = reg.columns.find(c => c.id.toString() === colIdStr);
+        if (col?.linkedTo && col.linkedTo.role === 'source') {
+          await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
+        }
+      }
     }
+
     reg.entryCount = reg.entries.length;
     reg.updatedAt = new Date().toISOString();
     await saveRegDocImmediate(reg);
@@ -2072,6 +2363,26 @@ export async function duplicateEntry(registerId: number, entryId: number): Promi
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
     await saveAddedEntryOnly(reg, reg.entries.length - 1);
+
+    // Sync new row and cell values to target registers
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of targetRegIds) {
+      await _syncAddRow(targetRegId);
+    }
+
+    for (const [colIdStr, value] of Object.entries(duplicate.cells)) {
+      if (value === undefined || value === null) continue;
+      const col = reg.columns.find(c => c.id.toString() === colIdStr);
+      if (col?.linkedTo && col.linkedTo.role === 'source') {
+        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, duplicate.rowNumber, value);
+      }
+    }
+
     return duplicate;
   });
 }
@@ -2096,6 +2407,18 @@ export async function bulkDeleteEntries(registerId: number, entryIds: number[]):
         });
       }
     });
+
+    // Sync to target registers BEFORE we mutate the source entries array
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    const deletedRowNumbers = reg.entries.filter(e => idsSet.has(e.id)).map(e => e.rowNumber);
+    for (const targetRegId of targetRegIds) {
+      await _syncBulkDeleteRows(targetRegId, deletedRowNumbers);
+    }
 
     reg.entries = reg.entries.filter((e) => !idsSet.has(e.id));
     renumberRows(reg); // Fix sequence after bulk delete

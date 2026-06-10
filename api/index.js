@@ -445,6 +445,16 @@ export default async function handler(req, res) {
         ]);
 
         const entries = data.entries || [];
+
+        // Delete any entries that are no longer in the payload
+        const entryIds = entries.map(e => Number(e.id));
+        if (entryIds.length > 0) {
+          const placeholders = entryIds.map((_, idx) => `$${idx + 2}`).join(', ');
+          await query(`DELETE FROM entries WHERE register_id = $1 AND id NOT IN (${placeholders})`, [regId, ...entryIds]);
+        } else {
+          await query('DELETE FROM entries WHERE register_id = $1', [regId]);
+        }
+
         if (entries.length > 0) {
           const batchSize = 100;
           for (let i = 0; i < entries.length; i += batchSize) {
@@ -559,6 +569,8 @@ export default async function handler(req, res) {
     if (pathname === '/api/activity' && method === 'GET') {
       const registerId = url.searchParams.get('registerId');
       const entryId = url.searchParams.get('entryId');
+      const limitVal = parseInt(url.searchParams.get('limit') || '200', 10);
+      const offsetVal = parseInt(url.searchParams.get('offset') || '0', 10);
 
       let queryText = 'SELECT * FROM activity_logs';
       const params = [];
@@ -577,7 +589,9 @@ export default async function handler(req, res) {
         queryText += ' WHERE ' + conditions.join(' AND ');
       }
 
-      queryText += ' ORDER BY timestamp DESC LIMIT 200';
+      const safeLimit = isNaN(limitVal) ? 200 : limitVal;
+      const safeOffset = isNaN(offsetVal) ? 0 : offsetVal;
+      queryText += ` ORDER BY timestamp DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
       const result = await query(queryText, params);
       return sendJson(res, 200, {

@@ -1,6 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { db } from '../../lib/firebase';
-import { collection, query, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
 import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown } from 'lucide-react';
 
@@ -55,7 +53,6 @@ export default function AdminActivityPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Pagination states
-  const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,7 +69,6 @@ export default function AdminActivityPage() {
   const fetch_ = async (isFirstPage = false) => {
     if (isFirstPage) {
       setLoading(true);
-      setLastDoc(null);
       setHasMore(true);
     } else {
       setLoadingMore(true);
@@ -86,28 +82,24 @@ export default function AdminActivityPage() {
         setUsers(usersList);
       }
 
-      const actCol = collection(db, 'app_activity');
-      let q = query(actCol, orderBy('timestamp', 'desc'), limit(PAGE_SIZE));
-      if (!isFirstPage && lastDoc) {
-        q = query(actCol, orderBy('timestamp', 'desc'), startAfter(lastDoc), limit(PAGE_SIZE));
-      }
-
-      const snap = await getDocs(q);
-      const newItems = snap.docs.map(d => d.data());
+      const offset = isFirstPage ? 0 : activities.length;
+      const res = await fetch(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`);
+      if (!res.ok) throw new Error('Failed to fetch activity logs');
+      const data = await res.json();
+      const newItems = data.activities || [];
 
       if (isFirstPage) {
         setActivities(newItems);
       } else {
         setActivities(prev => {
           const uniqueMap = new Map<string, any>();
-          prev.forEach(item => { if (item.id) uniqueMap.set(item.id.toString(), item); });
-          newItems.forEach(item => { if (item.id) uniqueMap.set(item.id.toString(), item); });
+          prev.forEach((item: any) => { if (item.id) uniqueMap.set(item.id.toString(), item); });
+          newItems.forEach((item: any) => { if (item.id) uniqueMap.set(item.id.toString(), item); });
           return Array.from(uniqueMap.values()).sort((a: any, b: any) => (b.timestamp || '').localeCompare(a.timestamp || ''));
         });
       }
 
-      setLastDoc(snap.docs[snap.docs.length - 1] || null);
-      setHasMore(snap.docs.length === PAGE_SIZE);
+      setHasMore(newItems.length === PAGE_SIZE);
     }
     catch (e) {
       console.error("Failed to load activity logs:", e);
