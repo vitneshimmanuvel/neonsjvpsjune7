@@ -444,48 +444,50 @@ export default async function handler(req, res) {
           regId
         ]);
 
-        const entries = data.entries || [];
+        if (data.entries) {
+          const entries = data.entries;
 
-        // Delete any entries that are no longer in the payload
-        const entryIds = entries.map(e => Number(e.id));
-        if (entryIds.length > 0) {
-          const placeholders = entryIds.map((_, idx) => `$${idx + 2}`).join(', ');
-          await query(`DELETE FROM entries WHERE register_id = $1 AND id NOT IN (${placeholders})`, [regId, ...entryIds]);
-        } else {
-          await query('DELETE FROM entries WHERE register_id = $1', [regId]);
-        }
+          // Delete any entries that are no longer in the payload
+          const entryIds = entries.map(e => Number(e.id));
+          if (entryIds.length > 0) {
+            const placeholders = entryIds.map((_, idx) => `$${idx + 2}`).join(', ');
+            await query(`DELETE FROM entries WHERE register_id = $1 AND id NOT IN (${placeholders})`, [regId, ...entryIds]);
+          } else {
+            await query('DELETE FROM entries WHERE register_id = $1', [regId]);
+          }
 
-        if (entries.length > 0) {
-          const batchSize = 100;
-          for (let i = 0; i < entries.length; i += batchSize) {
-            const batch = entries.slice(i, i + batchSize);
-            const valuePhrases = [];
-            const queryParams = [];
+          if (entries.length > 0) {
+            const batchSize = 100;
+            for (let i = 0; i < entries.length; i += batchSize) {
+              const batch = entries.slice(i, i + batchSize);
+              const valuePhrases = [];
+              const queryParams = [];
 
-            batch.forEach((entry, idx) => {
-              const offset = idx * 7;
-              valuePhrases.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
-              queryParams.push(
-                Number(entry.id),
-                regId,
-                Number(entry.rowNumber || 1),
-                JSON.stringify(entry.cells || {}),
-                entry.cellStyles ? JSON.stringify(entry.cellStyles) : null,
-                Number(entry.pageIndex || 0),
-                entry.createdAt ? new Date(entry.createdAt).toISOString() : new Date().toISOString()
-              );
-            });
+              batch.forEach((entry, idx) => {
+                const offset = idx * 7;
+                valuePhrases.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+                queryParams.push(
+                  Number(entry.id),
+                  regId,
+                  Number(entry.rowNumber || 1),
+                  JSON.stringify(entry.cells || {}),
+                  entry.cellStyles ? JSON.stringify(entry.cellStyles) : null,
+                  Number(entry.pageIndex || 0),
+                  entry.createdAt ? new Date(entry.createdAt).toISOString() : new Date().toISOString()
+                );
+              });
 
-            const queryText = `
-              INSERT INTO entries (id, register_id, row_number, cells, cell_styles, page_index, created_at)
-              VALUES ${valuePhrases.join(', ')}
-              ON CONFLICT (id) DO UPDATE SET
-                row_number = EXCLUDED.row_number,
-                cells = EXCLUDED.cells,
-                cell_styles = EXCLUDED.cell_styles,
-                page_index = EXCLUDED.page_index
-            `;
-            await query(queryText, queryParams);
+              const queryText = `
+                INSERT INTO entries (id, register_id, row_number, cells, cell_styles, page_index, created_at)
+                VALUES ${valuePhrases.join(', ')}
+                ON CONFLICT (id) DO UPDATE SET
+                  row_number = EXCLUDED.row_number,
+                  cells = EXCLUDED.cells,
+                  cell_styles = EXCLUDED.cell_styles,
+                  page_index = EXCLUDED.page_index
+              `;
+              await query(queryText, queryParams);
+            }
           }
         }
 

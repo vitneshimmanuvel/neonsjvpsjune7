@@ -389,12 +389,13 @@ async function getRegDoc(registerId: number): Promise<RegisterDetail> {
   return structuredClone(result);
 }
 
-async function saveRegDocImmediate(reg: RegisterDetail): Promise<void> {
+async function saveRegDocImmediate(reg: RegisterDetail, includeEntries = false): Promise<void> {
   firestoreRegisterCache.set(reg.id, reg);
+  const payload = includeEntries ? reg : { ...reg, entries: undefined };
   const res = await fetch(`/api/registers/${reg.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reg)
+    body: JSON.stringify(payload)
   });
   if (!res.ok) throw new Error('Failed to save register metadata');
 }
@@ -576,7 +577,7 @@ export async function duplicateRegister(registerId: number): Promise<RegisterSum
     duplicated.columns = duplicated.columns.map((c: Column, i: number) => ({ ...c, id: newId + i + 1, registerId: newId }));
     duplicated.entries = duplicated.entries.map((e: Entry, i: number) => ({ ...e, id: newId + 1000 + i, registerId: newId }));
     duplicated.pages = duplicated.pages.map((p: Page, i: number) => ({ ...p, id: newId + 2000 + i }));
-    await saveRegDocImmediate(duplicated);
+    await saveRegDocImmediate(duplicated, true);
     return duplicated;
   });
 }
@@ -1033,7 +1034,7 @@ export const importExcelData = async (
   });
 
   createdReg.entryCount = createdReg.entries.length;
-  await saveRegDocImmediate(createdReg);
+  await saveRegDocImmediate(createdReg, true);
   return createdReg;
 };
 
@@ -1352,7 +1353,7 @@ export async function restoreColumn(
       }
     });
 
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
     return reg;
   });
 }
@@ -1445,7 +1446,7 @@ export async function duplicateColumn(registerId: number, columnId: number): Pro
         entry.cells[newColId.toString()] = val;
       }
     });
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
     return reg;
   });
 }
@@ -1572,7 +1573,7 @@ export async function changeColumnType(
     const entryDataModified = (newType === 'currency') ||
                                (newType === 'auto_increment' && oldType !== 'auto_increment');
     if (entryDataModified) {
-      await saveRegDocImmediate(reg);
+      await saveRegDocImmediate(reg, true);
     } else {
       await saveMainDocOnly(reg);
     }
@@ -2022,7 +2023,7 @@ async function _syncReorderRows(targetRegisterId: number, originalRowNumbersOrde
     reg.entries = newEntries;
     renumberRows(reg);
     reg.updatedAt = new Date().toISOString();
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
   }).catch(e => console.error('Failed to sync reorder rows:', e));
 }
 
@@ -2196,7 +2197,7 @@ export async function updateEntriesOrder(registerId: number, sortedEntries: Entr
     reg.entries = sortedEntries;
     renumberRows(reg); // Update row numbers to match the new order
     reg.updatedAt = new Date().toISOString();
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
 
     // Sync to target registers
     const targetRegIds = new Set<number>();
@@ -2294,7 +2295,7 @@ export async function restoreEntry(registerId: number, entry: Entry, originalInd
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
     reg.updatedAt = new Date().toISOString();
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
 
     // Sync cells
     for (const [colIdStr, value] of Object.entries(entry.cells)) {
@@ -2652,7 +2653,7 @@ export async function restoreDeletedItem(registerId: number, deletedItemId: numb
     // Remove from bin
     reg.deletedItems.splice(itemIndex, 1);
     renumberRows(reg);
-    await saveRegDocImmediate(reg);
+    await saveRegDocImmediate(reg, true);
   });
 }
 
