@@ -103,17 +103,8 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
               })()}
             </div>
 
-            <div className="context-section-label">Sort</div>
-            <button className="context-item" onClick={() => { handleSort(colMenuId!, 'asc'); setColMenuId(null); }}>
-              <SortAsc size={16} /> Sort A → Z
-            </button>
-            <button className="context-item" onClick={() => { handleSort(colMenuId!, 'desc'); setColMenuId(null); }}>
-              <SortDesc size={16} /> Sort Z → A
-            </button>
-
             {canEdit && (
               <>
-                <div className="context-divider" />
                 <div className="context-section-label">Edit</div>
                 <button className="context-item" onClick={() => {
                   setRenameColValue(columns.find((c) => c.id === colMenuId)?.name || '');

@@ -131,8 +131,8 @@ export default function RegisterPage() {
     // the merge block below) already blocks localEntries overwrites when writes are
     // in-flight, so window-focus refetch is safe and ensures users see fresh data
     // when switching back to the tab.
-    refetchOnWindowFocus: true,
-    refetchInterval: (detailViewEntry || showAddRecordModal) ? false : 30 * 1000,  // Pause background sync when editing in modals
+    refetchOnWindowFocus: false,
+    refetchInterval: (detailViewEntry || showAddRecordModal) ? false : 10 * 60 * 1000,  // Pause background sync when editing in modals (now set to 10 minutes to save bandwidth)
     placeholderData: keepPreviousData,
   });
 

@@ -513,7 +513,6 @@ export async function deleteRegister(registerId: number): Promise<void> {
   const reg = await getRegDoc(registerId);
   const savedUser = JSON.parse(
     sessionStorage.getItem('recordbook_user') ||
-    localStorage.getItem('recordbook_user') ||
     'null'
   );
   
@@ -1279,7 +1278,6 @@ export async function deleteColumn(registerId: number, columnId: number): Promis
     // Move to bin
     const savedUser = JSON.parse(
       sessionStorage.getItem('recordbook_user') ||
-      localStorage.getItem('recordbook_user') ||
       'null'
     );
     if (!reg.deletedItems) reg.deletedItems = [];
@@ -2213,7 +2211,6 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
 
     const savedUser = JSON.parse(
       sessionStorage.getItem('recordbook_user') ||
-      localStorage.getItem('recordbook_user') ||
       'null'
     );
     if (!reg.deletedItems) reg.deletedItems = [];
@@ -2548,7 +2545,6 @@ export async function logAction(
   try {
     const savedUser = JSON.parse(
       sessionStorage.getItem('recordbook_user') ||
-      localStorage.getItem('recordbook_user') ||
       'null'
     );
     const res = await fetch('/api/activity', {
