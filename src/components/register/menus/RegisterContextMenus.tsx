@@ -1,4 +1,5 @@
-import { Hash, Calendar, ChevronDown, FlaskConical, Type as TypeIcon, SortAsc, SortDesc, Pencil, ArrowLeftRight, Copy, ArrowRight, ChevronsLeftRight, Pin, Eye, EyeOff, Eraser, Trash2, FileText, FileSpreadsheet, Share2, ArrowLeft, Link as LinkIcon, Plus, AlertTriangle } from 'lucide-react';
+import { Hash, Calendar, ChevronDown, FlaskConical, Type as TypeIcon, SortAsc, SortDesc, Pencil, ArrowLeftRight, Copy, ArrowRight, ChevronsLeftRight, Pin, Eye, EyeOff, Eraser, Trash2, FileText, FileSpreadsheet, Share2, ArrowLeft, Link as LinkIcon, Plus, AlertTriangle, ArrowUp, ArrowDown, MoveVertical } from 'lucide-react';
+import React, { useState } from 'react';
 import { type Column } from '../../../lib/api';
 import { ColumnIcon } from '../ColumnIcon';
 
@@ -47,6 +48,7 @@ interface RegisterContextMenusProps {
   localEntries: any[];
   handleRowDownloadPDF: (entryId: number) => void;
   handleRowDownloadExcel: (entryId: number) => void;
+  handleMoveRow?: (entryId: number, direction: 'up' | 'down' | number) => void;
   handleRowShareText: (entryId: number) => void;
   // Calc
   calcTypes: Record<number, string>;
@@ -69,7 +71,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
     hiddenColumns, setHiddenColumns, hideColumn, clearColumnDataMutation, deleteColumnMutation,
     setColumnMandatoryMutation, setColumnUniqueMutation,
     setColumnDoubleEntryWarningMutation,
-    rowMenuId, setRowMenuId, duplicateEntryMutation, deleteEntryMutation, insertEntryMutation, localEntries,
+    rowMenuId, setRowMenuId, duplicateEntryMutation, deleteEntryMutation, insertEntryMutation, localEntries, handleMoveRow,
     handleRowDownloadPDF, handleRowDownloadExcel, handleRowShareText,
     calcTypes, updateCalcType,
     manageColsMenu, setManageColsMenu,
@@ -294,62 +296,20 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
 
       {/* ── Row Context Menu ── */}
       {rowMenuId !== null && (
-        <div className="modal-overlay" onClick={() => setRowMenuId(null)}>
-          <div className="context-menu" onClick={(e) => e.stopPropagation()}>
-            <div className="context-title">Row Actions</div>
-
-            <button className="context-item" onClick={() => { handleRowDownloadPDF(rowMenuId); setRowMenuId(null); }}>
-              <FileText size={16} />
-              <div className="context-item-info">
-                <span>Download as PDF</span>
-                <span className="context-item-desc">{rowExportDesc}</span>
-              </div>
-            </button>
-            <button className="context-item" onClick={() => { handleRowDownloadExcel(rowMenuId); setRowMenuId(null); }}>
-              <FileSpreadsheet size={16} />
-              <div className="context-item-info">
-                <span>Download as Excel</span>
-                <span className="context-item-desc">{rowExportDesc}</span>
-              </div>
-            </button>
-            <button className="context-item" onClick={() => { handleRowShareText(rowMenuId); setRowMenuId(null); }}>
-              <Share2 size={16} />
-              <div className="context-item-info">
-                <span>Share as Text</span>
-                <span className="context-item-desc">{rowExportDesc}</span>
-              </div>
-            </button>
-
-            <div className="context-divider" />
-
-            {canEdit && (
-              <>
-                <button className="context-item" onClick={() => duplicateEntryMutation.mutate(rowMenuId)}>
-                  <Copy size={16} /> Duplicate Record
-                </button>
-
-                <button className="context-item" onClick={() => {
-                  const idx = localEntries.findIndex(e => e.id === rowMenuId);
-                  if (idx !== -1) {
-                    insertEntryMutation.mutate({ atIndex: idx + 1 });
-                  }
-                }}>
-                  <Plus size={16} />
-                  <div className="context-item-info">
-                    <span>Add Row Below</span>
-                    <span className="context-item-desc">Insert empty row at #{(localEntries.findIndex(e => e.id === rowMenuId) + 2)}</span>
-                  </div>
-                </button>
-
-                <div className="context-divider" />
-
-                <button className="context-item danger" onClick={() => { if (confirm('Delete row?')) deleteEntryMutation.mutate(rowMenuId); }}>
-                  <Trash2 size={16} /> Delete
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        <RowContextMenuContent
+          rowMenuId={rowMenuId}
+          setRowMenuId={setRowMenuId}
+          localEntries={localEntries}
+          canEdit={canEdit}
+          rowExportDesc={rowExportDesc}
+          handleRowDownloadPDF={handleRowDownloadPDF}
+          handleRowDownloadExcel={handleRowDownloadExcel}
+          handleRowShareText={handleRowShareText}
+          duplicateEntryMutation={duplicateEntryMutation}
+          deleteEntryMutation={deleteEntryMutation}
+          insertEntryMutation={insertEntryMutation}
+          handleMoveRow={handleMoveRow}
+        />
       )}
       {/* ── Manage Columns Dropdown ── */}
       {manageColsMenu !== null && (
@@ -469,5 +429,208 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
         </div>
       )}
     </>
+  );
+}
+
+// ── Row Context Menu (extracted to support local state for "Move to Position") ──
+function RowContextMenuContent({
+  rowMenuId,
+  setRowMenuId,
+  localEntries,
+  canEdit,
+  rowExportDesc,
+  handleRowDownloadPDF,
+  handleRowDownloadExcel,
+  handleRowShareText,
+  duplicateEntryMutation,
+  deleteEntryMutation,
+  insertEntryMutation,
+  handleMoveRow,
+}: {
+  rowMenuId: number;
+  setRowMenuId: (id: number | null) => void;
+  localEntries: any[];
+  canEdit: boolean;
+  rowExportDesc: string;
+  handleRowDownloadPDF: (entryId: number) => void;
+  handleRowDownloadExcel: (entryId: number) => void;
+  handleRowShareText: (entryId: number) => void;
+  duplicateEntryMutation: any;
+  deleteEntryMutation: any;
+  insertEntryMutation: any;
+  handleMoveRow?: (entryId: number, direction: 'up' | 'down' | number) => void;
+}) {
+  const [moveToPos, setMoveToPos] = useState('');
+  const [showMoveInput, setShowMoveInput] = useState(false);
+  const currentIdx = localEntries.findIndex(e => e.id === rowMenuId);
+  const currentRowNum = currentIdx + 1;
+  const totalRows = localEntries.length;
+  const isFirst = currentIdx === 0;
+  const isLast = currentIdx === totalRows - 1;
+
+  return (
+    <div className="modal-overlay" onClick={() => setRowMenuId(null)}>
+      <div className="context-menu" onClick={(e) => e.stopPropagation()}>
+        <div className="context-title">
+          Row Actions
+          <span className="context-type-badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>#{currentRowNum}</span>
+        </div>
+
+        <button className="context-item" onClick={() => { handleRowDownloadPDF(rowMenuId); setRowMenuId(null); }}>
+          <FileText size={16} />
+          <div className="context-item-info">
+            <span>Download as PDF</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+        <button className="context-item" onClick={() => { handleRowDownloadExcel(rowMenuId); setRowMenuId(null); }}>
+          <FileSpreadsheet size={16} />
+          <div className="context-item-info">
+            <span>Download as Excel</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+        <button className="context-item" onClick={() => { handleRowShareText(rowMenuId); setRowMenuId(null); }}>
+          <Share2 size={16} />
+          <div className="context-item-info">
+            <span>Share as Text</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+
+        {canEdit && handleMoveRow && (
+          <>
+            <div className="context-divider" />
+            <div className="context-section-label">Move</div>
+            <button
+              className="context-item"
+              disabled={isFirst}
+              onClick={() => { handleMoveRow(rowMenuId, 'up'); setRowMenuId(null); }}
+            >
+              <ArrowUp size={16} />
+              <div className="context-item-info">
+                <span>Move Up</span>
+                <span className="context-item-desc">{isFirst ? 'Already at top' : `Move to row #${currentRowNum - 1}`}</span>
+              </div>
+            </button>
+            <button
+              className="context-item"
+              disabled={isLast}
+              onClick={() => { handleMoveRow(rowMenuId, 'down'); setRowMenuId(null); }}
+            >
+              <ArrowDown size={16} />
+              <div className="context-item-info">
+                <span>Move Down</span>
+                <span className="context-item-desc">{isLast ? 'Already at bottom' : `Move to row #${currentRowNum + 1}`}</span>
+              </div>
+            </button>
+            <button
+              className="context-item"
+              onClick={() => setShowMoveInput(!showMoveInput)}
+            >
+              <MoveVertical size={16} />
+              <div className="context-item-info">
+                <span>Move to Position...</span>
+                <span className="context-item-desc">Jump to a specific row number</span>
+              </div>
+            </button>
+            {showMoveInput && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'var(--background)',
+                borderRadius: '6px',
+                margin: '2px 8px 4px',
+              }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalRows}
+                  value={moveToPos}
+                  onChange={(e) => setMoveToPos(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const target = parseInt(moveToPos);
+                      if (target >= 1 && target <= totalRows && target !== currentRowNum) {
+                        handleMoveRow(rowMenuId, target - 1); // 0-based index
+                        setRowMenuId(null);
+                      }
+                    }
+                  }}
+                  placeholder={`1 – ${totalRows}`}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    border: '1.5px solid var(--border)',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    width: '60px',
+                    background: 'white',
+                    fontWeight: 500,
+                  }}
+                />
+                <button
+                  className="context-item-mini"
+                  disabled={!moveToPos || parseInt(moveToPos) < 1 || parseInt(moveToPos) > totalRows || parseInt(moveToPos) === currentRowNum}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'var(--navy)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    opacity: (!moveToPos || parseInt(moveToPos) < 1 || parseInt(moveToPos) > totalRows || parseInt(moveToPos) === currentRowNum) ? 0.5 : 1,
+                  }}
+                  onClick={() => {
+                    const target = parseInt(moveToPos);
+                    if (target >= 1 && target <= totalRows && target !== currentRowNum) {
+                      handleMoveRow(rowMenuId, target - 1); // 0-based index
+                      setRowMenuId(null);
+                    }
+                  }}
+                >
+                  Go
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="context-divider" />
+
+        {canEdit && (
+          <>
+            <button className="context-item" onClick={() => duplicateEntryMutation.mutate(rowMenuId)}>
+              <Copy size={16} /> Duplicate Record
+            </button>
+
+            <button className="context-item" onClick={() => {
+              const idx = localEntries.findIndex(e => e.id === rowMenuId);
+              if (idx !== -1) {
+                insertEntryMutation.mutate({ atIndex: idx + 1 });
+              }
+            }}>
+              <Plus size={16} />
+              <div className="context-item-info">
+                <span>Add Row Below</span>
+                <span className="context-item-desc">Insert empty row at #{currentRowNum + 1}</span>
+              </div>
+            </button>
+
+            <div className="context-divider" />
+
+            <button className="context-item danger" onClick={() => { if (confirm('Delete row?')) deleteEntryMutation.mutate(rowMenuId); }}>
+              <Trash2 size={16} /> Delete
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

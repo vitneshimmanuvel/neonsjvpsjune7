@@ -2913,8 +2913,13 @@ export default function RegisterPage() {
         const bPage = b.pageIndex || 0;
         if (aPage !== currentPageIndex || bPage !== currentPageIndex) return 0;
 
-        const aVal = a.cells?.[colIdStr] || '';
-        const bVal = b.cells?.[colIdStr] || '';
+        const aVal = (a.cells?.[colIdStr] || '').toString().trim();
+        const bVal = (b.cells?.[colIdStr] || '').toString().trim();
+
+        // Place empty values at the bottom for A->Z, and at the top for Z->A
+        if (!aVal && bVal) return direction === 'asc' ? 1 : -1;
+        if (aVal && !bVal) return direction === 'asc' ? -1 : 1;
+        if (!aVal && !bVal) return 0;
 
         if (colDef?.type === 'date') {
           const dA = parseDateString(aVal);
@@ -2941,6 +2946,43 @@ export default function RegisterPage() {
       return sorted;
     });
   }, [columns, currentPageIndex, registerId, queryClient]);
+
+  // ── Move row up/down/to-position ──
+  const handleMoveRow = useCallback((entryId: number, direction: 'up' | 'down' | number) => {
+    setLocalEntries(prev => {
+      const newEntries = [...prev];
+      const fromIdx = newEntries.findIndex(e => e.id === entryId);
+      if (fromIdx === -1) return prev;
+
+      let toIdx: number;
+      if (direction === 'up') {
+        toIdx = fromIdx - 1;
+      } else if (direction === 'down') {
+        toIdx = fromIdx + 1;
+      } else {
+        toIdx = direction; // direct 0-based index
+      }
+
+      // Bounds check
+      if (toIdx < 0 || toIdx >= newEntries.length || toIdx === fromIdx) return prev;
+
+      // Remove the entry from its current position
+      const [movedEntry] = newEntries.splice(fromIdx, 1);
+      // Insert at the target position
+      newEntries.splice(toIdx, 0, movedEntry);
+
+      // Persist to Firestore
+      queryClient.setQueryData(['register', registerId], (old: any) => {
+        if (!old) return old;
+        return { ...old, entries: newEntries };
+      });
+      updateEntriesOrder(registerId, newEntries).catch(err => {
+        console.error('Failed to save row move:', err);
+      });
+
+      return newEntries;
+    });
+  }, [registerId, queryClient]);
 
   const openDatePicker = useCallback((entryId: number, colId: number, currentVal: string, rect?: DOMRect) => {
     // Support various separators like /, . or - for parsing
@@ -3909,6 +3951,7 @@ export default function RegisterPage() {
         localEntries={localEntries}
         handleRowDownloadPDF={handleRowDownloadPDF}
         handleRowDownloadExcel={handleRowDownloadExcel}
+        handleMoveRow={handleMoveRow}
         handleRowShareText={handleRowShareText}
         calcTypes={calcTypes}
         updateCalcType={updateCalcType}

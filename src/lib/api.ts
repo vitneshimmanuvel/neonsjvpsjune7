@@ -299,7 +299,7 @@ function updateMutationCount(delta: number) {
 
 async function runQueuedMutation<T>(registerId: number | string, op: () => Promise<T>): Promise<T> {
   const key = registerId.toString();
-  const currentQueue = registerMutationQueues.get(key) || Promise.resolve();
+  const currentQueue = (registerMutationQueues.get(key) || Promise.resolve()).catch(() => {});
   updateMutationCount(1);
   const currentActive = activeMutationsPerRegister.get(key) || 0;
   activeMutationsPerRegister.set(key, currentActive + 1);
@@ -1870,10 +1870,10 @@ export async function updateEntryDirect(
 }
 
 function ensureTargetRows(targetReg: RegisterDetail, maxRowNumber: number) {
-  targetReg.entries.sort((a, b) => a.rowNumber - b.rowNumber);
+  targetReg.entries.sort((a, b) => Number(a.rowNumber) - Number(b.rowNumber));
 
   for (let r = 1; r <= maxRowNumber; r++) {
-    const entry = targetReg.entries.find(e => e.rowNumber === r);
+    const entry = targetReg.entries.find(e => Number(e.rowNumber) === Number(r));
     if (!entry) {
       const newEntry: Entry = {
         id: generateId(),
@@ -1884,7 +1884,7 @@ function ensureTargetRows(targetReg: RegisterDetail, maxRowNumber: number) {
         pageIndex: 0
       };
       
-      const insertIdx = targetReg.entries.findIndex(e => e.rowNumber > r);
+      const insertIdx = targetReg.entries.findIndex(e => Number(e.rowNumber) > Number(r));
       if (insertIdx === -1) {
         targetReg.entries.push(newEntry);
       } else {
@@ -1955,7 +1955,7 @@ async function _syncInsertRow(targetRegisterId: number, atIndex: number) {
 async function _syncDeleteRow(targetRegisterId: number, rowNumber: number) {
   return runQueuedMutation(targetRegisterId, async () => {
     const reg = await getRegDoc(targetRegisterId);
-    const entryIndex = reg.entries.findIndex((e) => e.rowNumber === rowNumber);
+    const entryIndex = reg.entries.findIndex((e) => Number(e.rowNumber) === Number(rowNumber));
     if (entryIndex === -1) return;
     const entry = reg.entries[entryIndex];
 
@@ -1974,9 +1974,9 @@ async function _syncDeleteRow(targetRegisterId: number, rowNumber: number) {
 async function _syncBulkDeleteRows(targetRegisterId: number, rowNumbers: number[]) {
   return runQueuedMutation(targetRegisterId, async () => {
     const reg = await getRegDoc(targetRegisterId);
-    const rowSet = new Set(rowNumbers);
+    const rowSet = new Set(rowNumbers.map(Number));
     
-    const entriesToDelete = reg.entries.filter(e => rowSet.has(e.rowNumber));
+    const entriesToDelete = reg.entries.filter(e => rowSet.has(Number(e.rowNumber)));
     if (entriesToDelete.length === 0) return;
 
     for (const entry of entriesToDelete) {
@@ -1999,14 +1999,14 @@ async function _syncReorderRows(targetRegisterId: number, originalRowNumbersOrde
     
     const entryMap = new Map<number, Entry>();
     reg.entries.forEach(e => {
-      entryMap.set(e.rowNumber, e);
+      entryMap.set(Number(e.rowNumber), e);
     });
 
     const newEntries: Entry[] = [];
     const usedIds = new Set<number>();
 
     originalRowNumbersOrder.forEach(rn => {
-      const entry = entryMap.get(rn);
+      const entry = entryMap.get(Number(rn));
       if (entry) {
         newEntries.push(entry);
         usedIds.add(entry.id);
@@ -2031,8 +2031,9 @@ async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: numbe
   return runQueuedMutation(targetRegisterId, async () => {
     const targetReg = await getRegDoc(targetRegisterId);
     ensureTargetRows(targetReg, rowNumber);
-    let targetEntry = targetReg.entries.find(e => e.rowNumber === rowNumber);
+    let targetEntry = targetReg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
     if (targetEntry) {
+      if (!targetEntry.cells) targetEntry.cells = {};
       targetEntry.cells[targetColumnId.toString()] = value;
       targetReg.updatedAt = new Date().toISOString();
       await saveRegDocImmediate(targetReg);
@@ -2090,8 +2091,16 @@ export async function linkColumn(
       ensureTargetRows(reg, sourceMaxRowNumber);
 
       const targetColIdStr = targetColumnId.toString();
+
+      // Clear existing data in target column before applying source data
+      reg.entries.forEach(e => {
+        if (e.cells && targetColIdStr in e.cells) {
+          delete e.cells[targetColIdStr];
+        }
+      });
+
       sourceEntriesData.forEach(({ rowNumber, value }) => {
-        let targetEntry = reg.entries.find(e => e.rowNumber === rowNumber);
+        let targetEntry = reg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
         if (targetEntry) {
           if (!targetEntry.cells) targetEntry.cells = {};
           targetEntry.cells[targetColIdStr] = value;
