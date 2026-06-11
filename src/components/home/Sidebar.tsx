@@ -107,17 +107,17 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.7.5') !== 'true';
+      return localStorage.getItem('seen_version_1.7.6') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.7.5');
+  const [versionTab, setVersionTab] = useState<'1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.7.6');
 
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.7.5', 'true');
+      localStorage.setItem('seen_version_1.7.6', 'true');
     } catch (e) {
       console.error(e);
     }
@@ -445,13 +445,13 @@ export const Sidebar = memo(function Sidebar({
         </div>
         {/* Sidebar Add Button — only visible to users with canCreateSheets permission or admins */}
         {(isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
-        <div className="sidebar-add-section" style={{ padding: '12px 12px 8px', position: 'relative' }}>
+        <div className="sidebar-add-section" style={{ padding: '8px 8px 4px', position: 'relative' }}>
           <button 
             className="sidebar-add-btn"
             onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
             title="Add new item"
           >
-            <Plus size={18} /> <span className="sidebar-add-text">Add</span>
+            <Plus size={15} /> <span className="sidebar-add-text">Add</span>
           </button>
 
           {isAddMenuOpen && (
@@ -468,7 +468,7 @@ export const Sidebar = memo(function Sidebar({
                   top: '0',
                   ...(isCollapsed
                     ? { left: 'calc(100% + 8px)' }   // pop to the RIGHT in collapsed mode
-                    : { top: '56px', left: '12px', right: '12px' }  // drop down normally
+                    : { top: '44px', left: '8px', right: '8px' }  // drop down normally
                   ),
                   background: 'white',
                   border: '1px solid var(--border)',
@@ -480,17 +480,17 @@ export const Sidebar = memo(function Sidebar({
                   whiteSpace: 'nowrap',
                 }}
               >
-                <button className="context-item" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
                   <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
                 </button>
-                <button className="context-item" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
                   <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
                 </button>
-                <label className="context-item" style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label className="context-item" style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
                   <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
                   <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
                 </label>
-                <button className="context-item" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
                   <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
                 </button>
               </div>
@@ -501,21 +501,21 @@ export const Sidebar = memo(function Sidebar({
 
         {/* Entry Button — Quick Add Entry to any register */}
         {!isCollapsed && (
-          <div style={{ padding: '0 12px 8px' }}>
+          <div style={{ padding: '0 8px 4px' }}>
             <button
               onClick={() => setIsEntryPanelOpen(true)}
               style={{
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '9px 14px',
-                borderRadius: '8px',
+                gap: '6px',
+                padding: '6px 10px',
+                borderRadius: '6px',
                 border: '1px solid #e2e8f0',
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
                 color: '#15803d',
                 cursor: 'pointer',
-                fontSize: '13px',
+                fontSize: '11.5px',
                 fontWeight: 600,
                 transition: 'all 0.2s',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
@@ -532,7 +532,7 @@ export const Sidebar = memo(function Sidebar({
               }}
               title="Quick add entry to any register"
             >
-              <PenLine size={15} />
+              <PenLine size={13} />
               <span>Entry</span>
             </button>
           </div>
@@ -540,9 +540,9 @@ export const Sidebar = memo(function Sidebar({
 
         {/* Global Search Bar */}
         {!isCollapsed && (
-          <div style={{ padding: '4px 16px 12px' }}>
+          <div style={{ padding: '2px 10px 8px' }}>
             <div className="gs-input-wrap">
-              <Search size={13} className="gs-input-icon" />
+              <Search size={12} className="gs-input-icon" />
               <input
                 placeholder="Search all registers…"
                 value={search}
@@ -552,7 +552,7 @@ export const Sidebar = memo(function Sidebar({
               />
               {search && (
                 <button onClick={() => setSearch('')} className="gs-input-clear" title="Clear">
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               )}
             </div>
@@ -718,14 +718,14 @@ export const Sidebar = memo(function Sidebar({
                       className="sidebar-folder-header"
                       onDragOver={(e) => {
                         e.preventDefault();
-                        e.currentTarget.style.backgroundColor = 'rgba(30,45,120,0.05)';
+                        e.currentTarget.classList.add('drag-over');
                       }}
                       onDragLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.classList.remove('drag-over');
                       }}
                       onDrop={(e) => {
                         e.preventDefault();
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.classList.remove('drag-over');
                         const dragData = e.dataTransfer.getData('text/plain');
                         if (dragData) {
                           try {
@@ -744,20 +744,6 @@ export const Sidebar = memo(function Sidebar({
                         }
                       }}
                       onClick={() => setExpandedFolders(prev => ({...prev, [folder.id]: !prev[folder.id] ? true : false}))}
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '8px 12px', 
-                        margin: '2px 8px',
-                        borderRadius: '8px',
-                        cursor: 'pointer', 
-                        gap: '10px', 
-                        color: 'var(--navy)', 
-                        userSelect: 'none',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.03)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                       data-tooltip={isCollapsed ? folder.name : undefined}
                     >
                       {!isCollapsed && (
@@ -837,33 +823,57 @@ export const Sidebar = memo(function Sidebar({
         {/* The old bottom search bar has been removed and replaced by the top search bar. */}
 
         <div 
-          className="sidebar-footer" 
-          style={{ padding: '12px', display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative', background: isFooterMenuOpen ? '#f1f5f9' : 'transparent', borderTop: '1px solid #e2e8f0', margin: '0 8px', borderRadius: '8px 8px 0 0' }}
+          className={`sidebar-footer-profile ${isFooterMenuOpen ? 'open' : ''}`}
           onClick={() => setIsFooterMenuOpen(v => !v)}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-footer-logo" style={{ margin: 0, width: '28px', height: '28px', objectFit: 'contain' }} />
-            <span className="sidebar-footer-text" style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              AG Trust · Record Book
-              <span 
-                style={{ fontSize: '10px', fontWeight: 600, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontSizeAdjust: 'none', cursor: 'pointer', transition: 'all 0.15s' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setVersionTab('1.7.5');
-                  setShowVersionModal(true);
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#bfdbfe';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#dbeafe';
-                }}
-                title="View what's new in v1.7.5"
-              >
-                v1.7.5
-              </span>
-            </span>
+          <div className="sidebar-profile-avatar">
+            {user?.name ? user.name.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : 'U')}
           </div>
+          {!isCollapsed && (
+            <div className="sidebar-profile-info">
+              <span className="sidebar-profile-name">{user?.name || user?.email || 'User'}</span>
+              <span className="sidebar-profile-role">
+                {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role === 'sheet_admin' ? 'Staff' : 'User'}
+              </span>
+            </div>
+          )}
+          {!isCollapsed && (
+            <ChevronDown size={14} className={`sidebar-profile-chevron ${isFooterMenuOpen ? 'open' : ''}`} />
+          )}
+          {!isCollapsed && (
+            <span 
+              style={{
+                position: 'absolute',
+                top: '4px',
+                right: '4px',
+                fontSize: '9px',
+                fontWeight: 600,
+                color: '#1d4ed8',
+                backgroundColor: '#dbeafe',
+                padding: '1px 4px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                opacity: 0.6
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setVersionTab('1.7.6');
+                setShowVersionModal(true);
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.opacity = '1';
+                e.currentTarget.style.backgroundColor = '#bfdbfe';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.opacity = '0.6';
+                e.currentTarget.style.backgroundColor = '#dbeafe';
+              }}
+              title="View what's new in v1.7.6"
+            >
+              v1.7.6
+            </span>
+          )}
         </div>
 
         {/* Footer Popup Menu — rendered OUTSIDE footer div to avoid click bubbling */}
@@ -1744,6 +1754,25 @@ export const Sidebar = memo(function Sidebar({
             {/* Version Tabs */}
             <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', overflowX: 'auto' }}>
               <button
+                onClick={() => setVersionTab('1.7.6')}
+                style={{
+                  flex: 1,
+                  padding: '6px 4px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: versionTab === '1.7.6' ? 'white' : 'transparent',
+                  color: versionTab === '1.7.6' ? '#0f172a' : '#64748b',
+                  boxShadow: versionTab === '1.7.6' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                v1.7.6 (New)
+              </button>
+              <button
                 onClick={() => setVersionTab('1.7.5')}
                 style={{
                   flex: 1,
@@ -1760,7 +1789,7 @@ export const Sidebar = memo(function Sidebar({
                   whiteSpace: 'nowrap'
                 }}
               >
-                v1.7.5 (New)
+                v1.7.5
               </button>
               <button
                 onClick={() => setVersionTab('1.7.1')}
@@ -2043,9 +2072,52 @@ export const Sidebar = memo(function Sidebar({
               </button>
             </div>
             
-            {versionTab === '1.7.5' ? (
+            {versionTab === '1.7.6' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 11, 2026 (Latest)</span>
+                
+                {/* Feature 1: Modern UI Sidebar */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#dbeafe', color: '#2563eb', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>✨ Modern UI Sidebar Redesign</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Upgraded the sidebar background to a premium light slate gradient, introduced translation hover animations, custom scrollbars, and neon active selection indicators.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 2: User Profile Footer */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#ecfdf5', color: '#10b981', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>👤 Premium User Profile Footer</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Replaced the static brand label with a dynamic user profile card showing the active user's initials, name, and role.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Feature 3: Safe Data Sync */}
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>🔒 Safe Data Synchronization</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Ensured concurrent metadata updates and cell entry changes do not conflict, permanently resolving cache-overwriting bugs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : versionTab === '1.7.5' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 11, 2026</span>
                 
                 {/* Feature 1: PostgreSQL Migration */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
