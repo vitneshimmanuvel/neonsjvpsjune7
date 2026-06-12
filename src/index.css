@@ -7730,9 +7730,11 @@ body.modal-open {
 .img-preview-content {
   background: white;
   border-radius: 20px;
-  width: 95vw;
-  height: 95vh;
-  max-width: 1400px;
+  width: fit-content;
+  min-width: min(650px, 95vw);
+  max-width: 95vw;
+  height: fit-content;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -7901,8 +7903,9 @@ body.modal-open {
   overflow: auto;
   display: flex;
   background: #0f172a; /* Slate 900 */
-  padding: 32px;
+  padding: 24px;
   position: relative;
+  max-height: calc(92vh - 72px); /* Limit the body height to prevent overlay overflow */
   /* Custom scrollbar for dark background */
   scrollbar-color: rgba(255,255,255,0.2) transparent;
   scrollbar-width: thin;
@@ -7911,7 +7914,7 @@ body.modal-open {
 .img-preview-body img {
   margin: auto; /* Perfect centering with overflow */
   max-width: 100%;
-  max-height: 100%;
+  max-height: calc(92vh - 120px);
   width: auto;
   height: auto;
   object-fit: contain;
