@@ -260,11 +260,14 @@ const inFlightRegisterFetches = new Map<number, Promise<RegisterDetail>>();
 
 export function clearRegisterCache(registerId?: number): void {
   if (registerId !== undefined) {
-    firestoreRegisterCache.delete(registerId);
-    console.log(`[Cache] Cleared in-memory cache for register #${registerId}`);
+    const key = Number(registerId);
+    firestoreRegisterCache.delete(key);
+    inFlightRegisterFetches.delete(key);
+    console.log(`[Cache] Cleared in-memory cache and in-flight fetches for register #${key}`);
   } else {
     firestoreRegisterCache.clear();
-    console.log('[Cache] Cleared all in-memory register caches');
+    inFlightRegisterFetches.clear();
+    console.log('[Cache] Cleared all in-memory register caches and in-flight fetches');
   }
 }
 // Mutation queue: ensures operations on the same register run serially to prevent race conditions
@@ -305,7 +308,13 @@ async function runQueuedMutation<T>(registerId: number | string, op: () => Promi
   const currentActive = activeMutationsPerRegister.get(key) || 0;
   activeMutationsPerRegister.set(key, currentActive + 1);
 
-  const next = currentQueue.then(op).finally(() => {
+  const next = currentQueue.then(async () => {
+    const regId = Number(registerId);
+    if (!isNaN(regId)) {
+      clearRegisterCache(regId);
+    }
+    return op();
+  }).finally(() => {
     updateMutationCount(-1);
     const count = activeMutationsPerRegister.get(key) || 1;
     if (count <= 1) {
@@ -455,7 +464,10 @@ export async function getRegisterColumnsOnly(registerId: number): Promise<Regist
   return res.json();
 }
 
-export async function getRegister(registerId: number): Promise<RegisterDetail> {
+export async function getRegister(registerId: number, bypassCache = true): Promise<RegisterDetail> {
+  if (bypassCache) {
+    clearRegisterCache(registerId);
+  }
   const reg = await getRegDoc(registerId);
   if (!reg.pages || reg.pages.length === 0) reg.pages = [{ id: 1, name: 'Page 1', index: 0 }];
   if (!reg.entries) reg.entries = [];
@@ -1699,64 +1711,66 @@ export async function hideColumn(registerId: number, columnId: number, hidden: b
 // ─── Entry Operations ────────────────────────────────────────────────────────
 
 export async function addEntry(registerId: number, cells: Record<string, string> = {}, pageIndex: number = 0): Promise<Entry> {
-  const reg = await getRegDoc(registerId);
-  const pageEntries = reg.entries.filter((e) => (e.pageIndex || 0) === pageIndex);
+  return runQueuedMutation(registerId, async () => {
+    const reg = await getRegDoc(registerId);
+    const pageEntries = reg.entries.filter((e) => (e.pageIndex || 0) === pageIndex);
 
-  const autoIncrCols = reg.columns.filter(c => c.type === 'auto_increment');
-  for (const col of autoIncrCols) {
-    const colIdStr = col.id.toString();
-    if (!cells[colIdStr]) {
-      let maxVal = 0;
-      for (const e of pageEntries) {
-        const v = parseInt(e.cells?.[colIdStr] || '0', 10);
-        if (!isNaN(v) && v > maxVal) maxVal = v;
+    const autoIncrCols = reg.columns.filter(c => c.type === 'auto_increment');
+    for (const col of autoIncrCols) {
+      const colIdStr = col.id.toString();
+      if (!cells[colIdStr]) {
+        let maxVal = 0;
+        for (const e of pageEntries) {
+          const v = parseInt(e.cells?.[colIdStr] || '0', 10);
+          if (!isNaN(v) && v > maxVal) maxVal = v;
+        }
+        cells[colIdStr] = (maxVal + 1).toString();
       }
-      cells[colIdStr] = (maxVal + 1).toString();
     }
-  }
 
-  const entry: Entry = {
-    id: generateId(), registerId, rowNumber: reg.entries.length + 1,
-    cells, createdAt: new Date().toISOString(), pageIndex,
-  };
-  
-  const res = await fetch(`/api/registers/${registerId}/entries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry)
+    const entry: Entry = {
+      id: generateId(), registerId, rowNumber: reg.entries.length + 1,
+      cells, createdAt: new Date().toISOString(), pageIndex,
+    };
+    
+    const res = await fetch(`/api/registers/${registerId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    });
+    if (!res.ok) throw new Error('Failed to add entry');
+
+    reg.entries.push(entry);
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    firestoreRegisterCache.set(reg.id, reg);
+
+    const preview = Object.entries(cells).slice(0, 3).map(([id, val]) => {
+      const c = reg.columns.find(col => col.id.toString() === id);
+      return `${c?.name || id}: ${val}`;
+    }).join(', ');
+    logAction(reg.businessId, 'Add Row', `Added new row to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
+
+    const targetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        targetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of targetRegIds) {
+      await _syncAddRow(targetRegId);
+    }
+
+    for (const [colIdStr, value] of Object.entries(cells)) {
+      if (value === undefined || value === null) continue;
+      const col = reg.columns.find(c => c.id.toString() === colIdStr);
+      if (col?.linkedTo && col.linkedTo.role === 'source') {
+        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
+      }
+    }
+
+    return entry;
   });
-  if (!res.ok) throw new Error('Failed to add entry');
-
-  reg.entries.push(entry);
-  renumberRows(reg);
-  reg.entryCount = reg.entries.length;
-  firestoreRegisterCache.set(reg.id, reg);
-
-  const preview = Object.entries(cells).slice(0, 3).map(([id, val]) => {
-    const c = reg.columns.find(col => col.id.toString() === id);
-    return `${c?.name || id}: ${val}`;
-  }).join(', ');
-  logAction(reg.businessId, 'Add Row', `Added new row to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
-
-  const targetRegIds = new Set<number>();
-  for (const col of reg.columns) {
-    if (col.linkedTo && col.linkedTo.role === 'source') {
-      targetRegIds.add(col.linkedTo.registerId);
-    }
-  }
-  for (const targetRegId of targetRegIds) {
-    await _syncAddRow(targetRegId);
-  }
-
-  for (const [colIdStr, value] of Object.entries(cells)) {
-    if (value === undefined || value === null) continue;
-    const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo && col.linkedTo.role === 'source') {
-      await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
-    }
-  }
-
-  return entry;
 }
 
 /**
@@ -1764,65 +1778,67 @@ export async function addEntry(registerId: number, cells: Record<string, string>
  * Automatically shifts rowNumbers for subsequent entries in the same page.
  */
 export async function insertEntry(registerId: number, cells: Record<string, string> = {}, pageIndex: number = 0, atIndex: number): Promise<Entry> {
-  const reg = await getRegDoc(registerId);
-  const pageEntries = reg.entries.filter((e) => (e.pageIndex || 0) === pageIndex);
+  return runQueuedMutation(registerId, async () => {
+    const reg = await getRegDoc(registerId);
+    const pageEntries = reg.entries.filter((e) => (e.pageIndex || 0) === pageIndex);
 
-  const autoIncrCols = reg.columns.filter(c => c.type === 'auto_increment');
-  for (const col of autoIncrCols) {
-    const colIdStr = col.id.toString();
-    if (!cells[colIdStr]) {
-      let maxVal = 0;
-      for (const e of pageEntries) {
-        const v = parseInt(e.cells?.[colIdStr] || '0', 10);
-        if (!isNaN(v) && v > maxVal) maxVal = v;
+    const autoIncrCols = reg.columns.filter(c => c.type === 'auto_increment');
+    for (const col of autoIncrCols) {
+      const colIdStr = col.id.toString();
+      if (!cells[colIdStr]) {
+        let maxVal = 0;
+        for (const e of pageEntries) {
+          const v = parseInt(e.cells?.[colIdStr] || '0', 10);
+          if (!isNaN(v) && v > maxVal) maxVal = v;
+        }
+        cells[colIdStr] = (maxVal + 1).toString();
       }
-      cells[colIdStr] = (maxVal + 1).toString();
     }
-  }
 
-  const entry: Entry = {
-    id: generateId(), registerId, rowNumber: atIndex + 1,
-    cells, createdAt: new Date().toISOString(), pageIndex,
-  };
+    const entry: Entry = {
+      id: generateId(), registerId, rowNumber: atIndex + 1,
+      cells, createdAt: new Date().toISOString(), pageIndex,
+    };
 
-  const res = await fetch(`/api/registers/${registerId}/entries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry)
+    const res = await fetch(`/api/registers/${registerId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    });
+    if (!res.ok) throw new Error('Failed to insert entry');
+
+    reg.entries.splice(atIndex, 0, entry);
+    renumberRows(reg);
+    reg.entryCount = reg.entries.length;
+    firestoreRegisterCache.set(reg.id, reg);
+    await saveRegDocImmediate(reg);
+
+    const preview = Object.entries(cells).slice(0, 3).map(([id, val]) => {
+      const c = reg.columns.find(col => col.id.toString() === id);
+      return `${c?.name || id}: ${val}`;
+    }).join(', ');
+    await logAction(reg.businessId, 'Insert Row', `Inserted row at position ${atIndex + 1} in "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id });
+
+    const insertTargetRegIds = new Set<number>();
+    for (const col of reg.columns) {
+      if (col.linkedTo && col.linkedTo.role === 'source') {
+        insertTargetRegIds.add(col.linkedTo.registerId);
+      }
+    }
+    for (const targetRegId of insertTargetRegIds) {
+      await _syncInsertRow(targetRegId, atIndex);
+    }
+
+    for (const [colIdStr, value] of Object.entries(cells)) {
+      if (value === undefined || value === null) continue;
+      const col = reg.columns.find(c => c.id.toString() === colIdStr);
+      if (col?.linkedTo && col.linkedTo.role === 'source') {
+        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
+      }
+    }
+
+    return entry;
   });
-  if (!res.ok) throw new Error('Failed to insert entry');
-
-  reg.entries.splice(atIndex, 0, entry);
-  renumberRows(reg);
-  reg.entryCount = reg.entries.length;
-  firestoreRegisterCache.set(reg.id, reg);
-  await saveRegDocImmediate(reg);
-
-  const preview = Object.entries(cells).slice(0, 3).map(([id, val]) => {
-    const c = reg.columns.find(col => col.id.toString() === id);
-    return `${c?.name || id}: ${val}`;
-  }).join(', ');
-  await logAction(reg.businessId, 'Insert Row', `Inserted row at position ${atIndex + 1} in "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id });
-
-  const insertTargetRegIds = new Set<number>();
-  for (const col of reg.columns) {
-    if (col.linkedTo && col.linkedTo.role === 'source') {
-      insertTargetRegIds.add(col.linkedTo.registerId);
-    }
-  }
-  for (const targetRegId of insertTargetRegIds) {
-    await _syncInsertRow(targetRegId, atIndex);
-  }
-
-  for (const [colIdStr, value] of Object.entries(cells)) {
-    if (value === undefined || value === null) continue;
-    const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo && col.linkedTo.role === 'source') {
-      await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.rowNumber, value);
-    }
-  }
-
-  return entry;
 }
 
 
