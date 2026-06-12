@@ -215,7 +215,7 @@ export default function AdminAnalyticsPage() {
               <X size={14}/> Clear Filters
             </button>
           )}
-          <button onClick={fetch_} className="admin-btn-secondary-flat" style={{padding:'10px',borderRadius:'10px'}}><RefreshCw size={16}/></button>
+          <button onClick={fetch_} className="admin-btn-secondary-flat" style={{padding:'10px',borderRadius:'10px'}} title="Refresh analytics"><RefreshCw size={16}/></button>
         </div>
       </div>
 
@@ -224,7 +224,7 @@ export default function AdminAnalyticsPage() {
         <div style={{flex:'1 1 150px',minWidth:'130px'}}>
           <label style={sty.label}><User size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Employee</label>
           <div style={{position:'relative'}}>
-            <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
+            <select title="Filter by Employee" value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
               <option value="all">All Employees</option>
               {users.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -234,7 +234,7 @@ export default function AdminAnalyticsPage() {
         <div style={{flex:'1 1 130px',minWidth:'110px'}}>
           <label style={sty.label}><Clock size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Interval</label>
           <div style={{position:'relative'}}>
-            <select value={filterInterval} onChange={e=>{setFilterInterval(e.target.value);setFilterDateFrom('');setFilterDateTo('');setFilterSingleDate('');}} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
+            <select title="Filter by Interval" value={filterInterval} onChange={e=>{setFilterInterval(e.target.value);setFilterDateFrom('');setFilterDateTo('');setFilterSingleDate('');}} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
               <option value="1d">Today</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
@@ -246,15 +246,15 @@ export default function AdminAnalyticsPage() {
         </div>
         <div style={{flex:'1 1 130px',minWidth:'120px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Specific Date</label>
-          <input type="date" value={filterSingleDate} onChange={e=>{setFilterSingleDate(e.target.value);if(e.target.value){setFilterDateFrom('');setFilterDateTo('');setFilterInterval('custom');}}} className="admin-input-premium" style={{border:filterSingleDate?'1.5px solid var(--navy)':'1px solid var(--border)',background:filterSingleDate?'rgba(30,41,82,0.04)':'var(--surface)'}} />
+          <input type="date" title="Specific Date" value={filterSingleDate} onChange={e=>{setFilterSingleDate(e.target.value);if(e.target.value){setFilterDateFrom('');setFilterDateTo('');setFilterInterval('custom');}}} className="admin-input-premium" style={{border:filterSingleDate?'1.5px solid var(--navy)':'1px solid var(--border)',background:filterSingleDate?'rgba(30,41,82,0.04)':'var(--surface)'}} />
         </div>
         <div style={{flex:'1 1 110px',minWidth:'100px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> From</label>
-          <input type="date" value={filterDateFrom} onChange={e=>{setFilterDateFrom(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
+          <input type="date" title="From Date" value={filterDateFrom} onChange={e=>{setFilterDateFrom(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
         </div>
         <div style={{flex:'1 1 110px',minWidth:'100px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> To</label>
-          <input type="date" value={filterDateTo} onChange={e=>{setFilterDateTo(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
+          <input type="date" title="To Date" value={filterDateTo} onChange={e=>{setFilterDateTo(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
         </div>
       </div>
 

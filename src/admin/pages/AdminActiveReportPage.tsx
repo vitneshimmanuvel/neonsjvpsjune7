@@ -389,6 +389,7 @@ export default function AdminActiveReportPage() {
             onClick={() => fetch_(true)} 
             className="admin-btn-secondary-flat"
             style={{ padding: '10px', borderRadius: '10px' }}
+            title="Refresh active report logs"
           >
             <RefreshCw size={16} />
           </button>
@@ -438,7 +439,7 @@ export default function AdminActiveReportPage() {
                 <div style={{ flex: '1 1 180px', minWidth: '150px' }}>
                   <label style={sty.label}><User size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Staff Member</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
+                    <select title="Filter by Staff Member" value={filterUser} onChange={e => setFilterUser(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Staff Members</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
@@ -450,7 +451,7 @@ export default function AdminActiveReportPage() {
                 <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
                   <label style={sty.label}><ClipboardList size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Target Register</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterRegister} onChange={e => setFilterRegister(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
+                    <select title="Filter by Target Register" value={filterRegister} onChange={e => setFilterRegister(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Registers</option>
                       {registers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
@@ -462,7 +463,7 @@ export default function AdminActiveReportPage() {
                 <div style={{ flex: '1 1 150px', minWidth: '130px' }}>
                   <label style={sty.label}><Database size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Action Type</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
+                    <select title="Filter by Action Type" value={filterAction} onChange={e => setFilterAction(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Action Types</option>
                       {Object.entries(ACTION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
@@ -475,6 +476,7 @@ export default function AdminActiveReportPage() {
                   <label style={sty.label}><Calendar size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Specific Date</label>
                   <input 
                     type="date" 
+                    title="Specific Date"
                     value={filterSingleDate} 
                     onChange={e => { setFilterSingleDate(e.target.value); if (e.target.value) { setFilterDateFrom(''); setFilterDateTo(''); } }} 
                     className="admin-input-premium"
@@ -485,13 +487,13 @@ export default function AdminActiveReportPage() {
                 {/* From Date */}
                 <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
                   <label style={sty.label}><Calendar size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> From Date</label>
-                  <input type="date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
+                  <input type="date" title="From Date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
                 </div>
 
                 {/* To Date */}
                 <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
                   <label style={sty.label}><Calendar size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> To Date</label>
-                  <input type="date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
+                  <input type="date" title="To Date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
                 </div>
               </div>
 
@@ -513,6 +515,7 @@ export default function AdminActiveReportPage() {
                     <button 
                       onClick={() => setSearchQuery('')}
                       style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                      title="Clear search query"
                     >
                       <X size={14} />
                     </button>

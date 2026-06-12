@@ -207,7 +207,7 @@ export default function AdminActivityPage() {
               <span style={{background:'var(--accent)',color:'white',borderRadius:'50%',width:'18px',height:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,marginLeft:'4px'}}>{activeFilterCount}</span>
             )}
           </button>
-          <button onClick={() => fetch_(true)} className="admin-btn-secondary-flat" style={{padding:'12px',borderRadius:'10px'}}><RefreshCw size={16}/></button>
+          <button onClick={() => fetch_(true)} className="admin-btn-secondary-flat" style={{padding:'12px',borderRadius:'10px'}} title="Refresh activity logs"><RefreshCw size={16}/></button>
         </div>
       </div>
 
@@ -277,6 +277,7 @@ export default function AdminActivityPage() {
             </label>
             <div style={{position:'relative'}}>
               <select
+                title="Filter by User"
                 value={filterUser}
                 onChange={e => setFilterUser(e.target.value)}
                 className="admin-input-premium"
@@ -298,6 +299,7 @@ export default function AdminActivityPage() {
             </label>
             <div style={{position:'relative'}}>
               <select
+                title="Filter by Action Type"
                 value={filterAction}
                 onChange={e => setFilterAction(e.target.value)}
                 className="admin-input-premium"
@@ -319,6 +321,7 @@ export default function AdminActivityPage() {
             </label>
             <input
               type="date"
+              title="Specific Date"
               value={filterSingleDate}
               onChange={e => { setFilterSingleDate(e.target.value); if (e.target.value) { setFilterDateFrom(''); setFilterDateTo(''); } }}
               className="admin-input-premium"
@@ -337,6 +340,7 @@ export default function AdminActivityPage() {
             </label>
             <input
               type="date"
+              title="From Date"
               value={filterDateFrom}
               onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }}
               className="admin-input-premium"
@@ -351,6 +355,7 @@ export default function AdminActivityPage() {
             </label>
             <input
               type="date"
+              title="To Date"
               value={filterDateTo}
               onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }}
               className="admin-input-premium"
