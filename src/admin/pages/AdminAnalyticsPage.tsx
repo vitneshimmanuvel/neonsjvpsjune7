@@ -28,17 +28,24 @@ const ACTION_LABELS: Record<string,string> = {
 // Pure CSS bar chart component
 function BarChart({ data, label }: { data: {key:string;value:number;color:string}[]; label:string }) {
   const max = Math.max(...data.map(d=>d.value), 1);
-  if (data.length === 0) return <div style={{padding:'30px',textAlign:'center',color:'var(--muted)',fontSize:'13px'}}>No data</div>;
+  if (data.length === 0) return <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',fontSize:'13px',fontWeight:500}}>No chart data available</div>;
   return (
     <div>
-      <div style={{fontSize:'12px',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'12px'}}>{label}</div>
-      <div style={{display:'flex',alignItems:'flex-end',gap:'3px',height:'140px',padding:'0 4px'}}>
+      <div style={{fontSize:'12px',fontWeight:700,color:'var(--navy)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'16px',display:'flex',alignItems:'center',gap:'6px'}}>{label}</div>
+      <div style={{display:'flex',alignItems:'flex-end',gap:'6px',height:'150px',padding:'10px 4px'}}>
         {data.map((d,i)=>(
-          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',minWidth:0}}>
-            <span style={{fontSize:'10px',fontWeight:700,color:'var(--foreground)'}}>{d.value||''}</span>
-            <div style={{width:'100%',maxWidth:'32px',background:d.color,borderRadius:'4px 4px 0 0',
-              height:`${Math.max((d.value/max)*110,2)}px`,transition:'height 0.5s cubic-bezier(.4,0,.2,1)',opacity:0.85}} />
-            <span style={{fontSize:'9px',color:'var(--muted)',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'40px',textAlign:'center'}}>{d.key}</span>
+          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'6px',minWidth:0}}>
+            <span style={{fontSize:'10px',fontWeight:700,color:'var(--navy)'}}>{d.value||''}</span>
+            <div style={{
+              width:'100%',
+              maxWidth:'24px',
+              background: `linear-gradient(180deg, ${d.color}cc 0%, ${d.color}ff 100%)`,
+              borderRadius:'6px 6px 0 0',
+              height:`${Math.max((d.value/max)*110,3)}px`,
+              transition:'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: `0 2px 8px ${d.color}33`
+            }} />
+            <span style={{fontSize:'10px',color:'var(--muted)',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'45px',textAlign:'center'}} title={d.key}>{d.key}</span>
           </div>
         ))}
       </div>
@@ -57,20 +64,22 @@ function DonutChart({ data }: { data: {label:string;value:number;color:string}[]
   });
   const gradient = segments.map(s=>`${s.color} ${s.start}% ${s.start+s.pct}%`).join(', ');
   return (
-    <div style={{display:'flex',alignItems:'center',gap:'20px',flexWrap:'wrap'}}>
-      <div style={{width:'110px',height:'110px',borderRadius:'50%',background:`conic-gradient(${gradient||'var(--border) 0% 100%'})`,
-        display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-        <div style={{width:'60px',height:'60px',borderRadius:'50%',background:'var(--surface)',display:'flex',alignItems:'center',justifyContent:'center',
-          fontSize:'16px',fontWeight:800,color:'var(--foreground)'}}>{data.reduce((s,d)=>s+d.value,0)}</div>
-      </div>
-      <div style={{display:'flex',flexDirection:'column',gap:'4px',flex:1,minWidth:'120px'}}>
-        {segments.slice(0,8).map((s,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px'}}>
-            <div style={{width:'10px',height:'10px',borderRadius:'3px',background:s.color,flexShrink:0}} />
-            <span style={{color:'var(--muted)',fontWeight:500,flex:1}}>{s.label}</span>
-            <span style={{fontWeight:700,color:'var(--foreground)'}}>{s.value}</span>
-          </div>
-        ))}
+    <div>
+      <div style={{display:'flex',alignItems:'center',gap:'24px',flexWrap:'wrap'}}>
+        <div style={{width:'110px',height:'110px',borderRadius:'50%',background:`conic-gradient(${gradient||'var(--border) 0% 100%'})`,
+          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,boxShadow:'var(--admin-card-shadow)',border:'4px solid var(--surface)'}}>
+          <div style={{width:'70px',height:'70px',borderRadius:'50%',background:'var(--surface)',display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:'16px',fontWeight:800,color:'var(--navy)'}}>{data.reduce((s,d)=>s+d.value,0)}</div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:'6px',flex:1,minWidth:'140px'}}>
+          {segments.slice(0,8).map((s,i)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px'}}>
+              <div style={{width:'12px',height:'12px',borderRadius:'4px',background:s.color,flexShrink:0}} />
+              <span style={{color:'var(--muted)',fontWeight:500,flex:1}}>{s.label}</span>
+              <span style={{fontWeight:700,color:'var(--foreground)'}}>{s.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -194,24 +203,28 @@ export default function AdminAnalyticsPage() {
   const clearFilters = () => { setFilterUser('all'); setFilterInterval('7d'); setFilterDateFrom(''); setFilterDateTo(''); setFilterSingleDate(''); };
 
   return (
-    <div>
+    <div className="admin-animate-fade-in">
       {/* Header */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
-        <h2 style={{margin:0,fontSize:'18px',fontWeight:700,color:'var(--foreground)',display:'flex',alignItems:'center',gap:'10px'}}>
-          <BarChart3 size={20} color="var(--navy)" /> Employee Analytics
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px',flexWrap:'wrap',gap:'10px'}}>
+        <h2 style={{margin:0,fontSize:'20px',fontWeight:800,color:'var(--navy)',display:'flex',alignItems:'center',gap:'10px'}}>
+          <BarChart3 size={22} color="var(--accent)" /> Employee Analytics
         </h2>
         <div style={{display:'flex',gap:'8px'}}>
-          {activeFilterCount > 0 && <button onClick={clearFilters} style={{background:'var(--destructive-bg)',border:'1px solid var(--border)',color:'var(--destructive)',cursor:'pointer',padding:'8px 14px',borderRadius:'8px',display:'flex',alignItems:'center',gap:'4px',fontSize:'12px',fontWeight:600}}><X size={14}/>Clear</button>}
-          <button onClick={fetch_} style={{background:'var(--surface)',border:'1px solid var(--border)',color:'var(--navy)',cursor:'pointer',padding:'10px',borderRadius:'8px',display:'flex',boxShadow:'0 1px 2px rgba(0,0,0,.04)'}}><RefreshCw size={16}/></button>
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} className="admin-btn-secondary-flat" style={{background:'var(--destructive-bg)',border:'1px solid rgba(239,68,68,0.2)',color:'var(--destructive)',padding:'8px 14px',borderRadius:'10px',fontSize:'12px',fontWeight:700}}>
+              <X size={14}/> Clear Filters
+            </button>
+          )}
+          <button onClick={fetch_} className="admin-btn-secondary-flat" style={{padding:'10px',borderRadius:'10px'}}><RefreshCw size={16}/></button>
         </div>
       </div>
 
       {/* Filters */}
-      <div style={{display:'flex',flexWrap:'wrap',gap:'12px',marginBottom:'16px',...sty.card,padding:'12px 16px'}}>
+      <div className="admin-card-glass" style={{display:'flex',flexWrap:'wrap',gap:'16px',marginBottom:'20px',padding:'16px 20px',border:'1px solid var(--border)'}}>
         <div style={{flex:'1 1 150px',minWidth:'130px'}}>
           <label style={sty.label}><User size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Employee</label>
           <div style={{position:'relative'}}>
-            <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} style={sty.select}>
+            <select value={filterUser} onChange={e=>setFilterUser(e.target.value)} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
               <option value="all">All Employees</option>
               {users.map((u:any)=><option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
@@ -221,7 +234,7 @@ export default function AdminAnalyticsPage() {
         <div style={{flex:'1 1 130px',minWidth:'110px'}}>
           <label style={sty.label}><Clock size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Interval</label>
           <div style={{position:'relative'}}>
-            <select value={filterInterval} onChange={e=>{setFilterInterval(e.target.value);setFilterDateFrom('');setFilterDateTo('');setFilterSingleDate('');}} style={sty.select}>
+            <select value={filterInterval} onChange={e=>{setFilterInterval(e.target.value);setFilterDateFrom('');setFilterDateTo('');setFilterSingleDate('');}} className="admin-input-premium" style={{appearance:'none',cursor:'pointer',paddingRight:'28px'}}>
               <option value="1d">Today</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
@@ -233,22 +246,22 @@ export default function AdminAnalyticsPage() {
         </div>
         <div style={{flex:'1 1 130px',minWidth:'120px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> Specific Date</label>
-          <input type="date" value={filterSingleDate} onChange={e=>{setFilterSingleDate(e.target.value);if(e.target.value){setFilterDateFrom('');setFilterDateTo('');setFilterInterval('custom');}}} style={{...sty.dateInput,border:filterSingleDate?'1.5px solid var(--navy)':'1px solid var(--border)',background:filterSingleDate?'rgba(30,41,82,0.04)':'var(--background)'}} />
+          <input type="date" value={filterSingleDate} onChange={e=>{setFilterSingleDate(e.target.value);if(e.target.value){setFilterDateFrom('');setFilterDateTo('');setFilterInterval('custom');}}} className="admin-input-premium" style={{border:filterSingleDate?'1.5px solid var(--navy)':'1px solid var(--border)',background:filterSingleDate?'rgba(30,41,82,0.04)':'var(--surface)'}} />
         </div>
         <div style={{flex:'1 1 110px',minWidth:'100px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> From</label>
-          <input type="date" value={filterDateFrom} onChange={e=>{setFilterDateFrom(e.target.value);if(e.target.value)setFilterSingleDate('');}} style={sty.dateInput} />
+          <input type="date" value={filterDateFrom} onChange={e=>{setFilterDateFrom(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
         </div>
         <div style={{flex:'1 1 110px',minWidth:'100px'}}>
           <label style={sty.label}><Calendar size={10} style={{marginRight:'3px',verticalAlign:'middle'}}/> To</label>
-          <input type="date" value={filterDateTo} onChange={e=>{setFilterDateTo(e.target.value);if(e.target.value)setFilterSingleDate('');}} style={sty.dateInput} />
+          <input type="date" value={filterDateTo} onChange={e=>{setFilterDateTo(e.target.value);if(e.target.value)setFilterSingleDate('');}} className="admin-input-premium" />
         </div>
       </div>
 
-      {loading ? <div style={{padding:'50px',textAlign:'center',color:'var(--muted)'}}>Loading analytics...</div> : (
+      {loading ? <div style={{padding:'60px',textAlign:'center',color:'var(--muted)',fontWeight:600}}><RefreshCw className="animate-spin" style={{display:'inline-block',marginRight:'8px'}} size={16}/> Loading analytics...</div> : (
         <>
           {/* Summary Cards */}
-          <div style={{display:'flex',flexWrap:'wrap',gap:'12px',marginBottom:'20px'}}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'16px',marginBottom:'20px'}}>
             {[
               {icon:<TrendingUp size={16}/>,label:'Total Actions',value:rangedActivities.length,color:'#6366f1'},
               {icon:<User size={16}/>,label:'Active Users',value:userStats.filter(u=>u.totalActions>0).length,color:'#10b981'},
@@ -257,12 +270,12 @@ export default function AdminAnalyticsPage() {
               {icon:<Edit3 size={16}/>,label:'Edits',value:rangedActivities.filter(a=>['edit_cells','add_row','delete_row','add_column','delete_column'].includes(a.action)).length,color:'#8b5cf6'},
               {icon:<Download size={16}/>,label:'Downloads',value:rangedActivities.filter(a=>a.action==='download_data').length,color:'#06b6d4'},
             ].map((c,i)=>(
-              <div key={i} style={sty.statCard}>
+              <div key={i} className="admin-stat-card-premium" style={{flex:'1 1 180px',minWidth:'160px'}}>
                 <div style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-                  <div style={{width:'28px',height:'28px',borderRadius:'8px',background:`${c.color}15`,display:'flex',alignItems:'center',justifyContent:'center',color:c.color}}>{c.icon}</div>
+                  <div style={{width:'30px',height:'30px',borderRadius:'8px',background:`${c.color}12`,display:'flex',alignItems:'center',justifyContent:'center',color:c.color}}>{c.icon}</div>
                   <span style={{fontSize:'11px',color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em'}}>{c.label}</span>
                 </div>
-                <div style={{fontSize:'22px',fontWeight:800,color:'var(--foreground)'}}>{c.value}</div>
+                <div style={{fontSize:'22px',fontWeight:800,color:'var(--foreground)',marginTop:'4px'}}>{c.value}</div>
               </div>
             ))}
           </div>
@@ -270,12 +283,12 @@ export default function AdminAnalyticsPage() {
           {/* Charts Row */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:'16px',marginBottom:'20px'}}>
             {/* Daily Activity Bar Chart */}
-            <div style={sty.card}>
+            <div className="admin-card-glass" style={{border: '1px solid var(--border)', padding: '20px'}}>
               <BarChart data={dailyData} label="Daily Activity" />
             </div>
             {/* Action Distribution Donut */}
-            <div style={sty.card}>
-              <div style={{fontSize:'12px',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:'12px'}}>Action Distribution</div>
+            <div className="admin-card-glass" style={{border: '1px solid var(--border)', padding: '20px'}}>
+              <div style={{fontSize:'12px',fontWeight:700,color:'var(--navy)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'16px'}}>Action Distribution</div>
               <DonutChart data={actionDist} />
             </div>
           </div>
@@ -283,26 +296,26 @@ export default function AdminAnalyticsPage() {
           {/* Second Charts Row */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(280px, 1fr))',gap:'16px',marginBottom:'20px'}}>
             {/* Hourly Distribution */}
-            <div style={sty.card}>
+            <div className="admin-card-glass" style={{border: '1px solid var(--border)', padding: '20px'}}>
               <BarChart data={hourlyData} label="Activity by Hour (24h)" />
             </div>
             {/* Per-User Comparison */}
-            <div style={sty.card}>
+            <div className="admin-card-glass" style={{border: '1px solid var(--border)', padding: '20px'}}>
               <BarChart data={userBarData} label="Actions by Employee" />
             </div>
           </div>
 
           {/* Per-Employee Cards */}
           <h3 style={{fontSize:'13px',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'12px',fontWeight:700}}>Per-Employee Breakdown</h3>
-          <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+          <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
             {displayUsers.map((u,idx) => {
               const maxA = userStats[0]?.totalActions||1;
               const days = Object.keys(u.actionsByDay).length;
               const dayBars = Object.entries(u.actionsByDay).sort((a,b)=>a[0].localeCompare(b[0])).slice(-10)
                 .map(([k,v])=>({key:new Date(k).toLocaleDateString('en-US',{month:'short',day:'numeric'}),value:v,color:`hsl(${(idx*50)%360},60%,55%)`}));
               return (
-                <div key={u.id} style={sty.card}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px',flexWrap:'wrap',gap:'8px'}}>
+                <div key={u.id} className="admin-card-glass" style={{border: '1px solid var(--border)', padding: '20px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'8px'}}>
                     <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
                       <div style={{width:'36px',height:'36px',borderRadius:'10px',background:`hsl(${(idx*50)%360},70%,95%)`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'14px',color:`hsl(${(idx*50)%360},60%,45%)`}}>
                         {u.name.charAt(0).toUpperCase()}
@@ -313,53 +326,53 @@ export default function AdminAnalyticsPage() {
                       </div>
                     </div>
                     <div style={{display:'flex',gap:'6px',flexWrap:'wrap'}}>
-                      <span style={{padding:'4px 10px',borderRadius:'6px',fontSize:'11px',fontWeight:700,background:'rgba(99,102,241,0.1)',color:'#6366f1'}}>{u.totalActions} actions</span>
-                      <span style={{padding:'4px 10px',borderRadius:'6px',fontSize:'11px',fontWeight:700,background:'rgba(16,185,129,0.1)',color:'#10b981'}}>{days} active day{days!==1?'s':''}</span>
+                      <span className="admin-badge-pill" style={{background:'rgba(99,102,241,0.08)',color:'#6366f1',border:'1px solid rgba(99,102,241,0.15)'}}>{u.totalActions} actions</span>
+                      <span className="admin-badge-pill" style={{background:'rgba(16,185,129,0.08)',color:'var(--brand-green)',border:'1px solid rgba(16,185,129,0.15)'}}>{days} active day{days!==1?'s':''}</span>
                     </div>
                   </div>
 
                   {/* Stats grid */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(90px, 1fr))',gap:'8px',marginBottom:'12px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(90px, 1fr))',gap:'10px',marginBottom:'16px'}}>
                     {[
                       {icon:<LogIn size={10}/>,label:'Logins',val:u.logins,color:'#3b82f6'},
                       {icon:<Edit3 size={10}/>,label:'Edits',val:u.edits,color:'#8b5cf6'},
                       {icon:<Download size={10}/>,label:'Downloads',val:u.downloads,color:'#f59e0b'},
                       {icon:<Shield size={10}/>,label:'Perms',val:u.permChanges,color:'#ef4444'},
                     ].map((s,i)=>(
-                      <div key={i} style={{background:'var(--background)',borderRadius:'8px',padding:'10px 12px',border:'1px solid var(--border-light)'}}>
+                      <div key={i} style={{background:'var(--background)',borderRadius:'10px',padding:'10px 14px',border:'1px solid var(--border-light)'}}>
                         <div style={{fontSize:'11px',color:'var(--muted)',fontWeight:600,display:'flex',alignItems:'center',gap:'4px'}}>{s.icon} {s.label}</div>
-                        <div style={{fontSize:'18px',fontWeight:800,color:s.color}}>{s.val}</div>
+                        <div style={{fontSize:'18px',fontWeight:800,color:s.color,marginTop:'4px'}}>{s.val}</div>
                       </div>
                     ))}
                   </div>
 
                   {/* Mini bar chart for this user's daily activity */}
                   {dayBars.length > 1 && (
-                    <div style={{marginBottom:'10px'}}>
+                    <div style={{marginBottom:'16px'}}>
                       <BarChart data={dayBars} label={`${u.name}'s Daily Activity`} />
                     </div>
                   )}
 
                   {/* Volume bar */}
                   <div>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
-                      <span style={{fontSize:'11px',color:'var(--muted)',fontWeight:600}}>Work volume vs top</span>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                      <span style={{fontSize:'11px',color:'var(--muted)',fontWeight:600}}>Work volume vs top contributor</span>
                       <span style={{fontSize:'11px',color:'var(--navy)',fontWeight:700}}>{maxA>0?Math.round((u.totalActions/maxA)*100):0}%</span>
                     </div>
-                    <div style={{width:'100%',height:'8px',background:'var(--border-light)',borderRadius:'4px',overflow:'hidden'}}>
-                      <div style={{width:`${maxA>0?(u.totalActions/maxA)*100:0}%`,height:'100%',background:'var(--navy)',borderRadius:'4px',transition:'width 0.5s ease'}} />
+                    <div style={{width:'100%',height:'8px',background:'var(--border-light)',borderRadius:'99px',overflow:'hidden',border:'1px solid var(--border)'}}>
+                      <div style={{width:`${maxA>0?(u.totalActions/maxA)*100:0}%`,height:'100%',background:'var(--navy)',borderRadius:'99px',transition:'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)'}} />
                     </div>
                   </div>
 
                   {u.lastActive && (
-                    <div style={{fontSize:'11px',color:'var(--muted)',marginTop:'8px',display:'flex',alignItems:'center',gap:'4px'}}>
-                      <Clock size={10}/> Last active: {new Date(u.lastActive).toLocaleString()}
+                    <div style={{fontSize:'11px',color:'var(--muted)',marginTop:'10px',display:'flex',alignItems:'center',gap:'4px',fontWeight:500}}>
+                      <Clock size={12}/> Last active: {new Date(u.lastActive).toLocaleString()}
                     </div>
                   )}
                 </div>
               );
             })}
-            {displayUsers.length === 0 && <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',background:'var(--surface)',borderRadius:'12px',border:'1px dashed var(--border)'}}>No employee data for the selected filters</div>}
+            {displayUsers.length === 0 && <div style={{padding:'40px',textAlign:'center',color:'var(--muted)',background:'var(--surface)',borderRadius:'16px',border:'1px dashed var(--border)',fontWeight:500}}>No employee data for the selected filters</div>}
           </div>
         </>
       )}

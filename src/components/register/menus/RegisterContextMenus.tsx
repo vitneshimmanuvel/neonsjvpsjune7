@@ -37,6 +37,7 @@ interface RegisterContextMenusProps {
   setColumnMandatoryMutation: any;
   setColumnUniqueMutation: any;
   setColumnDoubleEntryWarningMutation: any;
+  updateColumnBgColorMutation: any;
 
 
   // Row Menu
@@ -71,6 +72,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
     hiddenColumns, setHiddenColumns, hideColumn, clearColumnDataMutation, deleteColumnMutation,
     setColumnMandatoryMutation, setColumnUniqueMutation,
     setColumnDoubleEntryWarningMutation,
+    updateColumnBgColorMutation,
     rowMenuId, setRowMenuId, duplicateEntryMutation, deleteEntryMutation, insertEntryMutation, localEntries, handleMoveRow,
     handleRowDownloadPDF, handleRowDownloadExcel, handleRowShareText,
     calcTypes, updateCalcType,
@@ -231,6 +233,49 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
             }}>
               <EyeOff size={16} /> Hide Column
             </button>
+
+            {canEdit && (
+              <>
+                <div className="context-divider" />
+                <div className="context-section-label">Column Background Color</div>
+                <div className="context-item-row" style={{ padding: '8px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { name: 'None', value: undefined, color: '#ffffff', border: '1px solid #e2e8f0' },
+                    { name: 'Mild Blue', value: 'rgba(26, 115, 232, 0.08)', color: 'rgba(26, 115, 232, 0.18)' },
+                    { name: 'Mild Green', value: 'rgba(34, 197, 94, 0.08)', color: 'rgba(34, 197, 94, 0.18)' },
+                    { name: 'Mild Yellow', value: 'rgba(234, 179, 8, 0.08)', color: 'rgba(234, 179, 8, 0.18)' },
+                    { name: 'Mild Red', value: 'rgba(239, 68, 68, 0.08)', color: 'rgba(239, 68, 68, 0.18)' },
+                    { name: 'Mild Purple', value: 'rgba(168, 85, 247, 0.08)', color: 'rgba(168, 85, 247, 0.18)' },
+                    { name: 'Mild Orange', value: 'rgba(249, 115, 22, 0.08)', color: 'rgba(249, 115, 22, 0.18)' },
+                    { name: 'Mild Teal', value: 'rgba(20, 184, 166, 0.08)', color: 'rgba(20, 184, 166, 0.18)' },
+                  ].map((colorOpt) => {
+                    const col = columns.find((c) => c.id === colMenuId);
+                    const isActive = col?.bgColor === colorOpt.value || (!col?.bgColor && !colorOpt.value);
+                    return (
+                      <button
+                        key={colorOpt.name}
+                        className={`context-item-color-chip ${isActive ? 'active' : ''}`}
+                        title={colorOpt.name}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: colorOpt.color,
+                          border: isActive ? '2px solid var(--primary)' : (colorOpt.border || '1px solid transparent'),
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: isActive ? '0 0 0 1px white, 0 0 4px rgba(0,0,0,0.15)' : 'none'
+                        }}
+                        onClick={() => {
+                          updateColumnBgColorMutation.mutate({ colId: colMenuId!, bgColor: colorOpt.value });
+                          setColMenuId(null);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             <div className="context-divider" />
             <div className="context-section-label">Footer Calculation</div>

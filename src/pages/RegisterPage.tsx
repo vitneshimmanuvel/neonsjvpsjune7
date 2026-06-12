@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import {
   getRegister, listRegisters, addColumn, deleteColumn, renameColumn, updateColumnDropdownOptions,
   duplicateColumn, moveColumn, reorderColumn, changeColumnType, clearColumnData, insertColumn, updateColumnWidth, updateColumnSummary,
+  updateColumnBgColor,
   freezeColumn, hideColumn, setColumnMandatory, setColumnUnique, setColumnDoubleEntryWarning,
   addEntry, updateEntry, updateEntryDirect, deleteEntry, duplicateEntry, bulkDeleteEntries, insertEntry,
   clearRegisterCache,
@@ -1959,6 +1960,32 @@ export default function RegisterPage() {
     },
   });
 
+  const updateColumnBgColorMutation = useMutation({
+    mutationFn: ({ colId, bgColor }: { colId: number; bgColor: string | undefined }) =>
+      updateColumnBgColor(registerId, colId, bgColor),
+    onMutate: async ({ colId, bgColor }) => {
+      await queryClient.cancelQueries({ queryKey: ['register', registerId] });
+      const prev = queryClient.getQueryData(['register', registerId]) as any;
+      if (prev) {
+        queryClient.setQueryData(['register', registerId], {
+          ...prev,
+          columns: (prev.columns || []).map((c: any) =>
+            c.id === colId ? { ...c, bgColor } : c
+          ),
+        });
+      }
+      setColMenuId(null);
+      return { prev };
+    },
+    onSuccess: (updatedReg) => {
+      queryClient.setQueryData(['register', registerId], updatedReg);
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) queryClient.setQueryData(['register', registerId], context.prev);
+      toast.error('Failed to update column color');
+    },
+  });
+
   const insertColumnMutation = useMutation({
     mutationFn: (vars: { 
       pos: number,           // pre-calculated, snapshot at click time
@@ -3677,6 +3704,9 @@ export default function RegisterPage() {
                   const stickyLeft = isFrozen ? frozenLeftOffsets[col.id] : undefined;
                   const colW = colWidths[col.id] || defaultColWidth;
 
+                  const headerBg = col.bgColor 
+                    ? `linear-gradient(${col.bgColor}, ${col.bgColor}), ${isFrozen ? 'var(--border-light)' : 'var(--surface)'}`
+                    : (isFrozen ? 'var(--border-light)' : undefined);
                   return (
                   <th
                     key={col.id}
@@ -3686,8 +3716,8 @@ export default function RegisterPage() {
                       else colHeaderRefs.current.delete(col.id);
                     }}
                     style={isFrozen
-                      ? { position: 'sticky', left: stickyLeft, zIndex: 13, background: 'var(--border-light)', width: colW, minWidth: colW, maxWidth: colW }
-                      : { width: colW, minWidth: colW, maxWidth: colW }
+                      ? { position: 'sticky', left: stickyLeft, zIndex: 13, background: headerBg, width: colW, minWidth: colW, maxWidth: colW }
+                      : { width: colW, minWidth: colW, maxWidth: colW, background: headerBg }
                     }
                   >
                     <div 
@@ -3945,6 +3975,7 @@ export default function RegisterPage() {
         setColumnMandatoryMutation={setColumnMandatoryMutation}
         setColumnUniqueMutation={setColumnUniqueMutation}
         setColumnDoubleEntryWarningMutation={setColumnDoubleEntryWarningMutation}
+        updateColumnBgColorMutation={updateColumnBgColorMutation}
         rowMenuId={rowMenuId} setRowMenuId={setRowMenuId}
         duplicateEntryMutation={duplicateEntryMutation} deleteEntryMutation={deleteEntryMutation}
         insertEntryMutation={insertEntryMutation}

@@ -726,14 +726,20 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
         const cs = entry.cellStyles?.[col.id.toString()];
         let cellStyle: React.CSSProperties = { width: w, minWidth: w, maxWidth: w };
         
-        // Apply user-defined cell formatting
+        // Apply column-level background styling if present
+        if (col.bgColor) cellStyle.background = col.bgColor;
+        
+        // Apply user-defined cell formatting (overrides column-level styles)
         if (cs?.bgColor) cellStyle.background = cs.bgColor;
         if (cs?.textColor) cellStyle.color = cs.textColor;
         if (cs?.textAlign) cellStyle.textAlign = cs.textAlign;
         
         if (isFrozen) {
           const left = frozenLeftOffsets?.[col.id] || 50;
-          cellStyle = { ...cellStyle, position: 'sticky', left, zIndex: 10, background: cs?.bgColor || 'var(--table-bg)' };
+          const frozenBg = cs?.bgColor 
+            ? cs.bgColor 
+            : (col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : 'var(--table-bg)');
+          cellStyle = { ...cellStyle, position: 'sticky', left, zIndex: 10, background: frozenBg };
         }
         
         const isEditable = !editableColumnIds || editableColumnIds.has(col.id);

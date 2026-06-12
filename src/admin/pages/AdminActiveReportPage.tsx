@@ -347,21 +347,21 @@ export default function AdminActiveReportPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="admin-animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Title Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <ClipboardList size={20} color="var(--navy)" /> Staff Active Entry Report
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <ClipboardList size={22} color="var(--accent)" /> Staff Active Entry Report
         </h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button 
             onClick={() => setShowFilters(!showFilters)} 
             style={{
               background: showFilters || activeFilterCount > 0 ? 'var(--navy)' : 'var(--surface)',
-              border: '1px solid var(--border)',
+              border: '1.5px solid var(--border)',
               color: showFilters || activeFilterCount > 0 ? 'white' : 'var(--navy)',
-              cursor: 'pointer', padding: '10px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px',
-              boxShadow: 'var(--shadow-sm)', fontSize: '13px', fontWeight: 600, transition: 'all 0.2s'
+              cursor: 'pointer', padding: '10px 18px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px',
+              boxShadow: 'var(--admin-card-shadow)', fontSize: '13px', fontWeight: 600, transition: 'all 0.2s'
             }}
           >
             <Filter size={14} />
@@ -375,11 +375,11 @@ export default function AdminActiveReportPage() {
           <button 
             onClick={handleExportExcel} 
             disabled={exporting || filteredReport.length === 0}
+            className="admin-btn-success-glow"
             style={{
-              background: 'linear-gradient(135deg, #16a34a, #15803d)',
-              color: 'white', border: 'none', cursor: exporting || filteredReport.length === 0 ? 'not-allowed' : 'pointer',
-              padding: '10px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px',
-              boxShadow: 'var(--shadow-sm)', fontSize: '13px', fontWeight: 600, opacity: filteredReport.length === 0 ? 0.6 : 1, transition: 'all 0.2s'
+              cursor: exporting || filteredReport.length === 0 ? 'not-allowed' : 'pointer',
+              padding: '10px 18px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px',
+              fontSize: '13px', fontWeight: 600, opacity: filteredReport.length === 0 ? 0.6 : 1, transition: 'all 0.2s', height: '38px'
             }}
           >
             <Download size={14} />
@@ -387,7 +387,8 @@ export default function AdminActiveReportPage() {
           </button>
           <button 
             onClick={() => fetch_(true)} 
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--navy)', cursor: 'pointer', padding: '10px', borderRadius: '8px', display: 'flex', boxShadow: 'var(--shadow-sm)' }}
+            className="admin-btn-secondary-flat"
+            style={{ padding: '10px', borderRadius: '10px' }}
           >
             <RefreshCw size={16} />
           </button>
@@ -395,23 +396,23 @@ export default function AdminActiveReportPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--muted)', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <Clock size={36} className="animate-spin" style={{ color: 'var(--navy)' }} />
+        <div className="admin-card-glass" style={{ padding: '80px 20px', textAlign: 'center', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <Clock size={36} className="animate-spin" style={{ color: 'var(--accent)' }} />
           <div style={{ fontSize: '14px', fontWeight: 600 }}>Fetching activity logs and registers...</div>
         </div>
       ) : (
         <>
           {/* Summary Strip */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
             {[
               { icon: <Database size={16} />, label: 'Total Audited Entries', value: metrics.total, color: '#6366f1' },
               { icon: <User size={16} />, label: 'Active Staff Contributors', value: metrics.contributorsCount, color: '#10b981' },
               { icon: <ClipboardList size={16} />, label: 'Most Active Register', value: metrics.mostActiveReg, color: '#f59e0b', isText: true },
               { icon: <Calendar size={16} />, label: "Today's Entries", value: metrics.todayEntries, color: '#06b6d4' },
             ].map((c, i) => (
-              <div key={i} style={sty.statCard}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: `${c.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: c.color }}>{c.icon}</div>
+              <div key={i} className="admin-stat-card-premium" style={{ flex: '1 1 200px', minWidth: '180px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${c.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: c.color }}>{c.icon}</div>
                   <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
                 </div>
                 <div style={{ 
@@ -420,7 +421,8 @@ export default function AdminActiveReportPage() {
                   color: 'var(--foreground)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  marginTop: '4px'
                 }} title={String(c.value)}>
                   {c.value}
                 </div>
@@ -430,13 +432,13 @@ export default function AdminActiveReportPage() {
 
           {/* Filters Dashboard */}
           {showFilters && (
-            <div style={{ ...sty.card, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="admin-card-glass" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', border:'1px solid var(--border)' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                 {/* Staff Selection */}
                 <div style={{ flex: '1 1 180px', minWidth: '150px' }}>
                   <label style={sty.label}><User size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Staff Member</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterUser} onChange={e => setFilterUser(e.target.value)} style={sty.select}>
+                    <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Staff Members</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
@@ -448,7 +450,7 @@ export default function AdminActiveReportPage() {
                 <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
                   <label style={sty.label}><ClipboardList size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Target Register</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterRegister} onChange={e => setFilterRegister(e.target.value)} style={sty.select}>
+                    <select value={filterRegister} onChange={e => setFilterRegister(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Registers</option>
                       {registers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
@@ -460,7 +462,7 @@ export default function AdminActiveReportPage() {
                 <div style={{ flex: '1 1 150px', minWidth: '130px' }}>
                   <label style={sty.label}><Database size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> Action Type</label>
                   <div style={{ position: 'relative' }}>
-                    <select value={filterAction} onChange={e => setFilterAction(e.target.value)} style={sty.select}>
+                    <select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="admin-input-premium" style={{ paddingRight: '28px', appearance: 'none', cursor: 'pointer' }}>
                       <option value="all">All Action Types</option>
                       {Object.entries(ACTION_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
@@ -475,20 +477,21 @@ export default function AdminActiveReportPage() {
                     type="date" 
                     value={filterSingleDate} 
                     onChange={e => { setFilterSingleDate(e.target.value); if (e.target.value) { setFilterDateFrom(''); setFilterDateTo(''); } }} 
-                    style={{ ...sty.dateInput, border: filterSingleDate ? '1.5px solid var(--navy)' : '1.5px solid var(--border)', background: filterSingleDate ? 'rgba(30,41,82,0.04)' : 'var(--background)' }} 
+                    className="admin-input-premium"
+                    style={{ border: filterSingleDate ? '1.5px solid var(--navy)' : '1.5px solid var(--border)', background: filterSingleDate ? 'rgba(30,41,82,0.04)' : 'var(--surface)' }} 
                   />
                 </div>
 
                 {/* From Date */}
                 <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
                   <label style={sty.label}><Calendar size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> From Date</label>
-                  <input type="date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }} style={sty.dateInput} />
+                  <input type="date" value={filterDateFrom} onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
                 </div>
 
                 {/* To Date */}
                 <div style={{ flex: '1 1 130px', minWidth: '110px' }}>
                   <label style={sty.label}><Calendar size={10} style={{ marginRight: '3px', verticalAlign: 'middle' }} /> To Date</label>
-                  <input type="date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }} style={sty.dateInput} />
+                  <input type="date" value={filterDateTo} onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }} className="admin-input-premium" />
                 </div>
               </div>
 
@@ -503,7 +506,8 @@ export default function AdminActiveReportPage() {
                     placeholder="Search inside audit log details..." 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    style={sty.input}
+                    className="admin-input-premium"
+                    style={{ paddingLeft: '36px' }}
                   />
                   {searchQuery && (
                     <button 
@@ -518,11 +522,10 @@ export default function AdminActiveReportPage() {
                 {activeFilterCount > 0 && (
                   <button 
                     onClick={clearFilters} 
+                    className="admin-btn-secondary-flat"
                     style={{
-                      padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border)',
-                      background: 'var(--destructive-bg)', color: 'var(--destructive)', cursor: 'pointer',
-                      fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px',
-                      transition: 'all 0.15s'
+                      background: 'var(--destructive-bg)', color: 'var(--destructive)', border: '1px solid rgba(239,68,68,0.2)',
+                      fontSize: '12px', fontWeight: 700, padding: '10px 16px', borderRadius: '10px'
                     }}
                   >
                     <X size={14} /> Clear All Filters
@@ -536,7 +539,7 @@ export default function AdminActiveReportPage() {
           <div style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <div>
               Showing <strong style={{ color: 'var(--foreground)' }}>{filteredReport.length}</strong> audited data actions
-              {activeFilterCount > 0 && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>({activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active)</span>}
+              {activeFilterCount > 0 && <span style={{ color: 'var(--accent)', marginLeft: '6px' }}>({activeFilterCount} active)</span>}
             </div>
             {hasMoreActivity && (
               <button 
@@ -554,49 +557,48 @@ export default function AdminActiveReportPage() {
           </div>
 
           {/* Audited Logs Grid */}
-          <div style={{ background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
+          <div className="admin-table-premium-wrap admin-animate-fade-in" style={{ border: '1px solid var(--border)' }}>
             <div style={{ maxHeight: 'calc(100vh - 290px)', overflowY: 'auto' }} ref={tableContainerRef} onScroll={handleTableScroll}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <table>
                 <thead>
-                  <tr style={{ background: 'var(--background)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: '50px' }}>S.No</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: '150px' }}>Staff Member</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: '180px' }}>Register Name</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: '120px' }}>Action</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>Audited Details</th>
-                    <th style={{ padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', width: '160px', textAlign: 'right' }}>Timestamp</th>
+                  <tr>
+                    <th style={{ width: '60px' }}>S.No</th>
+                    <th style={{ width: '180px' }}>Staff Member</th>
+                    <th style={{ width: '180px' }}>Register Name</th>
+                    <th style={{ width: '130px' }}>Action</th>
+                    <th>Audited Details</th>
+                    <th style={{ width: '160px', textAlign: 'right' }}>Timestamp</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredReport.map((a, idx) => (
-                    <tr key={a.id} className="report-row" style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}>
-                      <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>{idx + 1}</td>
-                      <td style={{ padding: '14px 16px', fontSize: '13.5px', color: 'var(--foreground)', fontWeight: 600 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(30,41,82,0.06)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, color: 'var(--navy)' }}>
+                    <tr key={a.id} className="report-row">
+                      <td style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>{idx + 1}</td>
+                      <td style={{ fontSize: '13.5px', fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(0,45,93,0.05)', color: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>
                             {a.userName?.charAt(0).toUpperCase()}
                           </div>
-                          <span>{a.userName || 'Unknown'}</span>
+                          <span style={{ color: 'var(--foreground)' }}>{a.userName || 'Unknown'}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '13.5px', color: 'var(--navy)', fontWeight: 600 }}>
+                      <td style={{ fontSize: '13.5px', color: 'var(--navy)', fontWeight: 600 }}>
                         {a.registerName || 'System'}
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ 
+                      <td>
+                        <span className="admin-badge-pill" style={{ 
                            background: `${ACTION_COLORS[a.action] || ACTION_COLORS.other}12`, 
                            color: ACTION_COLORS[a.action] || ACTION_COLORS.other,
-                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
                            border: `1px solid ${ACTION_COLORS[a.action] || ACTION_COLORS.other}24`
                          }}>
                           {ACTION_LABELS[a.action] || a.action.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
+                      <td style={{ fontSize: '13px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
                         {a.details}
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '12px', color: 'var(--muted)', fontWeight: 500, textAlign: 'right' }}>
-                        <div>{new Date(a.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                      <td style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 500, textAlign: 'right' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{new Date(a.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                         <div style={{ opacity: 0.7, fontSize: '11px', marginTop: '2px' }}>{new Date(a.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
                     </tr>
@@ -624,13 +626,12 @@ export default function AdminActiveReportPage() {
                   )}
                   {!loadingMore && hasMoreActivity && filteredReport.length > 0 && (
                     <tr>
-                      <td colSpan={6} style={{ padding: '12px', textAlign: 'center', background: 'var(--background)' }}>
+                      <td colSpan={6} style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-light)' }}>
                         <button 
                           onClick={() => fetch_(false)}
+                          className="admin-btn-secondary-flat"
                           style={{
-                            background: 'var(--surface)', border: '1px solid var(--border)',
-                            color: 'var(--navy)', cursor: 'pointer', padding: '6px 16px',
-                            borderRadius: '6px', fontSize: '12px', fontWeight: 600
+                            padding: '8px 20px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', margin: '0 auto'
                           }}
                         >
                           Load More Logs
@@ -647,8 +648,8 @@ export default function AdminActiveReportPage() {
 
       {/* Inject simple row hovering stylesheet */}
       <style>{`
-        .report-row:hover {
-          background-color: var(--border-light) !important;
+        .report-row:hover td {
+          background-color: rgba(0, 45, 93, 0.015) !important;
         }
       `}</style>
     </div>

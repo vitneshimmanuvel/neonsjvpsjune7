@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
-import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown } from 'lucide-react';
+import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown, Plus } from 'lucide-react';
 
 const ICONS: Record<string, any> = {
   login: <LogIn size={14} color="#10b981"/>, logout: <LogOut size={14} color="#f59e0b"/>,
@@ -190,40 +190,41 @@ export default function AdminActivityPage() {
   };
 
   return (
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
-        <h2 style={{margin:0,fontSize:'18px',fontWeight:700,color:'var(--foreground)',display:'flex',alignItems:'center',gap:'10px'}}><Activity size={20} color="var(--navy)"/> Activity Log</h2>
+    <div className="admin-animate-fade-in">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'20px',flexWrap:'wrap',gap:'10px'}}>
+        <h2 style={{margin:0,fontSize:'20px',fontWeight:800,color:'var(--navy)',display:'flex',alignItems:'center',gap:'10px'}}><Activity size={22} color="var(--accent)"/> Activity Log</h2>
         <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
           <button onClick={() => setShowFilters(!showFilters)} style={{
             background: showFilters || activeFilterCount > 0 ? 'var(--navy)' : 'var(--surface)',
-            border:'1px solid var(--border)',
+            border:'1.5px solid var(--border)',
             color: showFilters || activeFilterCount > 0 ? 'white' : 'var(--navy)',
-            cursor:'pointer',padding:'10px 16px',borderRadius:'8px',display:'flex',alignItems:'center',gap:'6px',
-            boxShadow:'var(--shadow-sm)',fontSize:'13px',fontWeight:600,transition:'all 0.2s'
+            cursor:'pointer',padding:'10px 18px',borderRadius:'10px',display:'flex',alignItems:'center',gap:'8px',
+            boxShadow:'var(--admin-card-shadow)',fontSize:'13px',fontWeight:600,transition:'all 0.2s'
           }}>
             <Filter size={14}/>
             Filters
             {activeFilterCount > 0 && (
-              <span style={{background:'var(--accent)',color:'white',borderRadius:'50%',width:'18px',height:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700}}>{activeFilterCount}</span>
+              <span style={{background:'var(--accent)',color:'white',borderRadius:'50%',width:'18px',height:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700,marginLeft:'4px'}}>{activeFilterCount}</span>
             )}
           </button>
-          <button onClick={() => fetch_(true)} style={{background:'var(--surface)',border:'1px solid var(--border)',color:'var(--navy)',cursor:'pointer',padding:'10px',borderRadius:'8px',display:'flex',boxShadow:'var(--shadow-sm)'}}><RefreshCw size={16}/></button>
+          <button onClick={() => fetch_(true)} className="admin-btn-secondary-flat" style={{padding:'12px',borderRadius:'10px'}}><RefreshCw size={16}/></button>
         </div>
       </div>
 
       {/* Quick Filter Chips */}
-      <div style={{display:'flex',gap:'8px',marginBottom:'12px',flexWrap:'wrap'}}>
+      <div style={{display:'flex',gap:'8px',marginBottom:'16px',flexWrap:'wrap'}}>
         {[
-          { label: 'All', value: 'all', color: 'var(--navy)', bg: 'var(--border-light)' },
-          { label: '🔑 Login/Logout', value: 'login', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
-          { label: '✏️ Edits', value: 'edit_cells', color: '#6366f1', bg: 'rgba(99,102,241,0.1)' },
-          { label: '➕ New Entries', value: 'add_row', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
-          { label: '🗑 Deletes', value: 'delete_row', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-          { label: '⬇ Downloads', value: 'download_data', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
-          { label: '👤 User Changes', value: '_user_changes_', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
-          { label: '🛡 Permissions', value: 'update_permissions', color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+          { label: 'All Actions', value: 'all', color: 'var(--navy)', bg: 'var(--border-light)', icon: <Activity size={12}/> },
+          { label: 'Logins', value: 'login', color: '#10b981', bg: 'rgba(16,185,129,0.06)', icon: <LogIn size={12}/> },
+          { label: 'Cell Edits', value: 'edit_cells', color: '#6366f1', bg: 'rgba(99,102,241,0.06)', icon: <Edit3 size={12}/> },
+          { label: 'New Entries', value: 'add_row', color: '#10b981', bg: 'rgba(16,185,129,0.06)', icon: <Plus size={12}/> },
+          { label: 'Deletes', value: 'delete_row', color: '#ef4444', bg: 'rgba(239,68,68,0.06)', icon: <Trash2 size={12}/> },
+          { label: 'Downloads', value: 'download_data', color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', icon: <Download size={12}/> },
+          { label: 'User Changes', value: '_user_changes_', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', icon: <User size={12}/> },
+          { label: 'Permissions', value: 'update_permissions', color: '#8b5cf6', bg: 'rgba(139,92,246,0.06)', icon: <Shield size={12}/> },
         ].map(chip => {
           const isActive = chip.value === 'all' ? filterAction === 'all' : filterAction === chip.value;
+          const iconColor = isActive ? chip.color : 'var(--muted)';
           return (
             <button
               key={chip.value}
@@ -231,7 +232,6 @@ export default function AdminActivityPage() {
                 if (chip.value === 'all') {
                   setFilterAction('all');
                 } else if (chip.value === '_user_changes_') {
-                  // Group filter: cycle through user-related actions
                   const userActions = ['create_user', 'delete_user', 'update_user', 'change_status'];
                   const currentIdx = userActions.indexOf(filterAction);
                   setFilterAction(userActions[(currentIdx + 1) % userActions.length]);
@@ -240,9 +240,9 @@ export default function AdminActivityPage() {
                 }
               }}
               style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
-                border: isActive ? `1.5px solid ${chip.color}` : '1px solid var(--border)',
+                padding: '8px 16px',
+                borderRadius: '99px',
+                border: isActive ? `1.5px solid ${chip.color}` : '1.5px solid var(--border)',
                 background: isActive ? chip.bg : 'var(--surface)',
                 color: isActive ? chip.color : 'var(--muted)',
                 cursor: 'pointer',
@@ -250,9 +250,15 @@ export default function AdminActivityPage() {
                 fontWeight: isActive ? 700 : 500,
                 transition: 'all 0.2s',
                 boxShadow: isActive ? `0 2px 8px ${chip.bg}` : 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {chip.label}
+              <span style={{ color: iconColor, display: 'flex', alignItems: 'center' }}>
+                {chip.icon}
+              </span>
+              <span>{chip.label}</span>
             </button>
           );
         })}
@@ -260,11 +266,9 @@ export default function AdminActivityPage() {
 
       {/* Filter Panel */}
       {showFilters && (
-        <div style={{
-          background:'var(--surface)',borderRadius:'12px',border:'1px solid var(--border)',
-          padding:'16px 20px',marginBottom:'16px',boxShadow:'var(--shadow-md)',
-          display:'flex',flexWrap:'wrap',gap:'16px',alignItems:'flex-end',
-          animation:'fadeIn 0.2s ease'
+        <div className="admin-card-glass admin-animate-fade-in" style={{
+          padding:'20px',marginBottom:'20px',
+          display:'flex',flexWrap:'wrap',gap:'16px',alignItems:'flex-end'
         }}>
           {/* User Filter */}
           <div style={{flex:'1 1 180px',minWidth:'160px'}}>
@@ -275,19 +279,15 @@ export default function AdminActivityPage() {
               <select
                 value={filterUser}
                 onChange={e => setFilterUser(e.target.value)}
-                style={{
-                  width:'100%',padding:'10px 32px 10px 12px',borderRadius:'8px',
-                  border:'1.5px solid var(--border)',background:'var(--background)',
-                  color:'var(--foreground)',fontSize:'13px',fontWeight:500,
-                  appearance:'none',cursor:'pointer',outline:'none'
-                }}
+                className="admin-input-premium"
+                style={{padding:'10px 32px 10px 12px',appearance:'none',cursor:'pointer'}}
               >
                 <option value="all">All Users</option>
                 {activityUsers.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </select>
-              <ChevronDown size={14} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'var(--muted)'}}/>
+              <ChevronDown size={14} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'var(--muted)'}}/>
             </div>
           </div>
 
@@ -300,23 +300,19 @@ export default function AdminActivityPage() {
               <select
                 value={filterAction}
                 onChange={e => setFilterAction(e.target.value)}
-                style={{
-                  width:'100%',padding:'10px 32px 10px 12px',borderRadius:'8px',
-                  border:'1.5px solid var(--border)',background:'var(--background)',
-                  color:'var(--foreground)',fontSize:'13px',fontWeight:500,
-                  appearance:'none',cursor:'pointer',outline:'none'
-                }}
+                className="admin-input-premium"
+                style={{padding:'10px 32px 10px 12px',appearance:'none',cursor:'pointer'}}
               >
                 <option value="all">All Actions</option>
                 {actionTypes.map(t => (
                   <option key={t} value={t}>{ACTION_LABELS[t] || t.replace(/_/g,' ')}</option>
                 ))}
               </select>
-              <ChevronDown size={14} style={{position:'absolute',right:'10px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'var(--muted)'}}/>
+              <ChevronDown size={14} style={{position:'absolute',right:'12px',top:'50%',transform:'translateY(-50%)',pointerEvents:'none',color:'var(--muted)'}}/>
             </div>
           </div>
 
-          {/* Single Date */}
+          {/* Specific Date */}
           <div style={{flex:'1 1 150px',minWidth:'140px'}}>
             <label style={{fontSize:'11px',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:'6px',display:'block'}}>
               <Calendar size={12} style={{marginRight:'4px',verticalAlign:'middle'}}/> Specific Date
@@ -325,12 +321,11 @@ export default function AdminActivityPage() {
               type="date"
               value={filterSingleDate}
               onChange={e => { setFilterSingleDate(e.target.value); if (e.target.value) { setFilterDateFrom(''); setFilterDateTo(''); } }}
+              className="admin-input-premium"
               style={{
-                width:'100%',padding:'9px 12px',borderRadius:'8px',
+                padding:'9px 12px',
                 border: filterSingleDate ? '1.5px solid var(--navy)' : '1.5px solid var(--border)',
-                background: filterSingleDate ? 'rgba(30,41,82,0.04)' : 'var(--background)',
-                color:'var(--foreground)',fontSize:'13px',fontWeight:500,outline:'none',
-                boxSizing:'border-box'
+                background: filterSingleDate ? 'rgba(30,41,82,0.04)' : 'var(--surface)'
               }}
             />
           </div>
@@ -344,12 +339,8 @@ export default function AdminActivityPage() {
               type="date"
               value={filterDateFrom}
               onChange={e => { setFilterDateFrom(e.target.value); if (e.target.value) setFilterSingleDate(''); }}
-              style={{
-                width:'100%',padding:'9px 12px',borderRadius:'8px',
-                border:'1.5px solid var(--border)',background:'var(--background)',
-                color:'var(--foreground)',fontSize:'13px',fontWeight:500,outline:'none',
-                boxSizing:'border-box'
-              }}
+              className="admin-input-premium"
+              style={{padding:'9px 12px'}}
             />
           </div>
 
@@ -362,24 +353,18 @@ export default function AdminActivityPage() {
               type="date"
               value={filterDateTo}
               onChange={e => { setFilterDateTo(e.target.value); if (e.target.value) setFilterSingleDate(''); }}
-              style={{
-                width:'100%',padding:'9px 12px',borderRadius:'8px',
-                border:'1.5px solid var(--border)',background:'var(--background)',
-                color:'var(--foreground)',fontSize:'13px',fontWeight:500,outline:'none',
-                boxSizing:'border-box'
-              }}
+              className="admin-input-premium"
+              style={{padding:'9px 12px'}}
             />
           </div>
 
           {/* Clear */}
           {activeFilterCount > 0 && (
-            <button onClick={clearFilters} style={{
-              padding:'10px 16px',borderRadius:'8px',border:'1px solid var(--border)',
-              background:'var(--destructive-bg)',color:'var(--destructive)',cursor:'pointer',
-              fontSize:'12px',fontWeight:700,display:'flex',alignItems:'center',gap:'6px',
-              height:'40px',alignSelf:'flex-end'
+            <button onClick={clearFilters} className="admin-btn-secondary-flat" style={{
+              background:'var(--destructive-bg)',color:'var(--destructive)',border:'1px solid rgba(239,68,68,0.2)',
+              fontSize:'12px',fontWeight:700,height:'40px',padding:'0 16px',borderRadius:'10px'
             }}>
-              <X size={14}/> Clear
+              <X size={14}/> Clear Filters
             </button>
           )}
         </div>
@@ -406,55 +391,55 @@ export default function AdminActivityPage() {
         )}
       </div>
 
-      <div style={{background:'var(--surface)',borderRadius:'12px',border:'1px solid var(--border)',overflow:'hidden',boxShadow:'var(--shadow-md)'}}>
-        {loading ? <div style={{padding:'50px',textAlign:'center',color:'var(--muted)'}}>Loading...</div> : (
-          <div style={{maxHeight:'calc(100vh - 260px)',overflowY:'auto'}} ref={containerRef} onScroll={handleScroll}>
+      {/* Activities Container */}
+      <div className="admin-card-glass" style={{padding:0, overflow:'hidden', border:'1px solid var(--border)'}}>
+        {loading ? <div style={{padding:'60px',textAlign:'center',color:'var(--muted)',fontWeight:600}}><RefreshCw className="animate-spin" style={{display:'inline-block',marginRight:'8px'}} size={16}/> Loading activities...</div> : (
+          <div style={{maxHeight:'calc(100vh - 270px)',overflowY:'auto'}} ref={containerRef} onScroll={handleScroll}>
             {filtered.map(a => (
-              <div key={a.id} style={{display:'flex',alignItems:'center',gap:'14px',padding:'14px 18px',borderBottom:'1px solid var(--border-light)'}}>
-                <div style={{width:'36px',height:'36px',borderRadius:'10px',background:'var(--background)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <div key={a.id} className="admin-activity-item" style={{display:'flex',alignItems:'center',gap:'16px',padding:'16px 20px',borderBottom:'1px solid var(--border-light)',transition:'all 0.2s'}}>
+                <div style={{width:'38px',height:'38px',borderRadius:'12px',background:'var(--background)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                   {ICONS[a.action] || <Activity size={16} color="var(--muted)"/>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:'14px',color:'var(--foreground)',fontWeight:600}}>{a.details}</div>
-                  <div style={{fontSize:'12px',color:'var(--muted)',marginTop:'4px',display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center'}}>
-                    <span style={{
-                      background:'var(--border-light)',padding:'2px 8px',borderRadius:'4px',fontWeight:600,
-                      color:'var(--navy)',fontSize:'11px'
+                  <div style={{fontSize:'12px',color:'var(--muted)',marginTop:'6px',display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center'}}>
+                    <span className="admin-badge-pill" style={{
+                      background:'rgba(0,45,93,0.06)',color:'var(--navy)',fontWeight:700,fontSize:'11px',padding:'3px 10px'
                     }}>
                       {a.userName}
                     </span>
                     <span>•</span>
-                    <span style={{
-                      background:'rgba(99,102,241,0.08)',padding:'2px 8px',borderRadius:'4px',fontWeight:500,
-                      color:'var(--primary)',fontSize:'11px'
+                    <span className="admin-badge-pill" style={{
+                      background:`${ICONS[a.action] ? 'rgba(99,102,241,0.08)' : 'rgba(71,85,105,0.08)'}`,
+                      color:`${ICONS[a.action] ? 'var(--primary)' : 'var(--muted)'}`,
+                      fontWeight:600,fontSize:'11px',padding:'3px 10px'
                     }}>
                       {ACTION_LABELS[a.action] || a.action.replace(/_/g, ' ')}
                     </span>
                   </div>
                 </div>
                 <div style={{fontSize:'12px',color:'var(--muted)',whiteSpace:'nowrap',flexShrink:0,fontWeight:500,textAlign:'right'}}>
-                  <div>{new Date(a.timestamp).toLocaleDateString()}</div>
-                  <div style={{fontSize:'11px',opacity:0.8}}>{new Date(a.timestamp).toLocaleTimeString()}</div>
+                  <div style={{fontWeight:600,color:'var(--foreground)'}}>{new Date(a.timestamp).toLocaleDateString()}</div>
+                  <div style={{fontSize:'11px',opacity:0.7,marginTop:'2px'}}>{new Date(a.timestamp).toLocaleTimeString()}</div>
                 </div>
               </div>
             ))}
-            {filtered.length===0 && <div style={{padding:'40px',textAlign:'center',color:'var(--muted)'}}>
-              {activeFilterCount > 0 ? 'No activity matches your filters' : 'No activity yet'}
+            {filtered.length===0 && <div style={{padding:'60px',textAlign:'center',color:'var(--muted)',fontWeight:500}}>
+              {activeFilterCount > 0 ? 'No activity matches your filters' : 'No activity logs found'}
             </div>}
             {loadingMore && (
               <div style={{ padding: '16px', textAlign: 'center', color: 'var(--muted)', background: 'var(--background)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                 <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--navy)', display: 'inline-block' }} />
-                Loading more activities...
+                Loading older activities...
               </div>
             )}
             {!loadingMore && hasMore && filtered.length > 0 && (
-              <div style={{ padding: '12px', textAlign: 'center', background: 'var(--background)' }}>
+              <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-light)' }}>
                 <button 
                   onClick={() => fetch_(false)}
+                  className="admin-btn-secondary-flat"
                   style={{
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                    color: 'var(--navy)', cursor: 'pointer', padding: '6px 16px',
-                    borderRadius: '6px', fontSize: '12px', fontWeight: 600
+                    padding: '8px 20px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', margin: '0 auto'
                   }}
                 >
                   Load More Activities
@@ -464,6 +449,11 @@ export default function AdminActivityPage() {
           </div>
         )}
       </div>
+      <style>{`
+        .admin-activity-item:hover {
+          background-color: rgba(0, 45, 93, 0.015) !important;
+        }
+      `}</style>
     </div>
   );
 }

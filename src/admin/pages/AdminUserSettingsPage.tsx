@@ -36,8 +36,6 @@ export default function AdminUserSettingsPage() {
 
   const [globalPerms, setGlobalPerms] = useState({ canView: true, canEdit: false, canDownload: false, isAdmin: false, fullSheetAccess: false, canCreateSheets: false });
 
-
-
   useEffect(() => {
     async function loadData() {
       try {
@@ -125,7 +123,7 @@ export default function AdminUserSettingsPage() {
     if (id && token) loadData();
   }, [id, token, navigate, addNotification]);
 
-  const handleSave = async (silent = false, overrides?: any) => {
+  const handleSave = async (silent = false) => {
     if (!user || !token) return;
     setSaving(true);
     try {
@@ -206,139 +204,169 @@ export default function AdminUserSettingsPage() {
     }
   };
 
-
-
-
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading user data...</div>;
+  if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: 'var(--muted)', fontWeight: 500 }}>Loading user data...</div>;
   if (!user) return null;
 
   return (
     <div style={{ height: '100vh', maxHeight: '100vh', background: 'var(--background)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div className="admin-topbar" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'white', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      
+      {/* Premium Glass Topbar */}
+      <div className="admin-topbar admin-animate-fade-in" style={{ 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 100, 
+        background: 'rgba(255, 255, 255, 0.85)', 
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        padding: '16px 24px'
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button onClick={() => navigate('/admin/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'transparent', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 500 }}>
+          <button onClick={() => navigate('/admin/dashboard')} className="admin-btn-secondary-flat" style={{ padding: '8px 16px', borderRadius: '10px', height: '38px' }}>
             <ArrowLeft size={16} /> Back
           </button>
           <div>
-            <h1 style={{ margin: 0, fontSize: '20px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '-0.02em' }}>
               User Settings: {user.name || user.email}
-              {saving && <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--brand-green)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '4px', animation: 'pulse 2s infinite' }}>Saving changes...</span>}
+              {saving && <span style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(16,185,129,0.2)', animation: 'pulse 2s infinite' }}>Saving changes...</span>}
             </h1>
-            <div style={{ color: 'var(--muted)', fontSize: '13px', marginTop: '4px' }}>Configure roles, global access, and granular sheet permissions.</div>
+            <div style={{ color: 'var(--muted)', fontSize: '13px', marginTop: '2px' }}>Configure roles, global access, and granular sheet permissions.</div>
           </div>
         </div>
       </div>
 
-      <div className="admin-content-wrap" style={{ flex: 1, overflowY: 'auto' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '30px' }}>
+      <div className="admin-content-wrap" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          <div className="admin-grid-two-col" style={{ display: 'grid', gap: '20px' }}>
-            {/* Profile Details */}
-            <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Edit3 size={18} /> Profile Details
+          {/* Responsive Profile & Password Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            
+            {/* Profile Details Card */}
+            <div className="admin-card-glass admin-animate-fade-in" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Edit3 size={18} color="var(--accent)" /> Profile Details
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--muted)', marginBottom: '4px' }}>Full Name</label>
-                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '14px', outline: 'none' }} />
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--muted)', marginBottom: '6px' }}>Full Name</label>
+                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="admin-input-premium" placeholder="Enter user's name" />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--muted)', marginBottom: '4px' }}>Phone Number</label>
-                  <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '14px', outline: 'none' }} />
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--muted)', marginBottom: '6px' }}>Phone Number</label>
+                  <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="admin-input-premium" placeholder="Enter user's phone" />
                 </div>
-                <button onClick={handleSaveProfile} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, var(--brand-green), var(--brand-green-dark))', color: 'white', fontWeight: 700, fontSize: '13px', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '4px', boxShadow: 'var(--shadow-button)' }}>Save Profile</button>
+                <button onClick={handleSaveProfile} className="admin-btn-success-glow" style={{ alignSelf: 'flex-start', marginTop: '6px' }}>
+                  Save Profile
+                </button>
               </div>
             </div>
 
-            {/* Password & Security */}
-            <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Lock size={18} /> Password & Security
+            {/* Password & Security Card */}
+            <div className="admin-card-glass admin-animate-fade-in" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Lock size={18} color="var(--accent)" /> Password & Security
               </h3>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <input type={showNewPw ? 'text' : 'password'} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Password" style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', paddingRight: '36px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '14px' }} />
-                  <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
-                    {showNewPw ? <EyeOff size={16}/> : <Eye size={16}/>}
-                  </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--muted)', marginBottom: '6px' }}>New Password</label>
+                    <input type={showNewPw ? 'text' : 'password'} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" className="admin-input-premium" style={{ paddingRight: '44px' }} />
+                    <button type="button" onClick={() => setShowNewPw(!showNewPw)} style={{ position: 'absolute', right: '14px', bottom: '12px', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}>
+                      {showNewPw ? <EyeOff size={16}/> : <Eye size={16}/>}
+                    </button>
+                  </div>
+                  <button onClick={handleChangePassword} className="admin-btn-primary-glow" style={{ height: '44px', padding: '0 20px' }}>Update</button>
                 </div>
-                <button onClick={handleChangePassword} style={{ padding: '0 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, var(--navy), var(--navy-light))', color: 'white', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}>Update</button>
+                <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5' }}>
+                  Set a temporary or updated password for this user. Passwords must be at least 6 characters.
+                </p>
               </div>
-              <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--muted)' }}>You can view or update the user's password here.</p>
             </div>
           </div>
 
-          <div className="admin-grid-two-col" style={{ display: 'grid', gap: '20px' }}>
+          {/* Permissions & Roles Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+            
             {/* Global Permissions */}
-            <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Shield size={18} /> Global Permissions
+            <div className="admin-card-glass admin-animate-fade-in" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Shield size={18} color="var(--accent)" /> Global Permissions
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {[
-                  { k: 'canCreateSheets', l: 'Can Create Folders & Sheets', icon: <FileText size={16}/>, desc: 'Can add new folders and sheets' },
-                  { k: 'isAdmin', l: 'Admin Access', icon: <Shield size={16}/>, desc: 'Full admin access' }
+                  { k: 'canCreateSheets', l: 'Can Create Folders & Sheets', icon: <FileText size={16} color="var(--accent)" />, desc: 'Can add new folders and sheets' },
+                  { k: 'isAdmin', l: 'Admin Access', icon: <Shield size={16} color="var(--accent)" />, desc: 'Full administrative access' }
                 ].map(({ k, l, icon, desc }) => (
-                  <label key={k} className="admin-global-permission-label" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: '1px solid var(--border-light)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={(globalPerms as any)[k]} onChange={() => setGlobalPerms(p => ({ ...p, [k]: !(p as any)[k] }))} style={{ width: '18px', height: '18px', accentColor: 'var(--brand-green)' }} />
-                    <span style={{ color: 'var(--foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}>{icon} {l}</span>
+                  <label key={k} className="admin-global-permission-label" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', transition: 'background-color 0.2s' }}>
+                    <input type="checkbox" checked={(globalPerms as any)[k]} onChange={() => setGlobalPerms(p => ({ ...p, [k]: !(p as any)[k] }))} style={{ width: '18px', height: '18px', accentColor: 'var(--brand-green)', cursor: 'pointer' }} />
+                    <span style={{ color: 'var(--foreground)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>{icon} {l}</span>
                     <span style={{ fontSize: '12px', color: 'var(--muted)', marginLeft: 'auto' }}>{desc}</span>
                   </label>
                 ))}
               </div>
             </div>
 
-          {/* Role Selector */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: '16px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={18} /> User Role
-            </h3>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              {[
-                { value: 'user', label: 'User', desc: 'Standard user with granular permissions. Use toggles below to control access.', color: 'var(--muted)', bg: 'var(--border-light)' },
-                { value: 'admin', label: 'System Admin', desc: 'Full dashboard + workspace + download access. Can manage all users and settings.', color: 'var(--accent)', bg: 'rgba(230,48,18,0.1)' },
-              ].map(r => (
-                <button key={r.value} onClick={async () => {
-                  if (userRole === r.value) return;
-                  try {
-                    const newPerms = r.value === 'admin'
-                      ? { ...globalPerms, canView: true, canEdit: true, canDownload: true, isAdmin: true, fullSheetAccess: true, canCreateSheets: true }
-                      : { ...globalPerms, fullSheetAccess: false, isAdmin: false };
-                    await firebaseUpdateUser(user.id, { role: r.value });
-                    await firebaseUpdatePermissions(user.id, { ...user.permissions, ...newPerms });
-                    setUserRole(r.value);
-                    setGlobalPerms(newPerms);
-                    setUser({ ...user, role: r.value, permissions: { ...user.permissions, ...newPerms } });
-                    addNotification({ title: 'Role Updated', message: `${user.name} is now a ${r.label}`, type: 'success' });
-                  } catch (err: any) {
-                    addNotification({ title: 'Error', message: err.message || 'Failed to update role', type: 'error' });
-                  }
-                }} style={{
-                  flex: '1 1 200px', padding: '16px', borderRadius: '10px', cursor: 'pointer',
-                  border: userRole === r.value ? `2px solid ${r.color}` : '2px solid var(--border)',
-                  background: userRole === r.value ? r.bg : 'var(--surface)',
-                  textAlign: 'left', transition: 'all 0.2s',
-                }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: userRole === r.value ? r.color : 'var(--foreground)', marginBottom: '4px' }}>
-                    {userRole === r.value && <Check size={14} style={{ marginRight: '6px' }} />}
-                    {r.label}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)' }}>{r.desc}</div>
-                </button>
-              ))}
+            {/* Role Selector Card */}
+            <div className="admin-card-glass admin-animate-fade-in" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Users size={18} color="var(--accent)" /> User Role
+              </h3>
+              <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+                {[
+                  { value: 'user', label: 'Standard User', desc: 'Granular sheets permission controller.', color: 'var(--muted)', bg: 'rgba(71, 85, 105, 0.05)', activeColor: 'var(--muted)' },
+                  { value: 'admin', label: 'System Admin', desc: 'Full access to workspaces, download rights, and configurations.', color: 'var(--accent)', bg: 'rgba(26, 115, 232, 0.05)', activeColor: 'var(--accent)' },
+                ].map(r => (
+                  <button key={r.value} onClick={async () => {
+                    if (userRole === r.value) return;
+                    try {
+                      const newPerms = r.value === 'admin'
+                        ? { ...globalPerms, canView: true, canEdit: true, canDownload: true, isAdmin: true, fullSheetAccess: true, canCreateSheets: true }
+                        : { ...globalPerms, fullSheetAccess: false, isAdmin: false };
+                      await firebaseUpdateUser(user.id, { role: r.value });
+                      await firebaseUpdatePermissions(user.id, { ...user.permissions, ...newPerms });
+                      setUserRole(r.value);
+                      setGlobalPerms(newPerms);
+                      setUser({ ...user, role: r.value, permissions: { ...user.permissions, ...newPerms } });
+                      addNotification({ title: 'Role Updated', message: `${user.name} is now a ${r.label}`, type: 'success' });
+                    } catch (err: any) {
+                      addNotification({ title: 'Error', message: err.message || 'Failed to update role', type: 'error' });
+                    }
+                  }} style={{
+                    padding: '16px', borderRadius: '14px', cursor: 'pointer',
+                    border: userRole === r.value ? `2px solid ${r.activeColor}` : '1.5px solid var(--border)',
+                    background: userRole === r.value ? r.bg : 'var(--surface)',
+                    textAlign: 'left', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px'
+                  }}>
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: userRole === r.value ? 'var(--navy)' : 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {userRole === r.value ? <Check size={16} color={r.activeColor} /> : <div style={{ width: 16, height: 16 }} />}
+                      {r.label}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', paddingLeft: '24px' }}>{r.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
 
-          {/* Full Sheet & Folder Access Toggle */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: `1px solid ${(globalPerms as any).fullSheetAccess ? '#6366f1' : 'var(--border)'}`, boxShadow: 'var(--shadow-sm)', transition: 'border-color 0.2s' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          {/* Full Sheet & Folder Access Banner */}
+          <div className="admin-card-glass admin-animate-fade-in" style={{ 
+            padding: '24px', 
+            border: `1.5px solid ${(globalPerms as any).fullSheetAccess ? 'var(--accent)' : 'var(--border)'}`, 
+            background: (globalPerms as any).fullSheetAccess ? 'rgba(26, 115, 232, 0.02)' : 'var(--surface)',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
               <div>
-                <h3 style={{ margin: '0 0 4px', fontSize: '16px', color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Shield size={18} /> Full Sheet & Folder Access
+                <h3 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Shield size={18} color="var(--accent)" /> Full Sheet & Folder Access
                 </h3>
-                <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)', maxWidth: '500px' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)', maxWidth: '650px', lineHeight: '1.5' }}>
                   When enabled, this user can access <strong>all sheets and folders</strong> — view, edit, create sheets, create folders — without needing granular permissions below. When disabled, only the specific sheet permissions assigned below will apply.
                 </p>
               </div>
@@ -355,42 +383,35 @@ export default function AdminUserSettingsPage() {
                     addNotification({ title: 'Error', message: err.message || 'Failed to toggle', type: 'error' });
                   }
                 }}
-                style={{
-                  padding: '10px 24px', borderRadius: '10px', fontWeight: 700, fontSize: '14px',
-                  cursor: 'pointer', border: 'none', transition: 'all 0.25s',
-                  background: (globalPerms as any).fullSheetAccess
-                    ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                    : 'var(--surface)',
-                  color: (globalPerms as any).fullSheetAccess ? '#fff' : 'var(--muted)',
-                  boxShadow: (globalPerms as any).fullSheetAccess ? '0 4px 15px rgba(99,102,241,0.3)' : 'inset 0 0 0 1px var(--border)',
-                  minWidth: '160px',
-                }}
+                className={(globalPerms as any).fullSheetAccess ? "admin-btn-primary-glow" : "admin-btn-secondary-flat"}
+                style={{ minWidth: '160px', justifyContent: 'center' }}
               >
                 {(globalPerms as any).fullSheetAccess ? (
-                  <><Check size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> All Access ON</>
+                  <><Check size={16} /> All Access ON</>
                 ) : (
-                  <><X size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Granular Only</>
+                  <><X size={16} /> Granular Only</>
                 )}
               </button>
             </div>
             {(globalPerms as any).fullSheetAccess && (
-              <div style={{ marginTop: '12px', padding: '10px 14px', background: 'rgba(99,102,241,0.06)', borderRadius: '8px', fontSize: '12px', color: '#6366f1', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Check size={14} /> This user has full access to all sheets and folders. The granular permissions below are bypassed.
+              <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(26, 115, 232, 0.06)', borderRadius: '10px', fontSize: '13px', color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Check size={16} /> This user has full access to all sheets and folders. Granular controls are currently bypassed.
               </div>
             )}
           </div>
 
-          <div className="admin-sheet-search-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--navy)' }}>Granular Sheet Permissions</h3>
+          {/* Granular Permission Search Header */}
+          <div className="admin-sheet-search-header-row admin-animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--navy)', letterSpacing: '-0.01em' }}>Granular Sheet Permissions</h3>
             <div className="admin-sheet-search-box-wrapper" style={{ position: 'relative', width: '300px' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+              <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--placeholder)' }} />
               <input
                 type="text"
                 placeholder="Search sheets..."
                 value={searchQuery}
-
                 onChange={e => setSearchQuery(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 12px 8px 36px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', outline: 'none' }}
+                className="admin-input-premium"
+                style={{ paddingLeft: '38px', height: '40px', fontSize: '13px' }}
               />
             </div>
           </div>
@@ -410,20 +431,42 @@ export default function AdminUserSettingsPage() {
 
             const renderSheet = (reg: RegisterDetail) => {
               const cols = [...reg.columns].sort((a, b) => a.position - b.position);
-              const allColIndices = cols.map((_, i) => i);
               const isExpanded = expandedRegId === reg.id;
               const hasAccess = globalPerms.isAdmin || sheetAccessGranted[reg.id] === true;
 
               return (
-                <div key={reg.id} className="admin-sheet-card" style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden', opacity: hasAccess ? 1 : 0.6 }}>
-                  <div className="admin-sheet-card-header" onClick={() => setExpandedRegId(isExpanded ? null : reg.id)} style={{ padding: '16px 20px', borderBottom: isExpanded ? '1px solid var(--border)' : 'none', cursor: 'pointer', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {isExpanded ? <ChevronDown size={20} color="var(--muted)" /> : <ChevronRight size={20} color="var(--muted)" />}
+                <div key={reg.id} className="admin-sheet-card admin-animate-fade-in" style={{ 
+                  background: 'var(--surface)', 
+                  borderRadius: '16px', 
+                  border: '1px solid var(--border)', 
+                  overflow: 'hidden', 
+                  opacity: hasAccess ? 1 : 0.7,
+                  transition: 'opacity 0.25s, box-shadow 0.25s',
+                  boxShadow: 'var(--admin-card-shadow)'
+                }}>
+                  <div className="admin-sheet-card-header" onClick={() => setExpandedRegId(isExpanded ? null : reg.id)} style={{ 
+                    padding: '16px 20px', 
+                    borderBottom: isExpanded ? '1.5px solid var(--border-light)' : 'none', 
+                    cursor: 'pointer', 
+                    background: 'var(--surface)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px' 
+                  }}>
+                    {isExpanded ? <ChevronDown size={18} color="var(--muted)" /> : <ChevronRight size={18} color="var(--muted)" />}
                     <FileText size={20} color="var(--accent)" style={{ flexShrink: 0 }} />
-                    <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--navy)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reg.name} {!hasAccess && <span style={{fontSize: '12px', color: 'var(--destructive)', marginLeft: '8px'}}>(No Access)</span>}</h3>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--navy)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {reg.name} 
+                      {!hasAccess && <span style={{fontSize: '11px', fontWeight: 700, color: 'var(--destructive)', background: 'var(--destructive-bg)', padding: '2px 8px', borderRadius: '12px', marginLeft: '10px'}}>No Access</span>}
+                    </h3>
+                    
                     <div className="admin-sheet-card-actions" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                       {hasAccess && (
                         <>
-                          <label onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#8B5CF6', cursor: 'pointer', padding: '4px 8px', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '6px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                          <label onClick={e => e.stopPropagation()} style={{ 
+                            display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#8B5CF6', cursor: 'pointer', 
+                            padding: '6px 12px', background: 'rgba(139, 92, 246, 0.06)', borderRadius: '8px', border: '1.5px solid rgba(139, 92, 246, 0.15)' 
+                          }}>
                             <input 
                               type="checkbox" 
                               checked={editRestrictions[reg.id] === undefined} 
@@ -433,12 +476,15 @@ export default function AdminUserSettingsPage() {
                                 else delete next[reg.id];
                                 return next;
                               })} 
-                              style={{ width: '16px', height: '16px', accentColor: '#8B5CF6' }}
+                              style={{ width: '15px', height: '15px', accentColor: '#8B5CF6', cursor: 'pointer' }}
                             />
-                            <Edit3 size={14} color="#8B5CF6" /> Edit
+                            <Edit3 size={13} color="#8B5CF6" /> Edit
                           </label>
 
-                          <label onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600, color: '#0891b2', cursor: 'pointer', padding: '4px 8px', background: 'rgba(8, 145, 178, 0.05)', borderRadius: '6px', border: '1px solid rgba(8, 145, 178, 0.2)' }}>
+                          <label onClick={e => e.stopPropagation()} style={{ 
+                            display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: '#0891b2', cursor: 'pointer', 
+                            padding: '6px 12px', background: 'rgba(8, 145, 178, 0.06)', borderRadius: '8px', border: '1.5px solid rgba(8, 145, 178, 0.15)' 
+                          }}>
                             <input 
                               type="checkbox" 
                               checked={downloadRestrictions[reg.id] === undefined} 
@@ -448,27 +494,41 @@ export default function AdminUserSettingsPage() {
                                 else delete next[reg.id];
                                 return next;
                               })} 
-                              style={{ width: '16px', height: '16px', accentColor: '#0891b2' }}
+                              style={{ width: '15px', height: '15px', accentColor: '#0891b2', cursor: 'pointer' }}
                             />
-                            <Download size={14} color="#0891b2" /> Download
+                            <Download size={13} color="#0891b2" /> Download
                           </label>
                         </>
                       )}
-                      <button disabled={globalPerms.isAdmin} onClick={(e) => { e.stopPropagation(); if (globalPerms.isAdmin) return; if (hasAccess) { setSheetAccessGranted(prev => ({ ...prev, [reg.id]: false })); } else { setSheetAccessGranted(prev => ({ ...prev, [reg.id]: true })); } }} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid', fontSize: '12px', fontWeight: 600, cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', background: hasAccess ? '#dcfce7' : 'var(--surface)', color: hasAccess ? '#16a34a' : 'var(--muted)', borderColor: hasAccess ? '#86efac' : 'var(--border)', flexShrink: 0 }}>
+                      
+                      <button disabled={globalPerms.isAdmin} onClick={(e) => { 
+                        e.stopPropagation(); 
+                        if (globalPerms.isAdmin) return; 
+                        setSheetAccessGranted(prev => ({ ...prev, [reg.id]: !hasAccess }));
+                      }} style={{ 
+                        padding: '6px 14px', borderRadius: '20px', border: '1.5px solid', fontSize: '11.5px', fontWeight: 700, 
+                        cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', 
+                        background: hasAccess ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)', 
+                        color: hasAccess ? '#10b981' : 'var(--muted)', 
+                        borderColor: hasAccess ? 'rgba(16, 185, 129, 0.25)' : 'var(--border)', 
+                        flexShrink: 0,
+                        transition: 'all 0.2s'
+                      }}>
                         {hasAccess ? <><Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Access Granted</> : 'Grant Access'}
                       </button>
-                      <span className="admin-sheet-cols-badge" style={{ fontSize: '12px', color: 'var(--muted)', background: 'var(--surface)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>{cols.length} Columns</span>
+                      <span className="admin-sheet-cols-badge" style={{ fontSize: '12px', color: 'var(--muted)', background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>{cols.length} Columns</span>
                     </div>
                   </div>
+
                   {isExpanded && (
-                    <div style={{ padding: '20px' }}>
-                      <div style={{ padding: '12px', background: 'rgba(0,45,93,0.02)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                        <div className="admin-sheet-cols-header-title" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ padding: '20px', background: 'rgba(248, 250, 252, 0.5)' }}>
+                      <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.01)' }}>
+                        <div className="admin-sheet-cols-header-title" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <FileText size={14} /> Sheet Columns ({cols.length})
+                            <FileText size={14} color="var(--accent)" /> Sheet Columns ({cols.length})
                           </div>
                           <div className="admin-sheet-cols-select-all-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--navy)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--navy)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal', fontWeight: 600 }}>
                               <input 
                                 type="checkbox" 
                                 checked={columnViewRestrictions[reg.id] === undefined || (Array.isArray(columnViewRestrictions[reg.id]) && columnViewRestrictions[reg.id].length === cols.length)} 
@@ -487,7 +547,7 @@ export default function AdminUserSettingsPage() {
                               />
                               Select All Visible
                             </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--navy)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--navy)', cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal', fontWeight: 600 }}>
                               <input 
                                 type="checkbox" 
                                 checked={editRestrictions[reg.id] === undefined || (Array.isArray(editRestrictions[reg.id]) && editRestrictions[reg.id].length === cols.length)} 
@@ -508,17 +568,20 @@ export default function AdminUserSettingsPage() {
                             </label>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           {cols.map((col, idx) => (
-                            <div key={col.id} className="admin-column-item-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', background: 'white', padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--navy)', fontWeight: 500 }}>
+                            <div key={col.id} className="admin-column-item-row" style={{ 
+                              display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', background: 'var(--surface)', 
+                              padding: '10px 16px', borderRadius: '10px', border: '1px solid var(--border-light)', color: 'var(--navy)', fontWeight: 500 
+                            }}>
                               <div className="admin-column-item-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                                <span style={{ color: 'var(--muted)', fontWeight: 600, width: '24px', flexShrink: 0 }}>{idx + 1}.</span> 
+                                <span style={{ color: 'var(--muted)', fontWeight: 700, width: '24px', flexShrink: 0 }}>{idx + 1}.</span> 
                                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '20px' }}>{col.name}</span>
-                                <span className="admin-column-item-type" style={{ fontSize: '10px', color: 'var(--muted)', background: 'var(--surface)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.02em', flexShrink: 0 }}>{col.type}</span>
+                                <span className="admin-column-item-type" style={{ fontSize: '10px', color: 'var(--muted)', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.02em', flexShrink: 0 }}>{col.type}</span>
                               </div>
                               
                               <div className="admin-column-item-actions" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexShrink: 0 }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: (columnViewRestrictions[reg.id] === undefined || (Array.isArray(columnViewRestrictions[reg.id]) && columnViewRestrictions[reg.id].includes(col.id))) ? '#3B82F6' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '80px', transition: 'color 0.2s' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: (columnViewRestrictions[reg.id] === undefined || (Array.isArray(columnViewRestrictions[reg.id]) && columnViewRestrictions[reg.id].includes(col.id))) ? '#3B82F6' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '80px', transition: 'color 0.2s', fontWeight: 600 }}>
                                   <input 
                                     type="checkbox" 
                                     checked={columnViewRestrictions[reg.id] === undefined || (Array.isArray(columnViewRestrictions[reg.id]) && columnViewRestrictions[reg.id].includes(col.id))} 
@@ -548,7 +611,7 @@ export default function AdminUserSettingsPage() {
                                   Visible
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: (editRestrictions[reg.id] === undefined || (Array.isArray(editRestrictions[reg.id]) && editRestrictions[reg.id].includes(col.id))) ? '#8B5CF6' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '90px', transition: 'color 0.2s' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: (editRestrictions[reg.id] === undefined || (Array.isArray(editRestrictions[reg.id]) && editRestrictions[reg.id].includes(col.id))) ? '#8B5CF6' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '90px', transition: 'color 0.2s', fontWeight: 600 }}>
                                   <input 
                                     type="checkbox" 
                                     checked={editRestrictions[reg.id] === undefined || (Array.isArray(editRestrictions[reg.id]) && editRestrictions[reg.id].includes(col.id))} 
@@ -578,7 +641,7 @@ export default function AdminUserSettingsPage() {
                                   Editable
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: (col as any).mandatory ? 'var(--primary)' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '100px', transition: 'color 0.2s' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: (col as any).mandatory ? 'var(--navy)' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '100px', transition: 'color 0.2s', fontWeight: 600 }}>
                                   <input 
                                     type="checkbox" 
                                     checked={!!(col as any).mandatory} 
@@ -592,12 +655,12 @@ export default function AdminUserSettingsPage() {
                                         addNotification({ title: 'Error', message: 'Failed to update column', type: 'error' });
                                       }
                                     }}
-                                    style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                                    style={{ width: '15px', height: '15px', accentColor: 'var(--navy)', cursor: 'pointer' }}
                                   />
                                   Mandatory
                                 </label>
 
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: (col as any).unique ? '#0891b2' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '90px', transition: 'color 0.2s' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: (col as any).unique ? '#0891b2' : 'var(--muted)', cursor: 'pointer', userSelect: 'none', width: '90px', transition: 'color 0.2s', fontWeight: 600 }}>
                                   <input 
                                     type="checkbox" 
                                     checked={!!(col as any).unique} 
@@ -634,11 +697,11 @@ export default function AdminUserSettingsPage() {
               <>
                 {/* Unassigned sheets at the top */}
                 {unassigned.length > 0 && (
-                  <div style={{ marginBottom: '8px' }}>
-                    <div style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                       Unassigned Sheets
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {unassigned.map(reg => renderSheet(reg))}
                     </div>
                   </div>
@@ -647,17 +710,30 @@ export default function AdminUserSettingsPage() {
                 {/* Folders below */}
                 {usedFolders.map(folder => {
                   const sheetsInFolder = folderMap[folder.id] || [];
-                  // Closed by default; auto-open when searching and folder has matching sheets
                   const isFolderOpen = isSearching ? true : (expandedFolders[folder.id] === true);
+                  const hasFolderAccess = folderAccessGranted[folder.id] === true;
+
                   return (
-                    <div key={`folder-${folder.id}`} style={{ marginBottom: '8px' }}>
+                    <div key={`folder-${folder.id}`} style={{ marginBottom: '12px' }}>
                       <div
                         onClick={() => setExpandedFolders(prev => ({ ...prev, [folder.id]: !isFolderOpen }))}
-                        style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', background: '#fef3c7', borderRadius: '10px', border: '1px solid #fcd34d', marginBottom: isFolderOpen ? '8px' : 0 }}
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '12px', 
+                          padding: '14px 20px', 
+                          cursor: 'pointer', 
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(245, 158, 11, 0.09))', 
+                          borderRadius: '14px', 
+                          border: '1.5px solid rgba(245, 158, 11, 0.18)', 
+                          marginBottom: isFolderOpen ? '10px' : 0,
+                          transition: 'all 0.2s ease',
+                          boxShadow: 'var(--shadow-sm)'
+                        }}
                       >
-                        {isFolderOpen ? <ChevronDown size={18} color="#92400e" /> : <ChevronRight size={18} color="#92400e" />}
-                        <FolderOpen size={20} color="#f59e0b" />
-                        <span style={{ fontWeight: 700, fontSize: '15px', color: '#92400e', flex: 1 }}>{folder.name}</span>
+                        {isFolderOpen ? <ChevronDown size={18} color="#b45309" /> : <ChevronRight size={18} color="#b45309" />}
+                        <FolderOpen size={20} color="#d97706" />
+                        <span style={{ fontWeight: 800, fontSize: '15px', color: '#78350f', flex: 1 }}>{folder.name}</span>
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <button 
@@ -665,21 +741,26 @@ export default function AdminUserSettingsPage() {
                             onClick={(e) => { 
                               e.stopPropagation(); 
                               if (globalPerms.isAdmin) return; 
-                              const hasAccess = folderAccessGranted[folder.id] === true;
-                              setFolderAccessGranted(prev => ({ ...prev, [folder.id]: !hasAccess }));
+                              setFolderAccessGranted(prev => ({ ...prev, [folder.id]: !hasFolderAccess }));
                             }} 
                             style={{ 
-                              padding: '6px 14px', borderRadius: '6px', border: '1px solid', fontSize: '12px', fontWeight: 600, cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', 
-                              background: folderAccessGranted[folder.id] ? '#dcfce7' : 'var(--surface)', color: folderAccessGranted[folder.id] ? '#16a34a' : 'var(--muted)', borderColor: folderAccessGranted[folder.id] ? '#86efac' : 'var(--border)' 
+                              padding: '6px 14px', borderRadius: '20px', border: '1.5px solid', fontSize: '11px', fontWeight: 700, 
+                              cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', 
+                              background: hasFolderAccess ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)', 
+                              color: hasFolderAccess ? '#10b981' : 'var(--muted)', 
+                              borderColor: hasFolderAccess ? 'rgba(16, 185, 129, 0.25)' : 'var(--border)',
+                              transition: 'all 0.2s'
                             }}
                           >
-                            {folderAccessGranted[folder.id] ? <><Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Access Granted</> : 'Grant Access'}
+                            {hasFolderAccess ? <><Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Access Granted</> : 'Grant Access'}
                           </button>
-                          <span style={{ fontSize: '12px', color: '#92400e', background: '#fde68a', padding: '3px 10px', borderRadius: '12px' }}>{sheetsInFolder.length} sheets</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#b45309', background: 'rgba(245, 158, 11, 0.12)', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                            {sheetsInFolder.length} sheets
+                          </span>
                         </div>
                       </div>
                       {isFolderOpen && (
-                        <div style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ paddingLeft: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           {sheetsInFolder.map(reg => renderSheet(reg))}
                         </div>
                       )}
@@ -690,50 +771,66 @@ export default function AdminUserSettingsPage() {
             );
           })()}
 
-          {registers.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>No sheets found in the system.</div>}
+          {registers.length === 0 && <div className="admin-card-glass" style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)', fontWeight: 500 }}>No sheets found in the system.</div>}
 
+          {/* Login History & Activity */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginTop: '10px' }}>
-            <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '16px', color: 'var(--navy)' }}>Login History & Activity</h3>
-              <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            <div className="admin-card-glass admin-animate-fade-in" style={{ padding: '24px' }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: 'var(--navy)' }}>Login History & Activity</h3>
+              <div style={{ maxHeight: '220px', overflowY: 'auto', paddingRight: '8px' }} className="sidebar-list">
                 {(user.loginHistory || []).slice(0, 50).map((h: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-light)', fontSize: '13px' }}>
-                    <span style={{ color: h.type === 'login' ? 'var(--brand-green)' : 'var(--destructive)', fontWeight: 500 }}>
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-light)', fontSize: '13px' }}>
+                    <span style={{ color: h.type === 'login' ? 'var(--brand-green)' : 'var(--destructive)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: h.type === 'login' ? 'var(--brand-green)' : 'var(--destructive)' }} />
                       {h.type === 'login' ? 'Login' : 'Logout'}
                     </span>
-                    <span style={{ color: 'var(--muted)' }}>{new Date(h.timestamp).toLocaleString()}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 500 }}>{new Date(h.timestamp).toLocaleString()}</span>
                   </div>
                 ))}
-                {(!user.loginHistory || user.loginHistory.length === 0) && <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0 }}>No login history yet</p>}
+                {(!user.loginHistory || user.loginHistory.length === 0) && (
+                  <p style={{ color: 'var(--muted)', fontSize: '13px', margin: 0, textAlign: 'center', padding: '20px' }}>No login history records found.</p>
+                )}
               </div>
             </div>
           </div>
 
         </div>
 
+        {/* Preview Drawer Modal */}
         {previewReg && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPreviewReg(null)}>
-            <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
-              <div style={{ padding: '20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(15, 23, 42, 0.35)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' 
+          }} onClick={() => setPreviewReg(null)}>
+            <div className="admin-card-glass admin-animate-fade-in" style={{ 
+              background: 'var(--surface)', width: '100%', maxWidth: '1000px', maxHeight: '85vh', 
+              display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' 
+            }} onClick={e => e.stopPropagation()}>
+              
+              <div style={{ padding: '20px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: '18px', color: 'var(--navy)' }}>Preview: {previewReg.name}</h2>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: 'var(--navy)' }}>Preview: {previewReg.name}</h2>
                   <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--muted)' }}>
                      Showing the first 5 rows of this register.
                   </p>
                 </div>
-                <button onClick={() => setPreviewReg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}><X size={24} /></button>
+                <button onClick={() => setPreviewReg(null)} className="admin-btn-secondary-flat" style={{ padding: '8px', borderRadius: '50%', border: 'none' }}>
+                  <X size={20} />
+                </button>
               </div>
-              <div style={{ padding: '0', overflow: 'auto', flex: 1, position: 'relative' }}>
+
+              <div style={{ padding: '0', overflow: 'auto', flex: 1, position: 'relative' }} className="spreadsheet-wrapper">
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '13px', whiteSpace: 'nowrap' }}>
                   <thead>
                     <tr>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', background: 'var(--surface)', borderBottom: '1px solid var(--border)', color: 'var(--navy)', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10, minWidth: '60px' }}>
+                      <th style={{ padding: '12px 18px', textAlign: 'left', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--navy)', fontWeight: 700, position: 'sticky', top: 0, zIndex: 10, minWidth: '60px' }}>
                         Row #
                       </th>
                       {(() => {
                         const cols = [...previewReg.columns].sort((a, b) => a.position - b.position);
                         return cols.map(col => (
-                          <th key={col.id} style={{ padding: '10px 16px', textAlign: 'left', background: 'var(--surface)', borderBottom: '1px solid var(--border)', color: 'var(--navy)', fontWeight: 600, position: 'sticky', top: 0, zIndex: 10, minWidth: '120px' }}>
+                          <th key={col.id} style={{ padding: '12px 18px', textAlign: 'left', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--navy)', fontWeight: 700, position: 'sticky', top: 0, zIndex: 10, minWidth: '120px' }}>
                             {col.name}
                           </th>
                         ));
@@ -746,7 +843,7 @@ export default function AdminUserSettingsPage() {
                         const entries = (previewReg.entries || []).slice(0, 5);
                         
                         if (entries.length === 0) {
-                          return <tr><td colSpan={cols.length + 1} style={{ padding: '30px', textAlign: 'center', color: 'var(--muted)' }}>No data available for preview.</td></tr>;
+                          return <tr><td colSpan={cols.length + 1} style={{ padding: '30px', textAlign: 'center', color: 'var(--muted)', fontWeight: 500 }}>No data available for preview.</td></tr>;
                         }
 
                         return entries.map((row, i) => {
@@ -754,24 +851,25 @@ export default function AdminUserSettingsPage() {
                           const isEditableInUserView = editRestrictions[previewReg.id] === undefined;
                           
                           return (
-                            <tr key={i} style={{ background: i % 2 === 0 ? 'white' : 'var(--background)' }}>
-                              <td style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-light)', color: 'var(--muted)', fontWeight: 500 }}>
+                            <tr key={i} style={{ background: i % 2 === 0 ? 'white' : 'var(--bg-light)' }}>
+                              <td style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-light)', color: 'var(--muted)', fontWeight: 600 }}>
                                 {actualRowIndex + 1}
                               </td>
                               {cols.map((col) => {
                                 const isEditable = isEditableInUserView;
                                 return (
-                                  <td key={col.id} style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-light)', color: isEditable ? 'var(--navy)' : 'var(--muted)' }}>
+                                  <td key={col.id} style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-light)', color: isEditable ? 'var(--navy)' : 'var(--muted)' }}>
                                     {isEditable ? (
                                       <input 
                                         type="text" 
                                         value={row.cells?.[col.id.toString()] || ''} 
                                         readOnly 
-                                        style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--accent)', background: 'white', fontSize: '13px', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)' }}
+                                        className="admin-input-premium"
+                                        style={{ height: '34px', padding: '6px 12px', fontSize: '13px', background: 'white' }}
                                         title="Editable by this user"
                                       />
                                     ) : (
-                                      <span style={{ display: 'inline-block', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.6 }}>{row.cells?.[col.id.toString()] || '-'}</span>
+                                      <span style={{ display: 'inline-block', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.65, fontWeight: 500 }}>{row.cells?.[col.id.toString()] || '-'}</span>
                                     )}
                                   </td>
                                 );

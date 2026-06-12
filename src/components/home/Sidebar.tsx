@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -107,21 +107,33 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.7.6') !== 'true';
+      return localStorage.getItem('seen_version_1.7.7') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.7.6');
+  const [versionTab, setVersionTab] = useState<'1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.7.7');
+  
+  // Slideshow state
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
 
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.7.6', 'true');
+      localStorage.setItem('seen_version_1.7.7', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
+
+  useEffect(() => {
+    if (versionTab !== '1.7.7' || !showVersionModal || !isPlaying) return;
+    const interval = setInterval(() => {
+      setActiveSlide(prev => (prev + 1) % 5);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [versionTab, showVersionModal, isPlaying]);
 
   const notifications = useMemo(() => {
     if (!register?.entries || register.entries.length < 2) return [];
@@ -832,47 +844,44 @@ export const Sidebar = memo(function Sidebar({
           {!isCollapsed && (
             <div className="sidebar-profile-info">
               <span className="sidebar-profile-name">{user?.name || user?.email || 'User'}</span>
-              <span className="sidebar-profile-role">
-                {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role === 'sheet_admin' ? 'Staff' : 'User'}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '1px' }}>
+                <span className="sidebar-profile-role">
+                  {user?.role === 'superadmin' ? 'Super Admin' : user?.role === 'admin' ? 'Admin' : user?.role === 'sheet_admin' ? 'Staff' : 'User'}
+                </span>
+                <span 
+                  style={{
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    color: 'var(--brand-blue)',
+                    backgroundColor: 'var(--brand-blue-light)',
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    display: 'inline-block',
+                    flexShrink: 0
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setVersionTab('1.7.7');
+                    setActiveSlide(0); // Reset slideshow to first slide
+                    setShowVersionModal(true);
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#bfdbfe';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
+                  }}
+                  title="View what's new in v1.7.7"
+                >
+                  v1.7.7
+                </span>
+              </div>
             </div>
           )}
           {!isCollapsed && (
             <ChevronDown size={14} className={`sidebar-profile-chevron ${isFooterMenuOpen ? 'open' : ''}`} />
-          )}
-          {!isCollapsed && (
-            <span 
-              style={{
-                position: 'absolute',
-                top: '4px',
-                right: '4px',
-                fontSize: '9px',
-                fontWeight: 600,
-                color: '#1d4ed8',
-                backgroundColor: '#dbeafe',
-                padding: '1px 4px',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                opacity: 0.6
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setVersionTab('1.7.6');
-                setShowVersionModal(true);
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.opacity = '1';
-                e.currentTarget.style.backgroundColor = '#bfdbfe';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.opacity = '0.6';
-                e.currentTarget.style.backgroundColor = '#dbeafe';
-              }}
-              title="View what's new in v1.7.6"
-            >
-              v1.7.6
-            </span>
           )}
         </div>
 
@@ -1730,8 +1739,32 @@ export const Sidebar = memo(function Sidebar({
       {/* ── Version Updates Modal ── */}
       {showVersionModal && (
         <div className="modal-overlay" onClick={handleCloseVersionModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', borderRadius: '16px', padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              maxWidth: versionTab === '1.7.7' ? '850px' : '500px', 
+              width: '100%',
+              borderRadius: '20px', 
+              padding: versionTab === '1.7.7' ? '0' : '24px', 
+              background: versionTab === '1.7.7' ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '90vh'
+            }}
+          >
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: versionTab === '1.7.7' ? '0' : '16px', 
+              borderBottom: '1px solid #f1f5f9', 
+              padding: versionTab === '1.7.7' ? '16px 24px' : '0 0 12px 0',
+              background: versionTab === '1.7.7' ? '#f8fafc' : 'transparent'
+            }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Sparkles size={20} />
@@ -1752,12 +1785,40 @@ export const Sidebar = memo(function Sidebar({
             </div>
 
             {/* Version Tabs */}
-            <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', background: '#f1f5f9', padding: '4px', borderRadius: '8px', overflowX: 'auto' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '4px', 
+              marginBottom: versionTab === '1.7.7' ? '0' : '20px', 
+              background: '#f1f5f9', 
+              padding: '4px', 
+              borderRadius: versionTab === '1.7.7' ? '0' : '8px',
+              borderBottom: versionTab === '1.7.7' ? '1px solid #e2e8f0' : 'none', 
+              overflowX: 'auto' 
+            }}>
+              <button
+                onClick={() => { setVersionTab('1.7.7'); setActiveSlide(0); }}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: versionTab === '1.7.7' ? 'white' : 'transparent',
+                  color: versionTab === '1.7.7' ? '#0f172a' : '#64748b',
+                  boxShadow: versionTab === '1.7.7' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                v1.7.7 (New)
+              </button>
               <button
                 onClick={() => setVersionTab('1.7.6')}
                 style={{
                   flex: 1,
-                  padding: '6px 4px',
+                  padding: '6px 8px',
                   borderRadius: '6px',
                   border: 'none',
                   fontSize: '11px',
@@ -1770,7 +1831,7 @@ export const Sidebar = memo(function Sidebar({
                   whiteSpace: 'nowrap'
                 }}
               >
-                v1.7.6 (New)
+                v1.7.6
               </button>
               <button
                 onClick={() => setVersionTab('1.7.5')}
@@ -2072,9 +2133,449 @@ export const Sidebar = memo(function Sidebar({
               </button>
             </div>
             
-            {versionTab === '1.7.6' ? (
+            {versionTab === '1.7.7' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                
+                {/* Style block injection */}
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes gentlePulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.04); }
+                  }
+                  @keyframes borderGlow {
+                    0%, 100% { border-color: rgba(37, 99, 235, 0.1); }
+                    50% { border-color: rgba(37, 99, 235, 0.3); }
+                  }
+                  @keyframes mockScroll {
+                    0%, 15% { transform: translateX(0); }
+                    40%, 60% { transform: translateX(-60px); }
+                    85%, 100% { transform: translateX(0); }
+                  }
+                  @keyframes spinSlow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                  }
+                  @keyframes colorFill {
+                    0%, 15% { background-color: transparent; }
+                    45%, 80% { background-color: rgba(22, 163, 74, 0.08); }
+                    95%, 100% { background-color: transparent; }
+                  }
+                  @keyframes cursorClick {
+                    0% { transform: translate(120px, 120px); }
+                    35% { transform: translate(50px, 32px); }
+                    40% { transform: translate(50px, 32px) scale(0.85); }
+                    45%, 70% { transform: translate(50px, 32px) scale(1); }
+                    90%, 100% { transform: translate(120px, 120px); }
+                  }
+                  @keyframes colorDropdownOpen {
+                    0%, 35% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                    40%, 75% { opacity: 1; transform: scale(1) translateY(0); visibility: visible; }
+                    80%, 100% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .progress-bar-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #3b82f6, #10b981);
+                    width: 0%;
+                    border-radius: 2px;
+                  }
+                  .progress-bar-fill-playing {
+                    width: 100%;
+                    transition: width 4.5s linear;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} style={{ animation: 'spinSlow 6s linear infinite' }} />
+                          <span>Version 1.7.7 Live</span>
+                        </div>
+                        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          UI/UX Makeover Special
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 18px 0', lineHeight: 1.5 }}>
+                          Welcome to the most polished release of RecordBook! We've cleaned up user portals, replaced text emojis with outline vector icons, and redesigned sheets to fit cleanly on laptop displays.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>Sleek Premium White Sidebar & Avatar Footer</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>100% Outlined Vector Icons (Lucide-React)</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>Compact Responsive Layout with Sticky Column</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>7 Mild Column Background Colors & Scroll Protection</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: 'linear-gradient(135deg, #eff6ff 0%, #e8faf0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }} className="animate-slide-right">
+                        <div style={{ padding: '24px', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255, 255, 255, 0.9)', borderRadius: '20px', boxShadow: '0 15px 30px rgba(30, 41, 59, 0.08)', textAlign: 'center', width: '190px', animation: 'gentlePulse 3s ease-in-out infinite' }}>
+                          <div style={{ fontSize: '38px', fontWeight: 900, background: 'linear-gradient(135deg, #2563eb, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            v1.7.7
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginTop: '4px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                            Big Update
+                          </div>
+                          <div style={{ height: '1px', background: '#cbd5e1', margin: '12px auto', width: '70%' }} />
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, lineHeight: 1.4 }}>
+                            Aesthetics & Layout Redesign
+                          </div>
+                        </div>
+                        <div style={{ position: 'absolute', top: '12%', left: '10%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#2563eb', border: '1px solid #dbeafe' }}>⚪ White Sidebar</div>
+                        <div style={{ position: 'absolute', bottom: '12%', left: '12%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#16a34a', border: '1px solid #dcfce7' }}>🎨 Mild Colors</div>
+                        <div style={{ position: 'absolute', top: '15%', right: '8%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#7c3aed', border: '1px solid #f3e8ff' }}>⚡ Vector Icons</div>
+                        <div style={{ position: 'absolute', bottom: '15%', right: '10%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#ea580c', border: '1px solid #ffedd5' }}>🖥️ Sticky Column</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 2 of 5</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          ⚪ Premium White Sidebar Redesign
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          The dark sidebar is gone. We've introduced a professional light theme with soft slate-blue colors, visual depth, and smooth list entry hover transformations.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Light Slate Palette:</strong> Integrates cleanly with workspace sheets.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Profile Footer:</strong> Shows user avatar, initials, and privilege tag.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Active Glow:</strong> Clear indicators marking your active sheets.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#f8fafc', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }} className="animate-slide-right">
+                        <div style={{ width: '100%', maxWidth: '210px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 8px 20px rgba(0,0,0,0.04)', overflow: 'hidden', animation: 'borderGlow 3s ease-in-out infinite' }}>
+                          <div style={{ padding: '10px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <img src="/logo-transparent.png" alt="AG Logo" style={{ width: '16px', height: '16px' }} />
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#0f172a' }}>AG Trust <span style={{ color: '#2563eb', fontSize: '8px' }}>Record Book</span></span>
+                          </div>
+                          <div style={{ padding: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            <div style={{ padding: '6px 10px', background: '#eff6ff', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px', borderLeft: '2px solid #2563eb' }}>
+                              <FileText size={10} color="#2563eb" />
+                              <span style={{ fontSize: '10px', fontWeight: 600, color: '#2563eb' }}>Students Register</span>
+                            </div>
+                            <div style={{ padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
+                              <Folder size={10} fill="#fbbf24" color="#f59e0b" />
+                              <span style={{ fontSize: '10px', fontWeight: 500 }}>All Folders</span>
+                            </div>
+                            <div style={{ padding: '6px 10px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b' }}>
+                              <Activity size={10} />
+                              <span style={{ fontSize: '10px', fontWeight: 500 }}>History Logs</span>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '16px', padding: '8px 10px', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '6px', background: '#fafbfc' }}>
+                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#2563eb', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: 700 }}>
+                              US
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 600, color: '#0f172a', lineHeight: 1.1 }}>User Account</span>
+                              <span style={{ fontSize: '7px', color: '#94a3b8', background: '#f1f5f9', padding: '0px 2px', borderRadius: '2px', width: 'fit-content' }}>Admin</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 3 of 5</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          ⚡ Crisp SVG Vector Icons
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Say goodbye to standard text emojis! We replaced them with high-fidelity Lucide outlines that stay sharp and clean at any zoom level or screen density.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Visual Consistency:</strong> Matching outline weights for all tools.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>•</span>
+                            <span><strong>No Fuzzy Rendering:</strong> Scalable vector graphics look outstanding.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#7c3aed', fontWeight: 'bold' }}>
+                            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Modern Feel:</strong> Gives the entire administration suite a premium SaaS look.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#eff6ff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', gap: '14px' }} className="animate-slide-right">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '200px' }}>
+                          <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Old Emojis</div>
+                          <div style={{ padding: '8px 12px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.5, border: '1px dashed #cbd5e1' }}>
+                            <span style={{ fontSize: '14px' }}>🛡️</span>
+                            <span style={{ fontSize: '11px', color: '#475569', fontWeight: 500 }}>Admin Setup</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '200px' }}>
+                          <div style={{ fontSize: '9px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>New Vector Icons</div>
+                          <div style={{ padding: '8px 12px', background: 'white', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #dbeafe', boxShadow: '0 4px 10px rgba(37,99,235,0.06)', transform: 'scale(1.02)' }}>
+                            <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Shield size={11} color="#2563eb" />
+                            </div>
+                            <span style={{ fontSize: '11px', color: '#0f172a', fontWeight: 600 }}>Admin Setup</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 4 of 5</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          🖥️ Compact Tables & Sticky Columns
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Table grids inside Admin Panels are now optimized to fit on standard laptop screens. Spacing has been compressed and critical column items are locked to avoid clipping.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#ea580c', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Sticky Left Anchoring:</strong> S.No and Name remain locked when scrolling.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#ea580c', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Grid Compression:</strong> Read role details and status without clutter.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#ea580c', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Responsive Glide:</strong> Data columns slide cleanly underneath locked headers.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#fafafb', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }} className="animate-slide-right">
+                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', marginBottom: '6px', alignSelf: 'flex-start' }}>Locked Name column scroll preview</div>
+                        <div style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', background: 'white', boxShadow: '0 4px 10px rgba(0,0,0,0.02)' }}>
+                          <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontWeight: 600, fontSize: '10px', color: '#475569' }}>
+                            <div style={{ width: '20px', padding: '6px', textAlign: 'center', borderRight: '1px solid #f1f5f9', background: '#f8fafc', zIndex: 2 }}>#</div>
+                            <div style={{ width: '60px', padding: '6px', borderRight: '1px solid #f1f5f9', background: '#f8fafc', zIndex: 2, boxShadow: '1px 0 3px rgba(0,0,0,0.05)', position: 'relative' }}>Name</div>
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                              <div style={{ display: 'flex', width: '180px', animation: 'mockScroll 5s ease-in-out infinite' }}>
+                                <div style={{ width: '60px', padding: '6px', flexShrink: 0 }}>Role</div>
+                                <div style={{ width: '60px', padding: '6px', flexShrink: 0 }}>Rights</div>
+                                <div style={{ width: '60px', padding: '6px', flexShrink: 0 }}>Status</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#0f172a' }}>
+                            <div style={{ display: 'flex', borderBottom: '1px solid #f1f5f9' }}>
+                              <div style={{ width: '20px', padding: '6px', textAlign: 'center', background: '#ffffff', borderRight: '1px solid #f1f5f9', zIndex: 2 }}>1</div>
+                              <div style={{ width: '60px', padding: '6px', background: '#f8fafc', borderRight: '1px solid #f1f5f9', fontWeight: 600, zIndex: 2, boxShadow: '1px 0 3px rgba(0,0,0,0.05)', position: 'relative' }}>Immanuvel</div>
+                              <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', width: '180px', animation: 'mockScroll 5s ease-in-out infinite' }}>
+                                  <div style={{ width: '60px', padding: '6px', flexShrink: 0, color: '#7c3aed', fontWeight: 600 }}>Staff</div>
+                                  <div style={{ width: '60px', padding: '6px', flexShrink: 0, color: '#475569' }}>Read/Write</div>
+                                  <div style={{ width: '60px', padding: '6px', flexShrink: 0 }}><span style={{ background: '#dcfce7', color: '#15803d', padding: '1px 4px', borderRadius: '3px', fontSize: '8px', fontWeight: 700 }}>Active</span></div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 4 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 5 of 5</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          🎨 Column Background Colors & Grid Fixes
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Highlight entire customizer columns with 7 soft tints. The scroll bleed-through fix stops scrolled items from overlapping frozen columns.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>•</span>
+                            <span><strong>7 Mild Transparent Colors:</strong> Tailored at 8% opacity to protect readability.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Scroll Bleed Blocking:</strong> Headers and frozen frames block scroll overlap.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#10b981', fontWeight: 'bold' }}>•</span>
+                            <span><strong>High Contrast Safety:</strong> Standard contrast toggle bypasses coloring if active.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#f0fdf4', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative' }} className="animate-slide-right">
+                        <div style={{ background: 'white', border: '1px solid #cbd5e1', borderRadius: '10px', padding: '10px', width: '180px', boxShadow: '0 8px 20px rgba(0,0,0,0.06)' }}>
+                          <div style={{ fontSize: '8px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>COLUMN STYLE TINT</div>
+                          <div style={{ display: 'flex', gap: '4px', marginBottom: '10px', position: 'relative' }}>
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1px solid #cbd5e1', background: 'white' }} />
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#dcfce7', border: '1.5px solid #2563eb' }} />
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#dbeafe' }} />
+                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#fef3c7' }} />
+                            
+                            {/* Color Dropdown Popover */}
+                            <div style={{ 
+                              position: 'absolute', 
+                              top: '16px', 
+                              left: '8px', 
+                              background: 'white', 
+                              border: '1px solid #cbd5e1', 
+                              borderRadius: '4px', 
+                              padding: '4px', 
+                              zIndex: 5,
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                              display: 'flex',
+                              gap: '3px',
+                              animation: 'colorDropdownOpen 5s infinite'
+                            }}>
+                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#dcfce7' }} />
+                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#dbeafe' }} />
+                              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#fef3c7' }} />
+                            </div>
+                          </div>
+                          <div style={{ border: '1px solid #e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ background: '#1b2a4a', color: 'white', fontSize: '8px', fontWeight: 600, padding: '3px 6px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Status Color</span>
+                              <span>🔒</span>
+                            </div>
+                            <div style={{ fontSize: '8px', padding: '5px 6px', borderBottom: '1px solid #f1f5f9', animation: 'colorFill 5s infinite' }}>Paid</div>
+                            <div style={{ fontSize: '8px', padding: '5px 6px', borderBottom: '1px solid #f1f5f9', animation: 'colorFill 5s infinite' }}>Pending</div>
+                          </div>
+                        </div>
+                        <div style={{ position: 'absolute', width: '10px', height: '15px', background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 320 512\'%3E%3Cpath fill=\'%23000000\' d=\'M0 55.2V426c0 24.2 27.3 37.2 46.2 22L135 376h121c21 0 38-17 38-38V55.2c0-21-17-38-38-38H38C17 17.2 0 34.2 0 55.2z\'/%3E%3C/svg%3E") no-repeat', backgroundSize: 'contain', zIndex: 10, animation: 'cursorClick 5s infinite' }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Slideshow Progress Bar */}
+                <div style={{ height: '3px', width: '100%', background: '#e2e8f0', position: 'relative' }}>
+                  <div 
+                    key={activeSlide + '-' + isPlaying}
+                    className={`progress-bar-fill ${isPlaying ? 'progress-bar-fill-playing' : ''}`}
+                  />
+                </div>
+
+                {/* Slideshow Navigation Controls Footer */}
+                <div style={{ padding: '12px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button 
+                      onClick={() => setIsPlaying(p => !p)} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      title={isPlaying ? 'Pause auto-play' : 'Resume auto-play'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                    </button>
+                    <div style={{ width: '1px', height: '14px', background: '#cbd5e1' }} />
+                    <button 
+                      onClick={() => { setActiveSlide(prev => (prev - 1 + 5) % 5); setIsPlaying(false); }} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button 
+                      onClick={() => { setActiveSlide(prev => (prev + 1) % 5); setIsPlaying(false); }} 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[0, 1, 2, 3, 4].map(idx => (
+                      <button
+                        key={idx}
+                        onClick={() => { setActiveSlide(idx); setIsPlaying(false); }}
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          background: activeSlide === idx ? '#2563eb' : '#cbd5e1',
+                          transition: 'background-color 0.2s, transform 0.2s',
+                          transform: activeSlide === idx ? 'scale(1.2)' : 'scale(1)'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <button 
+                    onClick={handleCloseVersionModal}
+                    style={{
+                      background: 'linear-gradient(135deg, var(--navy), var(--navy-light))',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '6px 14px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: 'var(--shadow-button)'
+                    }}
+                  >
+                    Got it, thanks!
+                  </button>
+                </div>
+              </div>
+            ) : versionTab === '1.7.6' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 11, 2026 (Latest)</span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 11, 2026</span>
                 
                 {/* Feature 1: Modern UI Sidebar */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
@@ -2956,24 +3457,26 @@ export const Sidebar = memo(function Sidebar({
               </div>
             )}
 
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-              <button 
-                onClick={handleCloseVersionModal}
-                style={{
-                  background: 'linear-gradient(135deg, var(--navy), var(--navy-light))',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: 'var(--shadow-button)'
-                }}
-              >
-                Got it, thanks!
-              </button>
-            </div>
+            {versionTab !== '1.7.7' && (
+              <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                <button 
+                  onClick={handleCloseVersionModal}
+                  style={{
+                    background: 'linear-gradient(135deg, var(--navy), var(--navy-light))',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-button)'
+                  }}
+                >
+                  Got it, thanks!
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

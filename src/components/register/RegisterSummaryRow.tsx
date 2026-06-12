@@ -79,8 +79,8 @@ export const RegisterSummaryRow: React.FC<RegisterSummaryRowProps> = ({
       const colW = colWidths[col.id] || defaultColWidth;
 
       const cellStyle: React.CSSProperties = isFrozen 
-        ? { position: 'sticky', left: leftOffset, zIndex: 11, background: 'var(--table-bg)', width: colW, minWidth: colW, maxWidth: colW }
-        : { width: colW, minWidth: colW, maxWidth: colW };
+        ? { position: 'sticky', left: leftOffset, zIndex: 11, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : 'var(--table-bg)', width: colW, minWidth: colW, maxWidth: colW }
+        : { width: colW, minWidth: colW, maxWidth: colW, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : undefined };
 
       return (
         <td

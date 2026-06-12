@@ -130,6 +130,7 @@ export interface Column {
   mandatory?: boolean;
   unique?: boolean;
   doubleEntryWarning?: boolean;
+  bgColor?: string;
 }
 
 export interface CellStyle {
@@ -1485,6 +1486,22 @@ export async function updateColumnSummary(registerId: number, columnId: number, 
     const col = reg.columns.find((c) => c.id.toString() === columnId.toString());
     if (col) {
       col.summary = summary;
+      await saveRegDocImmediate(reg);
+    }
+    return reg;
+  });
+}
+
+export async function updateColumnBgColor(registerId: number, columnId: number, bgColor: string | undefined): Promise<RegisterDetail> {
+  return runQueuedMutation(registerId, async () => {
+    const reg = await getRegDoc(registerId);
+    const col = reg.columns.find((c) => c.id.toString() === columnId.toString());
+    if (col) {
+      if (bgColor) {
+        col.bgColor = bgColor;
+      } else {
+        delete col.bgColor;
+      }
       await saveRegDocImmediate(reg);
     }
     return reg;
