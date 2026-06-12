@@ -212,71 +212,7 @@ export const RowDetailModal = React.memo(function RowDetailModal({
           </div>
         </div>
 
-        {/* Row Audit Trail Panel */}
-        {showRowAuditTrail && (
-          <div className="row-audit-trail-panel">
-            <div className="row-audit-trail-header">
-              <div className="row-audit-trail-title">
-                <Clock size={14} />
-                <span>Change History</span>
-              </div>
-              <button className="row-audit-trail-close" onClick={() => setShowRowAuditTrail(false)}>
-                <X size={14} />
-              </button>
-            </div>
-            <div className="row-audit-trail-content">
-              {rowAuditLoading ? (
-                <div className="row-audit-trail-loading">
-                  <div className="row-audit-spinner" />
-                  <span>Loading history…</span>
-                </div>
-              ) : rowAuditHistory.length === 0 ? (
-                <div className="row-audit-trail-empty">
-                  <Clock size={28} style={{ opacity: 0.25 }} />
-                  <p>No change history found for this row.</p>
-                  <span>Changes will appear here after the next edit or save.</span>
-                </div>
-              ) : (
-                <div className="row-audit-timeline">
-                  {rowAuditHistory.map((h, idx) => {
-                    const dt = new Date(h.timestamp);
-                    const dateStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-                    const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-                    const isFirst = idx === 0;
-                    const actionColor =
-                      h.action === 'Edit Row' ? '#3b82f6' :
-                      h.action === 'Add Row' || h.action === 'Insert Row' ? '#16a34a' :
-                      h.action === 'Delete Row' ? '#dc2626' :
-                      h.action === 'Restore Row' ? '#8b5cf6' : '#64748b';
 
-                    return (
-                      <div key={h.id} className={`row-audit-item ${isFirst ? 'latest' : ''}`}>
-                        <div className="row-audit-item-dot" style={{ borderColor: actionColor }}>
-                          <div className="row-audit-item-dot-inner" style={{ background: actionColor }} />
-                        </div>
-                        {idx < rowAuditHistory.length - 1 && <div className="row-audit-item-connector" />}
-                        <div className="row-audit-item-content">
-                          <div className="row-audit-item-top">
-                            <span className="row-audit-action-badge" style={{ background: actionColor }}>{h.action}</span>
-                            {isFirst && <span className="row-audit-latest-tag">Latest</span>}
-                          </div>
-                          <p className="row-audit-item-details">{h.details}</p>
-                          <div className="row-audit-item-meta">
-                            <span className="row-audit-meta-user">{h.userName || 'Unknown User'}</span>
-                            <span className="row-audit-meta-sep">•</span>
-                            <span className="row-audit-meta-date">{dateStr}</span>
-                            <span className="row-audit-meta-sep">•</span>
-                            <span className="row-audit-meta-time">{timeStr}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         <div className="row-detail-body">
           {modalColumns.map((col) => {
@@ -741,6 +677,204 @@ export const RowDetailModal = React.memo(function RowDetailModal({
           )}
         </div>
       </div>
+
+      {showRowAuditTrail && (
+        <div className="row-history-modal-overlay" onClick={() => setShowRowAuditTrail(false)}>
+          <div className="row-history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row-history-modal-header">
+              <div className="row-history-modal-title">
+                <Clock size={16} />
+                <span>Row Change History (Row #{localEntries.findIndex(e => e.id === detailViewEntry.id) + 1})</span>
+              </div>
+              <button className="row-history-modal-close" onClick={() => setShowRowAuditTrail(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="row-history-modal-body">
+              {rowAuditLoading ? (
+                <div className="row-history-loading">
+                  <div className="row-audit-spinner" />
+                  <span>Loading history…</span>
+                </div>
+              ) : rowAuditHistory.length === 0 ? (
+                <div className="row-history-empty">
+                  <Clock size={36} style={{ opacity: 0.25 }} />
+                  <p>No change history found for this row.</p>
+                </div>
+              ) : (
+                <div className="row-history-list">
+                  {rowAuditHistory.map((h, idx) => (
+                    <RowHistoryCard key={h.id} h={h} isLatest={idx === 0} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
+
+function RowHistoryCard({ h, isLatest }: { h: any; isLatest: boolean }) {
+  const dt = new Date(h.timestamp);
+  const dateStr = dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const timeStr = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+  const parsed = React.useMemo(() => {
+    if (h.action.toLowerCase() !== 'edit row') {
+      return { isEditRow: false, title: h.details, changes: [] };
+    }
+
+    const parts = h.details.split(': ');
+    if (parts.length < 2) {
+      return { isEditRow: true, title: h.details, changes: [] };
+    }
+
+    const title = parts[0];
+    const changesStr = parts.slice(1).join(': ');
+
+    const changes: Array<{ column: string; from: string; to: string }> = [];
+    let currentToken = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < changesStr.length; i++) {
+      const char = changesStr[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        currentToken += char;
+      } else if (char === ',' && !inQuotes) {
+        const trimmed = currentToken.trim();
+        if (trimmed) {
+          changes.push(parseSingleChange(trimmed));
+        }
+        currentToken = '';
+        if (changesStr[i + 1] === ' ') {
+          i++;
+        }
+      } else {
+        currentToken += char;
+      }
+    }
+
+    const finalTrimmed = currentToken.trim();
+    if (finalTrimmed) {
+      changes.push(parseSingleChange(finalTrimmed));
+    }
+
+    return {
+      isEditRow: true,
+      title,
+      changes: changes.filter(c => c.column !== '')
+    };
+  }, [h.details, h.action]);
+
+  const actionColor =
+    h.action === 'Edit Row' ? '#3b82f6' :
+    h.action === 'Add Row' || h.action === 'Insert Row' ? '#16a34a' :
+    h.action === 'Delete Row' ? '#dc2626' :
+    h.action === 'Restore Row' ? '#8b5cf6' : '#64748b';
+
+  return (
+    <div className="row-history-card">
+      <div className="row-history-card-header">
+        <span className="row-audit-action-badge" style={{ background: actionColor }}>{h.action}</span>
+        {isLatest && <span className="row-audit-latest-tag">Latest</span>}
+        <div className="row-history-card-time">
+          <span>{h.userName || 'Unknown User'}</span>
+          <span>•</span>
+          <span>{dateStr} {timeStr}</span>
+        </div>
+      </div>
+      
+      {parsed.isEditRow && parsed.changes.length > 0 ? (
+        <div className="row-history-card-changes">
+          <p className="row-history-card-title">{parsed.title}</p>
+          <div className="changes-table-wrapper">
+            <table className="changes-table">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Before</th>
+                  <th>After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parsed.changes.map((change, idx) => (
+                  <tr key={idx}>
+                    <td className="col-name">{change.column}</td>
+                    <td>
+                      {isImageValue(change.from) ? (
+                        <div className="history-value-images from">
+                          {change.from.split('|||').map((url, i) => (
+                            <img 
+                              key={i} 
+                              src={url.trim()} 
+                              alt="Before" 
+                              className="history-image-preview" 
+                              onClick={() => window.open(url.trim(), '_blank')}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="change-from">
+                          {change.from || <span className="empty-val">empty</span>}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {isImageValue(change.to) ? (
+                        <div className="history-value-images to">
+                          {change.to.split('|||').map((url, i) => (
+                            <img 
+                              key={i} 
+                              src={url.trim()} 
+                              alt="After" 
+                              className="history-image-preview" 
+                              onClick={() => window.open(url.trim(), '_blank')}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="change-to">
+                          {change.to || <span className="empty-val">empty</span>}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <p className="row-audit-item-details">{h.details}</p>
+      )}
+    </div>
+  );
+}
+
+function isImageValue(val: string): boolean {
+  if (!val) return false;
+  const urls = val.split('|||');
+  return urls.every(url => {
+    const u = url.trim();
+    return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/');
+  }) && urls.some(url => {
+    const u = url.trim().toLowerCase();
+    return u.includes('cloudinary.com') || u.includes('/image/upload/') || u.endsWith('.png') || u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.gif') || u.endsWith('.webp');
+  });
+}
+
+function parseSingleChange(part: string): { column: string; from: string; to: string } {
+  const match = part.match(/(.+?)\s+changed\s+from\s+"(.*?)"\s+to\s+"(.*?)"$/);
+  if (match) {
+    return {
+      column: match[1].trim(),
+      from: match[2],
+      to: match[3]
+    };
+  }
+  return { column: '', from: '', to: part };
+}
+

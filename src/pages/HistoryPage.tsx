@@ -113,66 +113,9 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div className="history-timeline">
-            {filteredHistory.map((entry: HistoryEntry) => {
-              const { icon, color, bg } = getActionStyle(entry.action);
-              return (
-                <div key={entry.id} className={`history-card${entry.registerId ? ' history-card-clickable' : ''}`}
-                  onClick={() => {
-                    if (entry.registerId && entry.entryId) {
-                      navigate(`/register/${entry.registerId}?row=${entry.entryId}`);
-                    } else if (entry.registerId) {
-                      navigate(`/register/${entry.registerId}`);
-                    }
-                  }}
-                  style={{ cursor: entry.registerId ? 'pointer' : 'default' }}
-                >
-                  <div className="history-card-icon">
-                    <div className="icon-circle" style={{ borderColor: color, background: bg }}>
-                      <span style={{ color }}>{icon}</span>
-                    </div>
-                    <div className="timeline-connector" />
-                  </div>
-                  <div className="history-card-main">
-                    <div className="history-card-header">
-                      <span className="action-badge" style={{ background: bg, color }}>
-                        {entry.action}
-                      </span>
-                      <span className="timestamp">
-                        <Calendar size={12} />
-                        {new Intl.DateTimeFormat('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        }).format(new Date(entry.timestamp))}
-                      </span>
-                    </div>
-                    <p className="history-details">{entry.details}</p>
-                    <div className="history-meta">
-                      {entry.userName && (
-                        <span className="meta-item">
-                          <User size={12} />
-                          {entry.userName}
-                        </span>
-                      )}
-                      {entry.registerName && (
-                        <span className="meta-item">
-                          <FileText size={12} />
-                          {entry.registerName}
-                        </span>
-                      )}
-                      {entry.registerId && (
-                        <span className="meta-item" style={{ marginLeft: 'auto', color: '#6366f1', fontWeight: 600, fontSize: 11 }}>
-                          View in Register <ArrowRight size={11} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {filteredHistory.map((entry: HistoryEntry) => (
+              <HistoryCard key={entry.id} entry={entry} navigate={navigate} />
+            ))}
           </div>
         )}
         {loadingMore && (
@@ -361,6 +304,121 @@ export default function HistoryPage() {
         margin: 0 0 16px;
       }
 
+      .history-details-title {
+        font-size: 15px;
+        color: #1e293b;
+        line-height: 1.5;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+
+      .history-changes-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        margin-bottom: 16px;
+      }
+
+      .changes-table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        margin: 12px 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: white;
+      }
+
+      .changes-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        text-align: left;
+      }
+
+      .changes-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 600;
+        padding: 10px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .changes-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+      }
+
+      .changes-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .col-name {
+        font-weight: 600;
+        color: #334155;
+      }
+
+      .change-from {
+        color: #b91c1c;
+        background: #fef2f2;
+        border: 1px solid #fee2e2;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+      }
+
+      .change-to {
+        color: #15803d;
+        font-weight: 600;
+        background: #f0fdf4;
+        border: 1px solid #dcfce7;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+      }
+
+      .empty-val {
+        font-style: italic;
+        color: #94a3b8;
+      }
+
+      .expand-changes-btn {
+        align-self: flex-start;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #4f46e5;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 6px 12px;
+        margin-top: 4px;
+        border-radius: 6px;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .expand-changes-btn:hover {
+        background: #e2e8f0;
+        color: #3730a3;
+        border-color: #cbd5e1;
+      }
+
       .history-meta {
         display: flex;
         gap: 16px;
@@ -392,6 +450,229 @@ export default function HistoryPage() {
   );
 }
 
+interface HistoryCardProps {
+  entry: HistoryEntry;
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+function HistoryCard({ entry, navigate }: HistoryCardProps) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const { icon, color, bg } = getActionStyle(entry.action);
+
+  const parsed = React.useMemo(() => parseDetails(entry.details, entry.action), [entry.details, entry.action]);
+
+  return (
+    <div className={`history-card${entry.registerId ? ' history-card-clickable' : ''}`}
+      onClick={() => {
+        if (entry.registerId && entry.entryId) {
+          navigate(`/register/${entry.registerId}?row=${entry.entryId}`);
+        } else if (entry.registerId) {
+          navigate(`/register/${entry.registerId}`);
+        }
+      }}
+      style={{ cursor: entry.registerId ? 'pointer' : 'default' }}
+    >
+      <div className="history-card-icon">
+        <div className="icon-circle" style={{ borderColor: color, background: bg }}>
+          <span style={{ color }}>{icon}</span>
+        </div>
+        <div className="timeline-connector" />
+      </div>
+      <div className="history-card-main">
+        <div className="history-card-header">
+          <span className="action-badge" style={{ background: bg, color }}>
+            {entry.action}
+          </span>
+          <span className="timestamp">
+            <Calendar size={12} />
+            {new Intl.DateTimeFormat('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }).format(new Date(entry.timestamp))}
+          </span>
+        </div>
+        
+        {parsed.isEditRow && parsed.changes.length > 0 ? (
+          <div className="history-changes-container">
+            <p className="history-details-title">{parsed.title}</p>
+            <div className="changes-table-wrapper" onClick={(e) => e.stopPropagation()}>
+              <table className="changes-table">
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Before</th>
+                    <th>After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(isExpanded ? parsed.changes : parsed.changes.slice(0, 3)).map((change, idx) => (
+                    <tr key={idx}>
+                      <td className="col-name">{change.column}</td>
+                      <td>
+                        {isImageValue(change.from) ? (
+                          <div className="history-value-images from">
+                            {change.from.split('|||').map((url, i) => (
+                              <img 
+                                key={i} 
+                                src={url.trim()} 
+                                alt="Before" 
+                                className="history-image-preview" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(url.trim(), '_blank');
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="change-from">
+                            {change.from || <span className="empty-val">empty</span>}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {isImageValue(change.to) ? (
+                          <div className="history-value-images to">
+                            {change.to.split('|||').map((url, i) => (
+                              <img 
+                                key={i} 
+                                src={url.trim()} 
+                                alt="After" 
+                                className="history-image-preview" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(url.trim(), '_blank');
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="change-to">
+                            {change.to || <span className="empty-val">empty</span>}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {parsed.changes.length > 3 && (
+              <button
+                className="expand-changes-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsExpanded(!isExpanded);
+                }}
+              >
+                {isExpanded ? 'Show less' : `+ ${parsed.changes.length - 3} more changes`}
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="history-details">{entry.details}</p>
+        )}
+
+        <div className="history-meta">
+          {entry.userName && (
+            <span className="meta-item">
+              <User size={12} />
+              {entry.userName}
+            </span>
+          )}
+          {entry.registerName && (
+            <span className="meta-item">
+              <FileText size={12} />
+              {entry.registerName}
+            </span>
+          )}
+          {entry.registerId && (
+            <span className="meta-item" style={{ marginLeft: 'auto', color: '#6366f1', fontWeight: 600, fontSize: 11 }}>
+              View in Register <ArrowRight size={11} />
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isImageValue(val: string): boolean {
+  if (!val) return false;
+  const urls = val.split('|||');
+  return urls.every(url => {
+    const u = url.trim();
+    return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/');
+  }) && urls.some(url => {
+    const u = url.trim().toLowerCase();
+    return u.includes('cloudinary.com') || u.includes('/image/upload/') || u.endsWith('.png') || u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.gif') || u.endsWith('.webp');
+  });
+}
+
+function parseDetails(details: string, action: string) {
+  if (action.toLowerCase() !== 'edit row') {
+    return { isEditRow: false, title: details, changes: [] };
+  }
+
+  const parts = details.split(': ');
+  if (parts.length < 2) {
+    return { isEditRow: true, title: details, changes: [] };
+  }
+
+  const title = parts[0];
+  const changesStr = parts.slice(1).join(': ');
+
+  const changes: Array<{ column: string; from: string; to: string }> = [];
+  let currentToken = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < changesStr.length; i++) {
+    const char = changesStr[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      currentToken += char;
+    } else if (char === ',' && !inQuotes) {
+      const trimmed = currentToken.trim();
+      if (trimmed) {
+        changes.push(parseSingleChange(trimmed));
+      }
+      currentToken = '';
+      if (changesStr[i + 1] === ' ') {
+        i++;
+      }
+    } else {
+      currentToken += char;
+    }
+  }
+
+  const finalTrimmed = currentToken.trim();
+  if (finalTrimmed) {
+    changes.push(parseSingleChange(finalTrimmed));
+  }
+
+  return {
+    isEditRow: true,
+    title,
+    changes: changes.filter(c => c.column !== '')
+  };
+}
+
+function parseSingleChange(part: string): { column: string; from: string; to: string } {
+  const match = part.match(/(.+?)\s+changed\s+from\s+"(.*?)"\s+to\s+"(.*?)"$/);
+  if (match) {
+    return {
+      column: match[1].trim(),
+      from: match[2],
+      to: match[3]
+    };
+  }
+  return { column: '', from: '', to: part };
+}
+
 function getActionStyle(action: string): { icon: React.ReactNode; color: string; bg: string } {
   const a = action.toLowerCase();
   if (a.includes('add row') || a.includes('create')) return { icon: <Plus size={16} />, color: '#10b981', bg: '#ecfdf5' };
@@ -402,3 +683,4 @@ function getActionStyle(action: string): { icon: React.ReactNode; color: string;
   if (a.includes('column') || a.includes('type')) return { icon: <Settings size={16} />, color: '#8b5cf6', bg: '#f5f3ff' };
   return { icon: <Activity size={16} />, color: '#64748b', bg: '#f1f5f9' };
 }
+
