@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AG Trust Record Book</string>
+    <string name="title_activity_main">AG Trust Record Book</string>
+    <string name="package_name">com.agtrust.recordbook</string>
+    <string name="custom_url_scheme">com.agtrust.recordbook</string>
+</resources>

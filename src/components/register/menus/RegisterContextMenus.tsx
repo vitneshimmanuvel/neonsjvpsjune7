@@ -1,0 +1,681 @@
+import { Hash, Calendar, ChevronDown, FlaskConical, Type as TypeIcon, SortAsc, SortDesc, Pencil, ArrowLeftRight, Copy, ArrowRight, ChevronsLeftRight, Pin, Eye, EyeOff, Eraser, Trash2, FileText, FileSpreadsheet, Share2, ArrowLeft, Link as LinkIcon, Plus, AlertTriangle, ArrowUp, ArrowDown, MoveVertical } from 'lucide-react';
+import React, { useState } from 'react';
+import { type Column } from '../../../lib/api';
+import { ColumnIcon } from '../ColumnIcon';
+
+interface RegisterContextMenusProps {
+  // Column Menu
+  colMenuId: number | null;
+  colMenuRect: DOMRect | null;
+  setColMenuId: (id: number | null) => void;
+  setActiveModalColId: (id: number | null) => void;
+  columns: Column[];
+  handleSort: (colId: number, direction: 'asc' | 'desc') => void;
+  setRenameColValue: (v: string) => void;
+  setRenameColModal: (v: boolean) => void;
+  setChangeTypeValue: (v: string) => void;
+  setChangeTypeModal: (v: boolean) => void;
+  setDropdownConfigOptions: (v: string) => void;
+  setDropdownConfigModal: (v: boolean) => void;
+  setLinkColumnModal: (v: boolean) => void;
+  duplicateColumnMutation: any;
+  setNewColName: (v: string) => void;
+  setNewColType: (v: string) => void;
+  setNewColDropdownOpts: (v: string) => void;
+  setNewColFormula: (v: string) => void;
+  setInsertColModal: (v: 'left' | 'right' | null) => void;
+  moveColumnMutation: any;
+  frozenColumns: Set<number>;
+  setFrozenColumns: (v: Set<number>) => void;
+  freezeColumn: (regId: number, colId: number, freeze: boolean) => void;
+  registerId: number;
+  hiddenColumns: Set<number>;
+  setHiddenColumns: (v: Set<number>) => void;
+  hideColumn: (regId: number, colId: number, hide: boolean) => void;
+  clearColumnDataMutation: any;
+  deleteColumnMutation: any;
+  setColumnMandatoryMutation: any;
+  setColumnUniqueMutation: any;
+  setColumnDoubleEntryWarningMutation: any;
+  updateColumnBgColorMutation: any;
+
+
+  // Row Menu
+  rowMenuId: number | null;
+  setRowMenuId: (id: number | null) => void;
+  duplicateEntryMutation: any;
+  deleteEntryMutation: any;
+  insertEntryMutation: any;
+  localEntries: any[];
+  handleRowDownloadPDF: (entryId: number) => void;
+  handleRowDownloadExcel: (entryId: number) => void;
+  handleMoveRow?: (entryId: number, direction: 'up' | 'down' | number) => void;
+  handleRowShareText: (entryId: number) => void;
+  // Calc
+  calcTypes: Record<number, string>;
+  updateCalcType: (colId: number, type: string) => void;
+  // Manage Columns Dropdown
+  manageColsMenu: { rect: DOMRect } | null;
+  setManageColsMenu: (v: { rect: DOMRect } | null) => void;
+  canEdit?: boolean;
+  selectedColumns?: Set<number>;
+  isPreviewSelectedColumns?: boolean;
+}
+
+export function RegisterContextMenus(props: RegisterContextMenusProps) {
+  const {
+    colMenuId, colMenuRect, setColMenuId, setActiveModalColId, columns, handleSort,
+    setRenameColValue, setRenameColModal, setChangeTypeValue, setChangeTypeModal,
+    setDropdownConfigOptions, setDropdownConfigModal, setLinkColumnModal, duplicateColumnMutation,
+    setNewColName, setNewColType, setNewColDropdownOpts, setNewColFormula, setInsertColModal,
+    moveColumnMutation, frozenColumns, setFrozenColumns, freezeColumn, registerId,
+    hiddenColumns, setHiddenColumns, hideColumn, clearColumnDataMutation, deleteColumnMutation,
+    setColumnMandatoryMutation, setColumnUniqueMutation,
+    setColumnDoubleEntryWarningMutation,
+    updateColumnBgColorMutation,
+    rowMenuId, setRowMenuId, duplicateEntryMutation, deleteEntryMutation, insertEntryMutation, localEntries, handleMoveRow,
+    handleRowDownloadPDF, handleRowDownloadExcel, handleRowShareText,
+    calcTypes, updateCalcType,
+    manageColsMenu, setManageColsMenu,
+    canEdit = true,
+    selectedColumns,
+    isPreviewSelectedColumns
+  } = props;
+
+  const isPreviewActive = !!(isPreviewSelectedColumns && selectedColumns && selectedColumns.size > 0);
+  const rowExportDesc = isPreviewActive ? 'Selected columns only' : 'All columns included';
+
+  return (
+    <>
+      {/* ── Column Context Menu ── */}
+      {colMenuId !== null && (
+        <div className="context-popover-layer" onClick={() => setColMenuId(null)}>
+          <div
+            className="context-menu context-menu-wide context-menu-column"
+            style={colMenuRect ? { top: colMenuRect.bottom + 4, left: colMenuRect.left } : undefined}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="context-title">
+              {(() => {
+                const col = columns.find((c) => c.id === colMenuId);
+                return (
+                  <>
+                    <ColumnIcon type={col?.type} size={14} /> {col?.name || 'Column'}
+                    <span className="context-type-badge">{col?.type}</span>
+                  </>
+                );
+              })()}
+            </div>
+
+            {canEdit && (
+              <>
+                <div className="context-section-label">Edit</div>
+                <button className="context-item" onClick={() => {
+                  setRenameColValue(columns.find((c) => c.id === colMenuId)?.name || '');
+                  setActiveModalColId(colMenuId);
+                  setRenameColModal(true); setColMenuId(null);
+                }}>
+                  <Pencil size={16} /> Rename Column
+                </button>
+                <button className="context-item" onClick={() => {
+                  const col = columns.find((c) => c.id === colMenuId);
+                  setChangeTypeValue(col?.type || 'text');
+                  setNewColName(col?.name || '');
+                  setNewColFormula(col?.formula || '');
+                  setNewColDropdownOpts(col?.dropdownOptions?.join(', ') || '');
+                  setActiveModalColId(colMenuId);
+                  setChangeTypeModal(true); setColMenuId(null);
+                }}>
+                  <ArrowLeftRight size={16} /> Change Column Type
+                </button>
+                <button className="context-item" onClick={() => {
+                  setActiveModalColId(colMenuId);
+                  setLinkColumnModal(true);
+                  setColMenuId(null);
+                }}>
+                  <LinkIcon size={16} /> Link
+                </button>
+                <button className="context-item" onClick={() => {
+                  const col = columns.find((c) => c.id === colMenuId);
+                  const isMandatory = !!(col as any)?.mandatory;
+                  setColumnMandatoryMutation.mutate({ colId: colMenuId!, mandatory: !isMandatory });
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px', color: 'var(--primary)' }}>＊</span> Mandatory Field
+                    </span>
+                    {!!(columns.find((c) => c.id === colMenuId) as any)?.mandatory && (
+                      <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '10px', fontWeight: 700 }}>ON</span>
+                    )}
+                  </span>
+                </button>
+                <button className="context-item" onClick={() => {
+                  const col = columns.find((c) => c.id === colMenuId);
+                  const isUnique = !!(col as any)?.unique;
+                  setColumnUniqueMutation.mutate({ colId: colMenuId!, unique: !isUnique });
+                }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '16px', color: 'var(--primary)' }}>★</span> Unique Field
+                    </span>
+                    {!!(columns.find((c) => c.id === colMenuId) as any)?.unique && (
+                      <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '10px', fontWeight: 700 }}>ON</span>
+                    )}
+                  </span>
+                </button>
+                {columns.find((c) => c.id === colMenuId)?.type === 'dropdown' && (
+                  <button className="context-item" onClick={() => {
+                    const col = columns.find((c) => c.id === colMenuId);
+                    setDropdownConfigOptions(col?.dropdownOptions?.join(', ') || '');
+                    setActiveModalColId(colMenuId);
+                    setDropdownConfigModal(true); setColMenuId(null);
+                  }}>
+                    <ChevronDown size={16} /> Edit Dropdown Options
+                  </button>
+                )}
+              </>
+            )}
+
+            {canEdit && (
+              <>
+                <div className="context-divider" />
+                <div className="context-section-label">Insert & Copy</div>
+                <button className="context-item" onClick={() => duplicateColumnMutation.mutate(colMenuId)}>
+                  <Copy size={16} /> Duplicate Column
+                </button>
+                <button className="context-item" onClick={() => {
+                  setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula('');
+                  setActiveModalColId(colMenuId);
+                  setInsertColModal('left'); setColMenuId(null);
+                }}>
+                  <ArrowLeft size={16} /> Insert Column Left
+                </button>
+                <button className="context-item" onClick={() => {
+                  setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula('');
+                  setActiveModalColId(colMenuId);
+                  setInsertColModal('right'); setColMenuId(null);
+                }}>
+                  <ArrowRight size={16} /> Insert Column Right
+                </button>
+
+                <div className="context-divider" />
+                <div className="context-section-label">Arrange</div>
+                <button className="context-item"
+                  disabled={columns.findIndex((c) => c.id === colMenuId) === 0}
+                  onClick={() => moveColumnMutation.mutate({ colId: colMenuId, dir: 'left' })}
+                >
+                  <ChevronsLeftRight size={16} /> Move Left
+                </button>
+                <button className="context-item"
+                  disabled={columns.findIndex((c) => c.id === colMenuId) === columns.length - 1}
+                  onClick={() => moveColumnMutation.mutate({ colId: colMenuId, dir: 'right' })}
+                >
+                  <ChevronsLeftRight size={16} /> Move Right
+                </button>
+              </>
+            )}
+            <button className="context-item" onClick={() => {
+              const newFrozen = new Set(frozenColumns);
+              const isFrozen = newFrozen.has(colMenuId);
+              if (isFrozen) newFrozen.delete(colMenuId); else newFrozen.add(colMenuId);
+              setFrozenColumns(newFrozen);
+              freezeColumn(registerId, colMenuId, !isFrozen);
+              setColMenuId(null);
+            }}>
+              <Pin size={16} /> {frozenColumns.has(colMenuId) ? 'Unfreeze Column' : 'Freeze / Pin Column'}
+            </button>
+            <button className="context-item" onClick={() => {
+              const newHidden = new Set(hiddenColumns);
+              newHidden.add(colMenuId);
+              setHiddenColumns(newHidden);
+              hideColumn(registerId, colMenuId, true);
+              setColMenuId(null);
+            }}>
+              <EyeOff size={16} /> Hide Column
+            </button>
+
+            {canEdit && (
+              <>
+                <div className="context-divider" />
+                <div className="context-section-label">Column Background Color</div>
+                <div className="context-item-row" style={{ padding: '8px 12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { name: 'None', value: undefined, color: '#ffffff', border: '1px solid #e2e8f0' },
+                    { name: 'Mild Blue', value: 'rgba(26, 115, 232, 0.08)', color: 'rgba(26, 115, 232, 0.18)' },
+                    { name: 'Mild Green', value: 'rgba(34, 197, 94, 0.08)', color: 'rgba(34, 197, 94, 0.18)' },
+                    { name: 'Mild Yellow', value: 'rgba(234, 179, 8, 0.08)', color: 'rgba(234, 179, 8, 0.18)' },
+                    { name: 'Mild Red', value: 'rgba(239, 68, 68, 0.08)', color: 'rgba(239, 68, 68, 0.18)' },
+                    { name: 'Mild Purple', value: 'rgba(168, 85, 247, 0.08)', color: 'rgba(168, 85, 247, 0.18)' },
+                    { name: 'Mild Orange', value: 'rgba(249, 115, 22, 0.08)', color: 'rgba(249, 115, 22, 0.18)' },
+                    { name: 'Mild Teal', value: 'rgba(20, 184, 166, 0.08)', color: 'rgba(20, 184, 166, 0.18)' },
+                  ].map((colorOpt) => {
+                    const col = columns.find((c) => c.id === colMenuId);
+                    const isActive = col?.bgColor === colorOpt.value || (!col?.bgColor && !colorOpt.value);
+                    return (
+                      <button
+                        key={colorOpt.name}
+                        className={`context-item-color-chip ${isActive ? 'active' : ''}`}
+                        title={colorOpt.name}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: colorOpt.color,
+                          border: isActive ? '2px solid var(--primary)' : (colorOpt.border || '1px solid transparent'),
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          boxShadow: isActive ? '0 0 0 1px white, 0 0 4px rgba(0,0,0,0.15)' : 'none'
+                        }}
+                        onClick={() => {
+                          updateColumnBgColorMutation.mutate({ colId: colMenuId!, bgColor: colorOpt.value });
+                          setColMenuId(null);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div className="context-divider" />
+            <div className="context-section-label">Footer Calculation</div>
+            <div className="context-item-row" style={{ padding: '6px 12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['sum', 'count', 'distinct', 'average', 'none'].map((type) => {
+                const isActive = type === 'none' 
+                  ? (!calcTypes[colMenuId!] || calcTypes[colMenuId!] === 'none')
+                  : calcTypes[colMenuId!] === type;
+                return (
+                  <button 
+                    key={type}
+                    className={`context-item-mini ${isActive ? 'active' : ''}`} 
+                    style={{ 
+                      padding: '4px 10px', 
+                      fontSize: '11px', 
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: isActive ? 'var(--primary-light)' : 'white',
+                      color: isActive ? 'var(--primary)' : 'inherit',
+                      borderColor: isActive ? 'var(--primary)' : 'var(--border)',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={() => {
+                      updateCalcType(colMenuId!, type);
+                      setColMenuId(null);
+                    }}
+                  >
+                    {type}
+                  </button>
+                );
+              })}
+            </div>
+
+            {canEdit && (
+              <>
+                <div className="context-divider" />
+                <button className="context-item danger" onClick={() => { if (confirm('Clear all data?')) clearColumnDataMutation.mutate(colMenuId); }}>
+                  <Eraser size={16} /> Clear Column Data
+                </button>
+                {columns.find((c) => c.id === colMenuId)?.type !== 'formula' ? (
+                  <button className="context-item danger" onClick={() => { if (confirm('Delete column?')) deleteColumnMutation.mutate(colMenuId); }}>
+                    <Trash2 size={16} /> Delete Column
+                  </button>
+                ) : (
+                  <button 
+                    className="context-item danger" 
+                    disabled 
+                    style={{ opacity: 0.5, cursor: 'not-allowed' }} 
+                    title="Formula columns cannot be deleted"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 size={16} /> Delete Column
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Row Context Menu ── */}
+      {rowMenuId !== null && (
+        <RowContextMenuContent
+          rowMenuId={rowMenuId}
+          setRowMenuId={setRowMenuId}
+          localEntries={localEntries}
+          canEdit={canEdit}
+          rowExportDesc={rowExportDesc}
+          handleRowDownloadPDF={handleRowDownloadPDF}
+          handleRowDownloadExcel={handleRowDownloadExcel}
+          handleRowShareText={handleRowShareText}
+          duplicateEntryMutation={duplicateEntryMutation}
+          deleteEntryMutation={deleteEntryMutation}
+          insertEntryMutation={insertEntryMutation}
+          handleMoveRow={handleMoveRow}
+        />
+      )}
+      {/* ── Manage Columns Dropdown ── */}
+      {manageColsMenu !== null && (
+        <div className="context-popover-layer" style={{ zIndex: 10000 }} onClick={() => setManageColsMenu(null)}>
+          <div
+            className="context-menu"
+            style={manageColsMenu ? { 
+              position: 'fixed',
+              top: manageColsMenu.rect.bottom + 6, 
+              left: Math.max(10, Math.min(manageColsMenu.rect.left - 180, window.innerWidth - 230)),
+              width: '220px',
+              maxHeight: '380px',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: 'var(--shadow-lg)',
+              border: '1px solid var(--border)',
+              padding: '0',
+              overflow: 'hidden',
+              animation: 'dropdownIn 0.15s ease-out'
+            } : undefined}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="context-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Manage Columns</span>
+              <span className="context-type-badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                {columns.length - hiddenColumns.size} / {columns.length}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', padding: '8px 12px', borderBottom: '1px solid var(--border-light)' }}>
+              <button 
+                className="context-item-mini"
+                style={{ flex: 1, padding: '4px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer' }}
+                onClick={() => {
+                  const newHidden = new Set<number>();
+                  setHiddenColumns(newHidden);
+                  columns.forEach(c => hideColumn(registerId, c.id, false));
+                }}
+              >
+                Show All
+              </button>
+              <button 
+                className="context-item-mini"
+                style={{ flex: 1, padding: '4px', fontSize: '11px', borderRadius: '4px', border: '1px solid var(--border)', background: 'white', cursor: 'pointer' }}
+                onClick={() => {
+                  const newHidden = new Set(columns.map(c => c.id));
+                  setHiddenColumns(newHidden);
+                  columns.forEach(c => hideColumn(registerId, c.id, true));
+                }}
+              >
+                Hide All
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1, padding: '4px 0', minHeight: '100px' }}>
+              {(() => {
+                const hiddenList = columns.filter(col => hiddenColumns.has(col.id));
+                if (hiddenList.length === 0) {
+                  return (
+                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '12px' }}>
+                      <EyeOff size={24} style={{ opacity: 0.2, marginBottom: '8px' }} />
+                      <div style={{ fontWeight: 500 }}>All columns are visible</div>
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <div style={{ padding: '4px 8px 8px' }}>
+                      <button 
+                        style={{ width: '100%', padding: '6px', fontSize: '11px', fontWeight: 600, background: 'var(--navy)', color: 'white', borderRadius: '4px', border: 'none' }}
+                        onClick={() => {
+                          setHiddenColumns(new Set());
+                          // You might need a bulk unhide function here or loop
+                          hiddenList.forEach(col => hideColumn(registerId, col.id, false));
+                        }}
+                      >
+                        Show All Columns
+                      </button>
+                    </div>
+                    {hiddenList.map(col => (
+                      <div 
+                        key={col.id} 
+                        className="manage-cols-item"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '10px', 
+                          padding: '10px 12px', 
+                          cursor: 'pointer',
+                          borderRadius: '6px',
+                          margin: '2px 4px',
+                          transition: 'background 0.15s'
+                        }}
+                        onClick={() => {
+                          const newHidden = new Set(hiddenColumns);
+                          newHidden.delete(col.id);
+                          setHiddenColumns(newHidden);
+                          hideColumn(registerId, col.id, false);
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--muted)' }}>
+                          <Eye size={12} />
+                        </div>
+                        <span style={{ fontSize: '13px', flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--foreground)' }}>
+                          {col.name}
+                        </span>
+                        <div className="unhide-badge" style={{ fontSize: '10px', color: 'var(--navy)', fontWeight: 700, padding: '2px 6px', background: 'rgba(30,45,120,0.06)', borderRadius: '4px' }}>
+                          Unhide
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Row Context Menu (extracted to support local state for "Move to Position") ──
+function RowContextMenuContent({
+  rowMenuId,
+  setRowMenuId,
+  localEntries,
+  canEdit,
+  rowExportDesc,
+  handleRowDownloadPDF,
+  handleRowDownloadExcel,
+  handleRowShareText,
+  duplicateEntryMutation,
+  deleteEntryMutation,
+  insertEntryMutation,
+  handleMoveRow,
+}: {
+  rowMenuId: number;
+  setRowMenuId: (id: number | null) => void;
+  localEntries: any[];
+  canEdit: boolean;
+  rowExportDesc: string;
+  handleRowDownloadPDF: (entryId: number) => void;
+  handleRowDownloadExcel: (entryId: number) => void;
+  handleRowShareText: (entryId: number) => void;
+  duplicateEntryMutation: any;
+  deleteEntryMutation: any;
+  insertEntryMutation: any;
+  handleMoveRow?: (entryId: number, direction: 'up' | 'down' | number) => void;
+}) {
+  const [moveToPos, setMoveToPos] = useState('');
+  const [showMoveInput, setShowMoveInput] = useState(false);
+  const currentIdx = localEntries.findIndex(e => e.id === rowMenuId);
+  const currentRowNum = currentIdx + 1;
+  const totalRows = localEntries.length;
+  const isFirst = currentIdx === 0;
+  const isLast = currentIdx === totalRows - 1;
+
+  return (
+    <div className="modal-overlay" onClick={() => setRowMenuId(null)}>
+      <div className="context-menu" onClick={(e) => e.stopPropagation()}>
+        <div className="context-title">
+          Row Actions
+          <span className="context-type-badge" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>#{currentRowNum}</span>
+        </div>
+
+        <button className="context-item" onClick={() => { handleRowDownloadPDF(rowMenuId); setRowMenuId(null); }}>
+          <FileText size={16} />
+          <div className="context-item-info">
+            <span>Download as PDF</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+        <button className="context-item" onClick={() => { handleRowDownloadExcel(rowMenuId); setRowMenuId(null); }}>
+          <FileSpreadsheet size={16} />
+          <div className="context-item-info">
+            <span>Download as Excel</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+        <button className="context-item" onClick={() => { handleRowShareText(rowMenuId); setRowMenuId(null); }}>
+          <Share2 size={16} />
+          <div className="context-item-info">
+            <span>Share as Text</span>
+            <span className="context-item-desc">{rowExportDesc}</span>
+          </div>
+        </button>
+
+        {canEdit && handleMoveRow && (
+          <>
+            <div className="context-divider" />
+            <div className="context-section-label">Move</div>
+            <button
+              className="context-item"
+              disabled={isFirst}
+              onClick={() => { handleMoveRow(rowMenuId, 'up'); setRowMenuId(null); }}
+            >
+              <ArrowUp size={16} />
+              <div className="context-item-info">
+                <span>Move Up</span>
+                <span className="context-item-desc">{isFirst ? 'Already at top' : `Move to row #${currentRowNum - 1}`}</span>
+              </div>
+            </button>
+            <button
+              className="context-item"
+              disabled={isLast}
+              onClick={() => { handleMoveRow(rowMenuId, 'down'); setRowMenuId(null); }}
+            >
+              <ArrowDown size={16} />
+              <div className="context-item-info">
+                <span>Move Down</span>
+                <span className="context-item-desc">{isLast ? 'Already at bottom' : `Move to row #${currentRowNum + 1}`}</span>
+              </div>
+            </button>
+            <button
+              className="context-item"
+              onClick={() => setShowMoveInput(!showMoveInput)}
+            >
+              <MoveVertical size={16} />
+              <div className="context-item-info">
+                <span>Move to Position...</span>
+                <span className="context-item-desc">Jump to a specific row number</span>
+              </div>
+            </button>
+            {showMoveInput && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                background: 'var(--background)',
+                borderRadius: '6px',
+                margin: '2px 8px 4px',
+              }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalRows}
+                  value={moveToPos}
+                  onChange={(e) => setMoveToPos(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const target = parseInt(moveToPos);
+                      if (target >= 1 && target <= totalRows && target !== currentRowNum) {
+                        handleMoveRow(rowMenuId, target - 1); // 0-based index
+                        setRowMenuId(null);
+                      }
+                    }
+                  }}
+                  placeholder={`1 – ${totalRows}`}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    border: '1.5px solid var(--border)',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    width: '60px',
+                    background: 'white',
+                    fontWeight: 500,
+                  }}
+                />
+                <button
+                  className="context-item-mini"
+                  disabled={!moveToPos || parseInt(moveToPos) < 1 || parseInt(moveToPos) > totalRows || parseInt(moveToPos) === currentRowNum}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'var(--navy)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    opacity: (!moveToPos || parseInt(moveToPos) < 1 || parseInt(moveToPos) > totalRows || parseInt(moveToPos) === currentRowNum) ? 0.5 : 1,
+                  }}
+                  onClick={() => {
+                    const target = parseInt(moveToPos);
+                    if (target >= 1 && target <= totalRows && target !== currentRowNum) {
+                      handleMoveRow(rowMenuId, target - 1); // 0-based index
+                      setRowMenuId(null);
+                    }
+                  }}
+                >
+                  Go
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="context-divider" />
+
+        {canEdit && (
+          <>
+            <button className="context-item" onClick={() => duplicateEntryMutation.mutate(rowMenuId)}>
+              <Copy size={16} /> Duplicate Record
+            </button>
+
+            <button className="context-item" onClick={() => {
+              const idx = localEntries.findIndex(e => e.id === rowMenuId);
+              if (idx !== -1) {
+                insertEntryMutation.mutate({ atIndex: idx + 1 });
+              }
+            }}>
+              <Plus size={16} />
+              <div className="context-item-info">
+                <span>Add Row Below</span>
+                <span className="context-item-desc">Insert empty row at #{currentRowNum + 1}</span>
+              </div>
+            </button>
+
+            <div className="context-divider" />
+
+            <button className="context-item danger" onClick={() => { if (confirm('Delete row?')) deleteEntryMutation.mutate(rowMenuId); }}>
+              <Trash2 size={16} /> Delete
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
