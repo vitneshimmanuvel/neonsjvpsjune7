@@ -30,4 +30,3 @@ export async function query(text, params) {
   // console.log('[DB Query] Executed query:', { text, duration, rows: res.rowCount });
   return res;
 }
-
