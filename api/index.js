@@ -1,4 +1,4 @@
-import { query } from '../api-lib/db.js';
+import { query } from '../db-lib/db.js';
 import crypto from 'crypto';
 
 // Helper to hash password matching the client-side SHA-256 algorithm

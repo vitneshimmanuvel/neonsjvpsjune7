@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
 import { listBusinesses, listRegisters } from '../../lib/api';
+import { apiUrl } from '../../lib/apiBase';
 import { 
   FileSpreadsheet, User, Calendar, RefreshCw, ChevronDown, 
   Filter, X, Search, Download, ClipboardList, Database, Check, Clock
@@ -122,7 +123,7 @@ export default function AdminActiveReportPage() {
       }
 
       const offset = isFirstPage ? 0 : activities.length;
-      const res = await fetch(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`);
+      const res = await fetch(apiUrl(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`));
       if (!res.ok) throw new Error('Failed to fetch activity logs');
       const data = await res.json();
       const rawActivities = data.activities || [];

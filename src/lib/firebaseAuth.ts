@@ -1,4 +1,5 @@
 // Client-side authentication and admin endpoints communicating with /api/ backend
+import { apiUrl } from './apiBase';
 
 export interface AppUser {
   id: string;
@@ -35,7 +36,7 @@ export async function ensureDefaultAdmin(): Promise<void> {
 }
 
 export async function firebaseLogin(email: string, password: string) {
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -56,7 +57,7 @@ export async function firebaseAdminLogin(email: string, password: string) {
 }
 
 export async function firebaseGetMe(token: string) {
-  const res = await fetch('/api/auth/me', {
+  const res = await fetch(apiUrl('/api/auth/me'), {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   if (!res.ok) {
@@ -91,7 +92,7 @@ export async function firebaseLogout(_token: string) {
 }
 
 export async function firebaseChangePassword(token: string, currentPassword: string, newPassword: string) {
-  const res = await fetch('/api/auth/change-password', {
+  const res = await fetch(apiUrl('/api/auth/change-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ export async function firebaseChangePassword(token: string, currentPassword: str
 }
 
 export async function firebaseGetUsers() {
-  const res = await fetch('/api/auth/users');
+  const res = await fetch(apiUrl('/api/auth/users'));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch users');
@@ -118,7 +119,7 @@ export async function firebaseGetUsers() {
 export async function firebaseCreateUser(data: {
   name: string; email: string; password: string; role?: string; phone?: string;
 }) {
-  const res = await fetch('/api/auth/users', {
+  const res = await fetch(apiUrl('/api/auth/users'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -131,7 +132,7 @@ export async function firebaseCreateUser(data: {
 }
 
 export async function firebaseUpdateUser(id: string, data: Record<string, unknown>) {
-  const res = await fetch(`/api/auth/users/${id}`, {
+  const res = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
@@ -144,7 +145,7 @@ export async function firebaseUpdateUser(id: string, data: Record<string, unknow
 }
 
 export async function firebaseUpdatePermissions(id: string, permissions: Record<string, unknown>) {
-  const res = await fetch(`/api/auth/users/${id}/permissions`, {
+  const res = await fetch(apiUrl(`/api/auth/users/${id}/permissions`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ permissions })
@@ -157,7 +158,7 @@ export async function firebaseUpdatePermissions(id: string, permissions: Record<
 }
 
 export async function firebaseAdminChangePassword(id: string, newPassword: string) {
-  const res = await fetch(`/api/auth/users/${id}`, {
+  const res = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: newPassword })
@@ -170,7 +171,7 @@ export async function firebaseAdminChangePassword(id: string, newPassword: strin
 }
 
 export async function firebaseDeleteUser(id: string) {
-  const res = await fetch(`/api/auth/users/${id}`, {
+  const res = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: 'DELETE'
   });
   if (!res.ok) {
@@ -181,7 +182,7 @@ export async function firebaseDeleteUser(id: string) {
 }
 
 export async function firebaseUpdateUserStatus(id: string, status: 'active' | 'inactive') {
-  const res = await fetch(`/api/auth/users/${id}`, {
+  const res = await fetch(apiUrl(`/api/auth/users/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
@@ -201,7 +202,7 @@ export async function logActivity(
   registerId?: string | number,
   registerName?: string
 ) {
-  const res = await fetch('/api/activity', {
+  const res = await fetch(apiUrl('/api/activity'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, userName, action, details, registerId, registerName })
@@ -224,7 +225,7 @@ export function firebaseLogWorkspaceAction(
 }
 
 export async function firebaseGetActivity(limitCount = 200) {
-  const res = await fetch(`/api/activity?limit=${limitCount}`);
+  const res = await fetch(apiUrl(`/api/activity?limit=${limitCount}`));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch activity');
@@ -233,7 +234,7 @@ export async function firebaseGetActivity(limitCount = 200) {
 }
 
 export async function firebaseGetUserActivity(userId: string) {
-  const res = await fetch(`/api/activity/user/${userId}`);
+  const res = await fetch(apiUrl(`/api/activity/user/${userId}`));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch user activity');
@@ -246,7 +247,7 @@ export async function firebaseCreateRequest(
   userName: string,
   data: { registerName: string; description: string; type: 'download' | 'delete_register'; registerId?: string | number; scope?: object }
 ) {
-  const res = await fetch('/api/requests', {
+  const res = await fetch(apiUrl('/api/requests'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, userName, ...data })
@@ -259,7 +260,7 @@ export async function firebaseCreateRequest(
 }
 
 export async function firebaseGetMyDownloadRequests(userId: string) {
-  const res = await fetch(`/api/requests/my?userId=${userId}`);
+  const res = await fetch(apiUrl(`/api/requests/my?userId=${userId}`));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch my requests');
@@ -268,7 +269,7 @@ export async function firebaseGetMyDownloadRequests(userId: string) {
 }
 
 export async function firebaseGetAllDownloadRequests() {
-  const res = await fetch('/api/requests/all');
+  const res = await fetch(apiUrl('/api/requests/all'));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch all requests');
@@ -277,7 +278,7 @@ export async function firebaseGetAllDownloadRequests() {
 }
 
 export async function firebaseGetPendingDownloadRequests() {
-  const res = await fetch('/api/requests/pending');
+  const res = await fetch(apiUrl('/api/requests/pending'));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch pending requests');
@@ -291,7 +292,7 @@ export async function firebaseRespondRequest(
   adminResponse: string,
   adminName: string = 'Admin'
 ) {
-  const res = await fetch(`/api/requests/${requestId}/respond`, {
+  const res = await fetch(apiUrl(`/api/requests/${requestId}/respond`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, adminResponse, adminName })
@@ -307,7 +308,7 @@ export async function firebaseCreateNotification(
   userId: string,
   data: { title: string; message: string; type: string; meta?: Record<string, any> }
 ) {
-  const res = await fetch('/api/notifications', {
+  const res = await fetch(apiUrl('/api/notifications'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, ...data })
@@ -320,7 +321,7 @@ export async function firebaseCreateNotification(
 }
 
 export async function firebaseGetMyNotifications(userId: string) {
-  const res = await fetch(`/api/notifications?userId=${userId}`);
+  const res = await fetch(apiUrl(`/api/notifications?userId=${userId}`));
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.error || 'Failed to fetch notifications');
@@ -329,7 +330,7 @@ export async function firebaseGetMyNotifications(userId: string) {
 }
 
 export async function firebaseMarkNotificationRead(notifId: string) {
-  const res = await fetch(`/api/notifications/${notifId}/read`, {
+  const res = await fetch(apiUrl(`/api/notifications/${notifId}/read`), {
     method: 'PUT'
   });
   if (!res.ok) {
@@ -339,7 +340,7 @@ export async function firebaseMarkNotificationRead(notifId: string) {
 }
 
 export async function firebaseMarkAllNotificationsRead(userId: string) {
-  const res = await fetch('/api/notifications/read-all', {
+  const res = await fetch(apiUrl('/api/notifications/read-all'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })

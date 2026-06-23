@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
+import { apiUrl } from '../../lib/apiBase';
 import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown, Plus } from 'lucide-react';
 import { cleanActivityLogs } from '../../lib/activityHelper';
 
@@ -84,7 +85,7 @@ export default function AdminActivityPage() {
       }
 
       const offset = isFirstPage ? 0 : activities.length;
-      const res = await fetch(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`);
+      const res = await fetch(apiUrl(`/api/activity?limit=${PAGE_SIZE}&offset=${offset}`));
       if (!res.ok) throw new Error('Failed to fetch activity logs');
       const data = await res.json();
       const newItems = data.activities || [];
