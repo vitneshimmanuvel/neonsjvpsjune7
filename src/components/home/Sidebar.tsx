@@ -107,12 +107,13 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.8.1') !== 'true';
+      return localStorage.getItem('seen_version_1.8.2') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.1');
+  const [versionTab, setVersionTab] = useState<'1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.2');
+  const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
 
   // Slideshow state
   const [activeSlide, setActiveSlide] = useState(0);
@@ -121,7 +122,7 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.8.1', 'true');
+      localStorage.setItem('seen_version_1.8.2', 'true');
     } catch (e) {
       console.error(e);
     }
@@ -858,7 +859,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('1.8.1');
+                    setVersionTab('1.8.2');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -868,9 +869,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v1.8.1"
+                  title="View what's new in v1.8.2"
                 >
-                  v1.8.1
+                  v1.8.2
                 </span>
               </div>
             </div>
@@ -1785,413 +1786,144 @@ export const Sidebar = memo(function Sidebar({
               </button>
             </div>
 
-            {/* Version Tabs */}
+            {/* Version Selector */}
             <div style={{
               display: 'flex',
-              gap: '4px',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               marginBottom: versionTab === '1.7.7' ? '0' : '20px',
-              background: '#f1f5f9',
-              padding: '4px',
-              borderRadius: versionTab === '1.7.7' ? '0' : '8px',
+              padding: versionTab === '1.7.7' ? '12px 24px' : '12px 0',
+              background: versionTab === '1.7.7' ? '#f8fafc' : 'transparent',
               borderBottom: versionTab === '1.7.7' ? '1px solid #e2e8f0' : 'none',
-              overflowX: 'auto'
+              position: 'relative'
             }}>
-              <button
-                onClick={() => { setVersionTab('1.8.1'); setActiveSlide(0); }}
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.8.1' ? 'white' : 'transparent',
-                  color: versionTab === '1.8.1' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.8.1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.8.1 (New)
-              </button>
-              <button
-                onClick={() => { setVersionTab('1.8.0'); setActiveSlide(0); }}
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.8.0' ? 'white' : 'transparent',
-                  color: versionTab === '1.8.0' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.8.0' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.8.0
-              </button>
-              <button
-                onClick={() => { setVersionTab('1.7.9'); setActiveSlide(0); }}
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.9' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.9' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.9' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.9
-              </button>
-              <button
-                onClick={() => { setVersionTab('1.7.7'); setActiveSlide(0); }}
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.7' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.7' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.7' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.7
-              </button>
-              <button
-                onClick={() => setVersionTab('1.7.6')}
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.6' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.6' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.6' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.6
-              </button>
-              <button
-                onClick={() => setVersionTab('1.7.5')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.5' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.5' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.5' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.5
-              </button>
-              <button
-                onClick={() => setVersionTab('1.7.1')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.1' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.1' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.1
-              </button>
-              <button
-                onClick={() => setVersionTab('1.7.0')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.7.0' ? 'white' : 'transparent',
-                  color: versionTab === '1.7.0' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.7.0' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.7.0
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.10')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.10' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.10' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.10' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.10
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.9')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.9' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.9' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.9' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.9
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.3')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.3' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.3' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.3' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.3
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.2')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.2' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.2' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.2' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.2
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.1')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.1' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.1' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.1
-              </button>
-              <button
-                onClick={() => setVersionTab('1.6.0')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.6.0' ? 'white' : 'transparent',
-                  color: versionTab === '1.6.0' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.6.0' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.6.0
-              </button>
-              <button
-                onClick={() => setVersionTab('1.5.6')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.5.6' ? 'white' : 'transparent',
-                  color: versionTab === '1.5.6' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.5.6' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                v1.5.6
-              </button>
-              <button
-                onClick={() => setVersionTab('1.5.5')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.5.5' ? 'white' : 'transparent',
-                  color: versionTab === '1.5.5' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.5.5' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.5.5
-              </button>
-              <button
-                onClick={() => setVersionTab('1.5.2')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.5.2' ? 'white' : 'transparent',
-                  color: versionTab === '1.5.2' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.5.2' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.5.2
-              </button>
-              <button
-                onClick={() => setVersionTab('1.5.1')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.5.1' ? 'white' : 'transparent',
-                  color: versionTab === '1.5.1' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.5.1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.5.1
-              </button>
-              <button
-                onClick={() => setVersionTab('1.5')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.5' ? 'white' : 'transparent',
-                  color: versionTab === '1.5' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.5' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.5
-              </button>
-              <button
-                onClick={() => setVersionTab('1.3.1')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.3.1' ? 'white' : 'transparent',
-                  color: versionTab === '1.3.1' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.3.1' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.3.1
-              </button>
-              <button
-                onClick={() => setVersionTab('1.2')}
-                style={{
-                  flex: 1,
-                  padding: '6px 4px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: versionTab === '1.2' ? 'white' : 'transparent',
-                  color: versionTab === '1.2' ? '#0f172a' : '#64748b',
-                  boxShadow: versionTab === '1.2' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
-                }}
-              >
-                v1.2
-              </button>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+                Showing version:
+              </span>
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowOlderVersionsDropdown(!showOlderVersionsDropdown)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    background: 'white',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                >
+                  {versionTab === '1.8.2' ? 'v1.8.2 (Current)' : `v${versionTab}`}
+                  <ChevronDown size={14} style={{ color: '#64748b', transition: 'transform 0.2s', transform: showOlderVersionsDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
+                </button>
+                
+                {showOlderVersionsDropdown && (
+                  <>
+                    <div 
+                      style={{ position: 'fixed', inset: 0, zIndex: 100 }} 
+                      onClick={() => setShowOlderVersionsDropdown(false)} 
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '4px',
+                      width: '160px',
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      zIndex: 101,
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      padding: '4px'
+                    }}>
+                      {[
+                        '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
+                        '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
+                      ].map(v => (
+                        <button
+                          key={v}
+                          onClick={() => {
+                            setVersionTab(v as any);
+                            setActiveSlide(0);
+                            setShowOlderVersionsDropdown(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 10px',
+                            fontSize: '12px',
+                            fontWeight: versionTab === v ? 700 : 500,
+                            borderRadius: '6px',
+                            border: 'none',
+                            background: versionTab === v ? '#f1f5f9' : 'transparent',
+                            color: versionTab === v ? '#0f172a' : '#475569',
+                            cursor: 'pointer',
+                            transition: 'all 0.1s'
+                          }}
+                          onMouseEnter={e => {
+                            if (versionTab !== v) e.currentTarget.style.background = '#f8fafc';
+                          }}
+                          onMouseLeave={e => {
+                            if (versionTab !== v) e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          {v === '1.8.2' ? 'v1.8.2 (Current)' : `v${v}`}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            {versionTab === '1.8.1' ? (
+            {versionTab === '1.8.2' ? (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px', 
+                maxHeight: '400px', 
+                overflowY: 'auto', 
+                paddingRight: '8px',
+                animation: 'slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+              }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 23, 2026</span>
+                
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#e0f2fe', color: '#0284c7', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Enhanced Column Unlinking & Data Retention Control</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Refined the column unlinking workflow. The "Keep Data" or "Clear Data" confirmation modal is now available on both sides of the link connection (source and target). However, selecting "Clear Data" will only clear the cell values of the target destination column. The source column data is guaranteed to be preserved under all actions.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#ecfdf5', color: '#10b981', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Fixed Column Unlink Data Clear Persistence</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Resolved an issue where selecting "Clear Data" on unlinking did not persist to the backend database after invalidating the queries or reloading the page. Unlink operations now correctly force entry updates to sync changes permanently.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : versionTab === '1.8.1' ? (
               <div style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 

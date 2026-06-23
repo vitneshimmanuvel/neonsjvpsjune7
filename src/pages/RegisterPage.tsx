@@ -4069,7 +4069,10 @@ export default function RegisterPage() {
                   <AlertTriangle size={16} /> Choose how to Unlink:
                 </h4>
                 <p style={{ fontSize: '12px', color: 'var(--text-main)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                  Unlinking will disconnect the live data sync. The columns will stop mirroring each other. Choose whether to keep or clear the mirrored values.
+                  {linkInfoModal.role === 'target'
+                    ? "Unlinking will disconnect the live data sync. The columns will stop mirroring each other. Choose whether to keep or clear the mirrored values in this column."
+                    : "Unlinking will disconnect the live data sync. The columns will stop mirroring each other. Choose whether to keep or clear the mirrored values in the target destination column (the source column data will be preserved)."
+                  }
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', gap: '8px' }}>

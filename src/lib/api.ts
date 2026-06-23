@@ -1,6 +1,7 @@
 // Firestore-backed API client for RecordBook Web
 // Firebase imports removed
 import { TEMPLATES, type Template, type TemplateColumn } from './templates';
+import { apiUrl } from './apiBase';
 // Local filesystem completely unmounted from regular API.
 
 // ==================== AUTH ====================
@@ -56,13 +57,13 @@ export async function getMe(): Promise<User> {
 export interface Business { id: number; name: string; ownerId: number; createdAt: string; }
 
 export async function listBusinesses(): Promise<Business[]> {
-  const res = await fetch('/api/businesses');
+  const res = await fetch(apiUrl('/api/businesses'));
   if (!res.ok) throw new Error('Failed to fetch businesses');
   return res.json();
 }
 
 export async function createBusiness(name: string): Promise<Business> {
-  const res = await fetch('/api/businesses', {
+  const res = await fetch(apiUrl('/api/businesses'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name })
@@ -80,13 +81,13 @@ export interface Folder {
 }
 
 export async function listFolders(businessId: number): Promise<Folder[]> {
-  const res = await fetch(`/api/folders?businessId=${businessId}`);
+  const res = await fetch(apiUrl(`/api/folders?businessId=${businessId}`));
   if (!res.ok) throw new Error('Failed to fetch folders');
   return res.json();
 }
 
 export async function createFolder(businessId: number, name: string): Promise<Folder> {
-  const res = await fetch('/api/folders', {
+  const res = await fetch(apiUrl('/api/folders'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ businessId, name })
@@ -96,14 +97,14 @@ export async function createFolder(businessId: number, name: string): Promise<Fo
 }
 
 export async function deleteFolder(folderId: number): Promise<void> {
-  const res = await fetch(`/api/folders/${folderId}`, {
+  const res = await fetch(apiUrl(`/api/folders/${folderId}`), {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to delete folder');
 }
 
 export async function renameFolder(folderId: number, newName: string): Promise<Folder> {
-  const res = await fetch(`/api/folders/${folderId}`, {
+  const res = await fetch(apiUrl(`/api/folders/${folderId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: newName })
@@ -383,7 +384,7 @@ async function getRegDoc(registerId: number): Promise<RegisterDetail> {
   if (!fetchPromise) {
     fetchPromise = (async () => {
       try {
-        const res = await fetch(`/api/registers/${registerId}`);
+        const res = await fetch(apiUrl(`/api/registers/${registerId}`));
         if (!res.ok) throw new Error('Register not found');
         const data = await res.json();
         firestoreRegisterCache.set(registerId, data);
@@ -402,7 +403,7 @@ async function getRegDoc(registerId: number): Promise<RegisterDetail> {
 async function saveRegDocImmediate(reg: RegisterDetail, includeEntries = false): Promise<void> {
   firestoreRegisterCache.set(reg.id, reg);
   const payload = includeEntries ? reg : { ...reg, entries: undefined };
-  const res = await fetch(`/api/registers/${reg.id}`, {
+  const res = await fetch(apiUrl(`/api/registers/${reg.id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
@@ -447,19 +448,19 @@ export function bustRegisterCache(registerId: number): void {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export async function listRegisters(businessId: number): Promise<RegisterSummary[]> {
-  const res = await fetch(`/api/registers?businessId=${businessId}`);
+  const res = await fetch(apiUrl(`/api/registers?businessId=${businessId}`));
   if (!res.ok) throw new Error('Failed to list registers');
   return res.json();
 }
 
 export async function listDeletedRegisters(businessId: number): Promise<RegisterSummary[]> {
-  const res = await fetch(`/api/registers/deleted?businessId=${businessId}`);
+  const res = await fetch(apiUrl(`/api/registers/deleted?businessId=${businessId}`));
   if (!res.ok) throw new Error('Failed to list deleted registers');
   return res.json();
 }
 
 export async function getRegisterColumnsOnly(registerId: number): Promise<RegisterDetail> {
-  const res = await fetch(`/api/registers/${registerId}/columns`);
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/columns`));
   if (!res.ok) throw new Error('Failed to fetch columns');
   return res.json();
 }
@@ -499,7 +500,7 @@ export async function createRegister(data: {
     summary: c.summary,
   }));
   
-  const res = await fetch('/api/registers', {
+  const res = await fetch(apiUrl('/api/registers'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -530,7 +531,7 @@ export async function deleteRegister(registerId: number): Promise<void> {
     'null'
   );
   
-  const res = await fetch(`/api/registers/${registerId}`, {
+  const res = await fetch(apiUrl(`/api/registers/${registerId}`), {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -547,7 +548,7 @@ export async function deleteRegister(registerId: number): Promise<void> {
 
 export async function permanentlyDeleteRegister(registerId: number): Promise<void> {
   const reg = await getRegDoc(registerId);
-  const res = await fetch(`/api/registers/${registerId}/hard`, {
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/hard`), {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to permanently delete register');
@@ -558,7 +559,7 @@ export async function permanentlyDeleteRegister(registerId: number): Promise<voi
 
 export async function restoreRegister(registerId: number): Promise<void> {
   const reg = await getRegDoc(registerId);
-  const res = await fetch(`/api/registers/${registerId}/restore`, {
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/restore`), {
     method: 'POST'
   });
   if (!res.ok) throw new Error('Failed to restore register');
@@ -1733,7 +1734,7 @@ export async function addEntry(registerId: number, cells: Record<string, string>
       cells, createdAt: new Date().toISOString(), pageIndex,
     };
     
-    const res = await fetch(`/api/registers/${registerId}/entries`, {
+    const res = await fetch(apiUrl(`/api/registers/${registerId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry)
@@ -1800,7 +1801,7 @@ export async function insertEntry(registerId: number, cells: Record<string, stri
       cells, createdAt: new Date().toISOString(), pageIndex,
     };
 
-    const res = await fetch(`/api/registers/${registerId}/entries`, {
+    const res = await fetch(apiUrl(`/api/registers/${registerId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry)
@@ -1856,7 +1857,7 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
   const oldCells = { ...entry.cells };
   entry.cells = { ...entry.cells, ...safeCells };
 
-  const res = await fetch(`/api/registers/${registerId}/entries/${entryId}`, {
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cells: entry.cells, cellStyles: entry.cellStyles, pageIndex: entry.pageIndex, rowNumber: entry.rowNumber })
@@ -1945,7 +1946,7 @@ async function _syncAddRow(targetRegisterId: number, sourceEntryId: number) {
       pageIndex: 0
     };
 
-    const res = await fetch(`/api/registers/${targetRegisterId}/entries`, {
+    const res = await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newEntry)
@@ -1976,7 +1977,7 @@ async function _syncInsertRow(targetRegisterId: number, atIndex: number, sourceE
       pageIndex: 0
     };
 
-    const res = await fetch(`/api/registers/${targetRegisterId}/entries`, {
+    const res = await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newEntry)
@@ -2000,7 +2001,7 @@ async function _syncDeleteRow(targetRegisterId: number, sourceEntryId: number, r
     if (entryIndex === -1) return;
     const entry = reg.entries[entryIndex];
 
-    const res = await fetch(`/api/registers/${targetRegisterId}/entries/${entry.id}`, {
+    const res = await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries/${entry.id}`), {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to delete entry in sync');
@@ -2026,7 +2027,7 @@ async function _syncBulkDeleteRows(targetRegisterId: number, sourceEntryIds: num
     if (entriesToDelete.length === 0) return;
 
     for (const entry of entriesToDelete) {
-      await fetch(`/api/registers/${targetRegisterId}/entries/${entry.id}`, {
+      await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries/${entry.id}`), {
         method: 'DELETE'
       });
     }
@@ -2189,14 +2190,16 @@ export async function unlinkColumn(
     if (col && col.linkedTo) {
       targetRegisterId = col.linkedTo.registerId;
       targetColumnId = col.linkedTo.columnId;
+      const role = col.linkedTo.role;
       delete col.linkedTo;
-      if (clearData) {
+      const shouldSaveEntries = !!(clearData && role === 'target');
+      if (shouldSaveEntries) {
         const colIdStr = columnId.toString();
         reg.entries.forEach(entry => {
           if (entry.cells) delete entry.cells[colIdStr];
         });
       }
-      await saveRegDocImmediate(reg);
+      await saveRegDocImmediate(reg, shouldSaveEntries);
     }
   });
 
@@ -2208,14 +2211,16 @@ export async function unlinkColumn(
       const reg = await getRegDoc(finalTargetRegisterId);
       const col = reg.columns.find(c => c.id === finalTargetColumnId);
       if (col) {
+        const role = col.linkedTo?.role;
         delete col.linkedTo;
-        if (clearData) {
+        const shouldSaveEntries = !!(clearData && role === 'target');
+        if (shouldSaveEntries) {
           const colIdStr = finalTargetColumnId.toString();
           reg.entries.forEach(entry => {
             if (entry.cells) delete entry.cells[colIdStr];
           });
         }
-        await saveRegDocImmediate(reg);
+        await saveRegDocImmediate(reg, shouldSaveEntries);
       }
     });
   }
@@ -2230,7 +2235,7 @@ export async function updateEntryCellStyles(registerId: number, entryId: number,
 
   entry.cellStyles = { ...(entry.cellStyles || {}), ...cellStyles };
 
-  const res = await fetch(`/api/registers/${registerId}/entries/${entryId}`, {
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cells: entry.cells, cellStyles: entry.cellStyles, pageIndex: entry.pageIndex, rowNumber: entry.rowNumber })
@@ -2290,7 +2295,7 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
       deletedById: savedUser?.id || '',
     });
 
-    const res = await fetch(`/api/registers/${registerId}/entries/${entryId}`, {
+    const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Failed to delete entry');
@@ -2610,7 +2615,7 @@ export async function logAction(
       sessionStorage.getItem('recordbook_user') ||
       'null'
     );
-    const res = await fetch('/api/activity', {
+    const res = await fetch(apiUrl('/api/activity'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2631,14 +2636,14 @@ export async function logAction(
 }
 
 export async function listHistory(businessId: number): Promise<HistoryEntry[]> {
-  const res = await fetch('/api/activity');
+  const res = await fetch(apiUrl('/api/activity'));
   if (!res.ok) throw new Error('Failed to fetch activity logs');
   const data = await res.json();
   return data.activities;
 }
 
 export async function listRowHistory(registerId: number, entryId: number): Promise<HistoryEntry[]> {
-  const res = await fetch(`/api/activity?registerId=${registerId}&entryId=${entryId}`);
+  const res = await fetch(apiUrl(`/api/activity?registerId=${registerId}&entryId=${entryId}`));
   if (!res.ok) throw new Error('Failed to fetch row history');
   const data = await res.json();
   return data.activities;
@@ -2650,7 +2655,7 @@ export async function listRowHistory(registerId: number, entryId: number): Promi
  * Get all deleted items (rows + columns) across all registers for a business.
  */
 export async function getAllDeletedItems(businessId: number): Promise<DeletedItem[]> {
-  const res = await fetch(`/api/recycle-bin?businessId=${businessId}`);
+  const res = await fetch(apiUrl(`/api/recycle-bin?businessId=${businessId}`));
   if (!res.ok) throw new Error('Failed to fetch deleted items');
   const data = await res.json();
   return data.deletedItems;
@@ -2774,7 +2779,7 @@ export interface BackupSnapshot {
  * Create a full backup of all registers and folders for a business.
  */
 export async function createBackup(businessId: number, label?: string): Promise<BackupMeta> {
-  const res = await fetch('/api/backups', {
+  const res = await fetch(apiUrl('/api/backups'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ businessId, label })
@@ -2787,7 +2792,7 @@ export async function createBackup(businessId: number, label?: string): Promise<
  * List all available backups for a business, newest first.
  */
 export async function listBackups(businessId: number): Promise<BackupMeta[]> {
-  const res = await fetch(`/api/backups?businessId=${businessId}`);
+  const res = await fetch(apiUrl(`/api/backups?businessId=${businessId}`));
   if (!res.ok) throw new Error('Failed to fetch backups');
   return res.json();
 }
@@ -2797,7 +2802,7 @@ export async function listBackups(businessId: number): Promise<BackupMeta[]> {
  * WARNING: This is destructive. Current data will be replaced.
  */
 export async function restoreBackup(backupId: string): Promise<void> {
-  const res = await fetch(`/api/backups/${backupId}/restore`, {
+  const res = await fetch(apiUrl(`/api/backups/${backupId}/restore`), {
     method: 'POST'
   });
   if (!res.ok) throw new Error('Failed to restore backup');
@@ -2808,7 +2813,7 @@ export async function restoreBackup(backupId: string): Promise<void> {
  * Delete a backup permanently.
  */
 export async function deleteBackup(backupId: string): Promise<void> {
-  const res = await fetch(`/api/backups/${backupId}`, {
+  const res = await fetch(apiUrl(`/api/backups/${backupId}`), {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to delete backup');
