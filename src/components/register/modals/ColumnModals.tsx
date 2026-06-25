@@ -698,6 +698,10 @@ interface ColumnModalsProps {
   setNewColFormula: (v: string) => void;
   addColumnMutation: any;
   insertColumnMutation: any;
+  newColMinVal: string;
+  setNewColMinVal: (v: string) => void;
+  newColMaxVal: string;
+  setNewColMaxVal: (v: string) => void;
 
   // Rename Column
   renameColModal: boolean;
@@ -739,6 +743,7 @@ export function ColumnModals(props: ColumnModalsProps) {
     newColumnModal, setNewColumnModal, insertColModal, setInsertColModal,
     newColName, setNewColName, newColType, setNewColType,
     newColDropdownOpts, setNewColDropdownOpts, newColFormula, setNewColFormula,
+    newColMinVal, setNewColMinVal, newColMaxVal, setNewColMaxVal,
     addColumnMutation, insertColumnMutation,
     renameColModal, setRenameColModal, renameColValue, setRenameColValue, renameColumnMutation,
     dropdownConfigModal, setDropdownConfigModal, dropdownConfigOptions, setDropdownConfigOptions, updateDropdownMutation,
@@ -785,6 +790,32 @@ export function ColumnModals(props: ColumnModalsProps) {
                 outputName={newColName}
                 excludeId={activeModalColId}
               />
+            )}
+            {(newColType === 'currency' || newColType === 'number') && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Min Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMinVal} 
+                      onChange={(e) => setNewColMinVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Max Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMaxVal} 
+                      onChange={(e) => setNewColMaxVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                </div>
+              </div>
             )}
             <div className="modal-actions">
               <button className="modal-cancel-btn" onClick={() => setNewColumnModal(false)}>Cancel</button>
@@ -866,8 +897,38 @@ export function ColumnModals(props: ColumnModalsProps) {
                 excludeId={activeModalColId}
               />
             )}
+            {(changeTypeValue === 'currency' || changeTypeValue === 'number') && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Min Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMinVal} 
+                      onChange={(e) => setNewColMinVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Max Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMaxVal} 
+                      onChange={(e) => setNewColMaxVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="modal-actions">
-              <button className="modal-cancel-btn" onClick={() => setChangeTypeModal(false)}>Cancel</button>
+              <button className="modal-cancel-btn" onClick={() => {
+                setChangeTypeModal(false);
+                setNewColMinVal('');
+                setNewColMaxVal('');
+              }}>Cancel</button>
               <button className="modal-confirm-btn" onClick={() => changeColumnTypeMutation.mutate()}>Change Type</button>
             </div>
           </div>
@@ -921,8 +982,38 @@ export function ColumnModals(props: ColumnModalsProps) {
                 excludeId={activeModalColId}
               />
             )}
+            {(newColType === 'currency' || newColType === 'number') && (
+              <div style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Min Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMinVal} 
+                      onChange={(e) => setNewColMinVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="modal-label" style={{ display: 'block', marginBottom: '6px' }}>Max Value</label>
+                    <input 
+                      type="number" 
+                      className="modal-input" 
+                      value={newColMaxVal} 
+                      onChange={(e) => setNewColMaxVal(e.target.value)} 
+                      placeholder="No limit" 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="modal-actions">
-              <button className="modal-cancel-btn" onClick={() => setInsertColModal(null)}>Cancel</button>
+              <button className="modal-cancel-btn" onClick={() => {
+                setInsertColModal(null);
+                setNewColMinVal('');
+                setNewColMaxVal('');
+              }}>Cancel</button>
               <button className="modal-confirm-btn" disabled={!newColName.trim()} onClick={() => {
                 // Pre-calculate position HERE (click-time snapshot) before modal state is cleared
                 const targetCol = columns.find(c => c.id === activeModalColId);
@@ -935,6 +1026,8 @@ export function ColumnModals(props: ColumnModalsProps) {
                   type: newColType,
                   dropdownOpts: newColDropdownOpts,
                   formula: newColFormula,
+                  minVal: newColMinVal,
+                  maxVal: newColMaxVal
                 });
               }}>Insert Column</button>
             </div>

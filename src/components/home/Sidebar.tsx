@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -53,6 +53,26 @@ export const Sidebar = memo(function Sidebar({
   onToggleNotifications
 }: SidebarProps) {
   const navigate = useNavigate();
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'monitor'>(() => {
+    try {
+      return (localStorage.getItem('theme-mode') as 'light' | 'dark' | 'monitor') || 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  const toggleThemeMode = useCallback(() => {
+    const nextMode = themeMode === 'light' ? 'dark' : themeMode === 'dark' ? 'monitor' : 'light';
+    setThemeMode(nextMode);
+    try {
+      document.documentElement.classList.remove('light', 'dark', 'monitor');
+      document.documentElement.classList.add(nextMode);
+      localStorage.setItem('theme-mode', nextMode);
+    } catch (e) {
+      console.error('Failed to set theme mode:', e);
+    }
+  }, [themeMode]);
+
   const { id: currentRegId } = useParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -107,12 +127,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.8.2') !== 'true';
+      return localStorage.getItem('seen_version_1.8.5') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.2');
+  const [versionTab, setVersionTab] = useState<'1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.5');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
 
   // Slideshow state
@@ -122,7 +142,7 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.8.2', 'true');
+      localStorage.setItem('seen_version_1.8.5', 'true');
     } catch (e) {
       console.error(e);
     }
@@ -427,6 +447,21 @@ export const Sidebar = memo(function Sidebar({
           <div className="sidebar-brand-actions">
             <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
               <X size={18} />
+            </button>
+
+            <button
+              className="sidebar-collapse-btn"
+              onClick={toggleThemeMode}
+              title={`Switch theme mode (Current: ${themeMode})`}
+              aria-label="Switch theme mode"
+            >
+              {themeMode === 'light' ? (
+                <Sun size={16} />
+              ) : themeMode === 'dark' ? (
+                <Moon size={16} />
+              ) : (
+                <Monitor size={16} />
+              )}
             </button>
 
             <button
@@ -859,7 +894,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('1.8.2');
+                    setVersionTab('1.8.5');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -869,9 +904,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v1.8.2"
+                  title="View what's new in v1.8.5"
                 >
-                  v1.8.2
+                  v1.8.5
                 </span>
               </div>
             </div>
@@ -894,14 +929,14 @@ export const Sidebar = memo(function Sidebar({
                 bottom: '60px',
                 left: '8px',
                 width: '240px',
-                background: 'white',
+                background: 'var(--surface)',
                 borderRadius: '8px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '8px',
                 zIndex: 1001,
-                border: '1px solid #e2e8f0',
+                border: '1px solid var(--border)',
               }}
             >
               <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: 'inherit', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/profile'); }}>
@@ -924,7 +959,7 @@ export const Sidebar = memo(function Sidebar({
                   <Shield size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Admin Dashboard</span>
                 </button>
               )}
-              <div style={{ height: '1px', background: '#e2e8f0', margin: '4px 0' }} />
+              <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
               <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: '#ef4444', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); logout(); navigate('/login'); }}>
                 <LogOut size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Logout</span>
               </button>
@@ -958,9 +993,9 @@ export const Sidebar = memo(function Sidebar({
                 maxWidth: '95vw',
                 height: isMobile ? undefined : '700px',
                 maxHeight: '85vh',
-                background: 'white',
+                background: 'var(--surface)',
                 borderRadius: '16px',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05)',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border-v)',
                 display: 'flex',
                 flexDirection: isMobile ? 'column' : 'row',
                 overflow: 'hidden',
@@ -973,15 +1008,15 @@ export const Sidebar = memo(function Sidebar({
                   width: isMobile ? '100%' : '360px',
                   display: 'flex',
                   flexDirection: 'column',
-                  borderRight: isMobile ? 'none' : '1px solid #e2e8f0',
+                  borderRight: isMobile ? 'none' : '1px solid var(--border)',
                   flexShrink: 0,
-                  background: 'white',
+                  background: 'var(--surface)',
                   height: '100%',
                 }}>
                   {/* Header */}
                   <div style={{
                     padding: '20px 24px 16px',
-                    borderBottom: '1px solid #f1f5f9',
+                    borderBottom: '1px solid var(--border-light)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -998,8 +1033,8 @@ export const Sidebar = memo(function Sidebar({
                         <PenLine size={18} color="#16a34a" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>Quick Entry</h3>
-                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--foreground)' }}>Quick Entry</h3>
+                        <span style={{ fontSize: '12px', color: 'var(--muted-light)' }}>
                           {entrySavedCount > 0 ? `${entrySavedCount} entries saved` : 'Select a register below'}
                         </span>
                       </div>
@@ -1008,19 +1043,19 @@ export const Sidebar = memo(function Sidebar({
                       <button
                         onClick={() => { setIsEntryPanelOpen(false); setEntrySearch(''); setEntrySelectedReg(null); setEntryColumns([]); setEntryValues({}); setEntrySavedCount(0); }}
                         style={{
-                          background: '#f1f5f9',
+                          background: 'var(--bg-secondary)',
                           border: 'none',
                           cursor: 'pointer',
                           padding: '6px',
-                          color: '#64748b',
+                          color: 'var(--muted-light)',
                           borderRadius: '8px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'all 0.15s',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
-                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--border)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'; }}
                       >
                         <X size={16} />
                       </button>
@@ -1028,15 +1063,15 @@ export const Sidebar = memo(function Sidebar({
                   </div>
 
                   {/* Search */}
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #f8fafc' }}>
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-light)' }}>
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
                       padding: '8px 12px',
-                      background: '#f8fafc',
+                      background: 'var(--bg-secondary)',
                       borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
+                      border: '1px solid var(--border)',
                     }}>
                       <Search size={14} color="#94a3b8" />
                       <input
@@ -1050,7 +1085,7 @@ export const Sidebar = memo(function Sidebar({
                           outline: 'none',
                           background: 'transparent',
                           fontSize: '13px',
-                          color: '#0f172a',
+                          color: 'var(--foreground)',
                           width: '100%',
                           font: 'inherit',
                         }}
@@ -1118,14 +1153,14 @@ export const Sidebar = memo(function Sidebar({
                               borderRadius: '8px',
                               cursor: 'pointer',
                               transition: 'all 0.15s',
-                              backgroundColor: isSelected ? '#f0fdf4' : 'transparent',
-                              borderLeft: isSelected ? '3px solid #16a34a' : 'none',
+                              backgroundColor: isSelected ? 'var(--quick-entry-selected-bg)' : 'transparent',
+                              borderLeft: isSelected ? '3px solid var(--quick-entry-selected-icon)' : 'none',
                               paddingLeft: isSelected ? `${(indent || 12) - 3}px` : `${indent || 12}px`,
                               transform: isSelected ? 'translateX(2px)' : 'none',
                             }}
                             onMouseEnter={e => {
                               if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = '#f8fafc';
+                                e.currentTarget.style.backgroundColor = 'var(--surface-hover)';
                                 e.currentTarget.style.transform = 'translateX(2px)';
                               }
                             }}
@@ -1138,14 +1173,14 @@ export const Sidebar = memo(function Sidebar({
                           >
                             <div style={{
                               width: '28px', height: '28px', borderRadius: '6px',
-                              background: isSelected ? '#dcfce7' : (reg.iconColor ? `${reg.iconColor}15` : '#f1f5f9'),
+                              background: isSelected ? 'var(--quick-entry-selected-icon-bg)' : (reg.iconColor ? `${reg.iconColor}15` : 'var(--bg-secondary)'),
                               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                             }}>
-                              <FileText size={14} color={isSelected ? '#16a34a' : (reg.iconColor || '#64748b')} />
+                              <FileText size={14} color={isSelected ? 'var(--quick-entry-selected-icon)' : (reg.iconColor || 'var(--muted-light)')} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 500, color: isSelected ? '#15803d' : '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{reg.name}</div>
-                              <div style={{ fontSize: '11px', color: isSelected ? '#16a34a' : '#94a3b8', opacity: isSelected ? 0.8 : 1 }}>{reg.entryCount} entries</div>
+                              <div style={{ fontSize: '13px', fontWeight: isSelected ? 600 : 500, color: isSelected ? 'var(--quick-entry-selected-text)' : 'var(--foreground)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{reg.name}</div>
+                              <div style={{ fontSize: '11px', color: isSelected ? 'var(--quick-entry-selected-icon)' : 'var(--muted-light)', opacity: isSelected ? 0.8 : 1 }}>{reg.entryCount} entries</div>
                             </div>
                             <PenLine size={14} color="#16a34a" style={{ opacity: isSelected ? 1 : 0.6, flexShrink: 0 }} />
                           </div>
@@ -1174,12 +1209,12 @@ export const Sidebar = memo(function Sidebar({
                                     padding: '8px 12px', borderRadius: '8px',
                                     cursor: 'pointer', transition: 'all 0.15s', userSelect: 'none',
                                   }}
-                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--surface-hover)'}
                                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                                 >
                                   {isExp ? <ChevronDown size={14} color="#94a3b8" /> : <ChevronRight size={14} color="#94a3b8" />}
                                   <Folder size={15} fill="#fbbf24" color="#f59e0b" />
-                                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#334155', flex: 1 }}>{folder.name}</span>
+                                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', flex: 1 }}>{folder.name}</span>
                                   <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{regs.length}</span>
                                 </div>
                                 {isExp && regs.map(reg => renderEntryRegItem(reg, 40))}
@@ -1212,27 +1247,27 @@ export const Sidebar = memo(function Sidebar({
                   flexDirection: 'column',
                   height: '100%',
                   minWidth: 0,
-                  background: '#f8fafc',
+                  background: 'var(--background)',
                 }}>
                   {entrySelectedReg ? (
                     <>
                       {/* Header with Back button */}
                       <div style={{
                         padding: '16px 20px',
-                        borderBottom: '1px solid #f1f5f9',
+                        borderBottom: '1px solid var(--border-light)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '12px',
-                        background: 'white',
+                        background: 'var(--surface)',
                       }}>
                         <button
                           onClick={() => { setEntrySelectedReg(null); setEntryColumns([]); setEntryValues({}); setEntryExistingEntries([]); }}
                           style={{
-                            background: '#f1f5f9',
+                            background: 'var(--bg-secondary)',
                             border: 'none',
                             cursor: 'pointer',
                             padding: '6px',
-                            color: '#64748b',
+                            color: 'var(--muted-light)',
                             borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
@@ -1240,8 +1275,8 @@ export const Sidebar = memo(function Sidebar({
                             transition: 'all 0.15s',
                             flexShrink: 0,
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
-                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--border)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'; }}
                           title={isMobile ? "Back to register list" : "Deselect register"}
                         >
                           <ArrowLeft size={16} />
@@ -1255,7 +1290,7 @@ export const Sidebar = memo(function Sidebar({
                             }}>
                               <FileText size={12} color={entrySelectedReg.iconColor || '#16a34a'} />
                             </div>
-                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {entrySelectedReg.name}
                             </h3>
                           </div>
@@ -1266,11 +1301,11 @@ export const Sidebar = memo(function Sidebar({
                         <button
                           onClick={() => { setIsEntryPanelOpen(false); setEntrySearch(''); setEntrySelectedReg(null); setEntryColumns([]); setEntryValues({}); setEntrySavedCount(0); }}
                           style={{
-                            background: '#f1f5f9',
+                            background: 'var(--bg-secondary)',
                             border: 'none',
                             cursor: 'pointer',
                             padding: '6px',
-                            color: '#64748b',
+                            color: 'var(--muted-light)',
                             borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
@@ -1278,22 +1313,22 @@ export const Sidebar = memo(function Sidebar({
                             transition: 'all 0.15s',
                             flexShrink: 0,
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
-                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--border)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'; }}
                         >
                           <X size={16} />
                         </button>
                       </div>
 
                       {entryLoading ? (
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', flexDirection: 'column', gap: '12px', background: 'white' }}>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', flexDirection: 'column', gap: '12px', background: 'var(--surface)' }}>
                           <Loader2 size={28} color="#16a34a" style={{ animation: 'spin 1s linear infinite' }} />
                           <span style={{ fontSize: '13px', color: '#94a3b8' }}>Loading columns…</span>
                         </div>
                       ) : (
                         <>
                           {/* Form Fields */}
-                          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: 'white' }}>
+                          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: 'var(--surface)' }}>
                             {entryColumns.filter((c: any) => c.type !== 'formula').length === 0 ? (
                               <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
                                 No columns found. Add columns first.
@@ -1307,7 +1342,7 @@ export const Sidebar = memo(function Sidebar({
                                 return (
                                   <div key={col.id} style={{ marginBottom: '14px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                      <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                         {col.name}
                                         {col.mandatory && <span style={{ color: '#ef4444', fontSize: 14 }}>*</span>}
                                       </label>
@@ -1320,8 +1355,8 @@ export const Sidebar = memo(function Sidebar({
                                         ref={idx === 0 ? (el: any) => { entryFirstInputRef.current = el; } : undefined}
                                         style={{
                                           width: '100%', padding: '10px 14px', fontSize: '13px',
-                                          borderRadius: '8px', border: '1px solid #e2e8f0',
-                                          background: 'white', color: '#0f172a',
+                                          borderRadius: '8px', border: '1px solid var(--border)',
+                                          background: 'var(--surface)', color: 'var(--foreground)',
                                           outline: 'none', transition: 'border-color 0.15s',
                                           font: 'inherit',
                                         }}
@@ -1349,12 +1384,12 @@ export const Sidebar = memo(function Sidebar({
                                             width: '100%',
                                             height: '140px',
                                             borderRadius: '10px',
-                                            border: '1px solid #e2e8f0',
+                                            border: '1px solid var(--border)',
                                             overflow: 'hidden',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            background: '#f8fafc',
+                                            background: 'var(--background)',
                                           }}>
                                             <img
                                               src={val.split('|||')[0]}
@@ -1394,16 +1429,16 @@ export const Sidebar = memo(function Sidebar({
                                             justifyContent: 'center',
                                             width: '100%',
                                             height: '100px',
-                                            border: '2px dashed #cbd5e1',
+                                            border: '2px dashed var(--border)',
                                             borderRadius: '10px',
                                             cursor: 'pointer',
-                                            background: '#f8fafc',
+                                            background: 'var(--bg-secondary)',
                                             transition: 'all 0.15s',
                                             boxSizing: 'border-box',
                                             padding: '16px',
                                           }}
                                             onMouseEnter={e => { e.currentTarget.style.borderColor = '#86efac'; e.currentTarget.style.backgroundColor = '#f0fdf4'; }}
-                                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'; }}
                                           >
                                             {entryUploadingImageCol === colIdStr ? (
                                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
@@ -1412,8 +1447,8 @@ export const Sidebar = memo(function Sidebar({
                                               </div>
                                             ) : (
                                               <>
-                                                <CloudUpload size={24} color="#64748b" style={{ marginBottom: '6px' }} />
-                                                <span style={{ fontSize: '13px', fontWeight: 500, color: '#475569' }}>Click to upload photo</span>
+                                                <CloudUpload size={24} color="var(--muted-light)" style={{ marginBottom: '6px' }} />
+                                                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--muted)' }}>Click to upload photo</span>
                                                 <span style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>JPEG, PNG, WebP</span>
                                               </>
                                             )}
@@ -1452,14 +1487,14 @@ export const Sidebar = memo(function Sidebar({
                                         max={col.type === 'rating' ? 5 : undefined}
                                         style={{
                                           width: '100%', padding: '10px 14px', fontSize: '13px',
-                                          borderRadius: '8px', border: '1px solid #e2e8f0',
-                                          background: 'white', color: '#0f172a',
+                                          borderRadius: '8px', border: '1px solid var(--border)',
+                                          background: 'var(--surface)', color: 'var(--foreground)',
                                           outline: 'none', transition: 'border-color 0.15s',
                                           font: 'inherit',
                                           boxSizing: 'border-box',
                                         }}
                                         onFocus={e => { e.currentTarget.style.borderColor = '#86efac'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,163,74,0.08)'; }}
-                                        onBlur={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none'; }}
+                                        onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
                                       />
                                     )}
                                   </div>
@@ -1471,12 +1506,12 @@ export const Sidebar = memo(function Sidebar({
                           {/* Footer */}
                           <div style={{
                             padding: '14px 20px',
-                            borderTop: '1px solid #f1f5f9',
+                            borderTop: '1px solid var(--border-light)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'flex-end',
                             gap: '10px',
-                            background: '#fafbfc',
+                            background: 'var(--bg-secondary)',
                           }}>
                             {isMobile && (
                               <button
@@ -1484,8 +1519,8 @@ export const Sidebar = memo(function Sidebar({
                                 onClick={() => { setEntrySelectedReg(null); setEntryColumns([]); setEntryValues({}); setEntryExistingEntries([]); }}
                                 style={{
                                   padding: '9px 18px', fontSize: '13px', fontWeight: 600,
-                                  borderRadius: '8px', border: '1px solid #e2e8f0',
-                                  background: 'white', color: '#64748b', cursor: 'pointer',
+                                  borderRadius: '8px', border: '1px solid var(--border)',
+                                  background: 'var(--surface)', color: 'var(--muted-light)', cursor: 'pointer',
                                   transition: 'all 0.15s',
                                 }}
                                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = '#f8fafc'; }}
@@ -1589,7 +1624,7 @@ export const Sidebar = memo(function Sidebar({
                       justifyContent: 'center',
                       padding: '40px',
                       textAlign: 'center',
-                      background: 'white',
+                      background: 'var(--surface)',
                     }}>
                       <div style={{
                         width: '80px',
@@ -1604,8 +1639,8 @@ export const Sidebar = memo(function Sidebar({
                       }}>
                         <PenLine size={32} color="#16a34a" />
                       </div>
-                      <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Quick Entry Pane</h3>
-                      <p style={{ margin: 0, fontSize: '13px', color: '#64748b', maxWidth: '320px', lineHeight: 1.6 }}>
+                      <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 700, color: 'var(--foreground)' }}>Quick Entry Pane</h3>
+                      <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted-light)', maxWidth: '320px', lineHeight: 1.6 }}>
                         Select a register from the left list to instantly start entering data without leaving this view.
                       </p>
                       <button
@@ -1615,15 +1650,15 @@ export const Sidebar = memo(function Sidebar({
                           padding: '8px 18px',
                           fontSize: '13px',
                           fontWeight: 600,
-                          color: '#64748b',
-                          background: '#f1f5f9',
+                          color: 'var(--muted-light)',
+                          background: 'var(--bg-secondary)',
                           border: 'none',
                           borderRadius: '8px',
                           cursor: 'pointer',
                           transition: 'all 0.15s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--border)'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
                       >
                         Cancel
                       </button>
@@ -1821,7 +1856,7 @@ export const Sidebar = memo(function Sidebar({
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
                 >
-                  {versionTab === '1.8.2' ? 'v1.8.2 (Current)' : `v${versionTab}`}
+                  {versionTab === '1.8.5' ? 'v1.8.5 (Current)' : `v${versionTab}`}
                   <ChevronDown size={14} style={{ color: '#64748b', transition: 'transform 0.2s', transform: showOlderVersionsDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
                 </button>
                 
@@ -1847,7 +1882,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1878,7 +1913,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '1.8.2' ? 'v1.8.2 (Current)' : `v${v}`}
+                          {v === '1.8.5' ? 'v1.8.5 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1887,7 +1922,79 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '1.8.2' ? (
+            {versionTab === '1.8.5' ? (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px', 
+                maxHeight: '400px', 
+                overflowY: 'auto', 
+                paddingRight: '8px',
+                animation: 'slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+              }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Released Jun 25, 2026</span>
+                
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#e0f2fe', color: '#0284c7', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Breadcrumb Navigation & Folder Dropdown</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Navigate your registers with ease using the new breadcrumb path at the top: Home › Folder › Register. Click on any folder name to instantly see and switch between sibling registers inside the same folder, complete with subtle icons for a clean, intuitive experience.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <PenLine size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Cell Split & Merge</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Right-click any cell and choose "Split Cell" to divide it into two side-by-side editable areas within one cell. Need it back as one? Use "Merge Cell" to combine them again. Works seamlessly with all column types including currency.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#fce7f3', color: '#db2777', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <Shield size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Min/Max Validation for Currency & Number Columns</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Set minimum and maximum allowed values when creating or changing currency and number columns. If any entered value falls outside the range, a warning toast will alert you immediately — even inside split cells.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#ecfdf5', color: '#10b981', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Alphabetical Dropdown & Filter Sorting</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      Dropdown cell options and filter panel values are now automatically sorted alphabetically from A to Z when displayed. Case-insensitive and numeric-aware sorting makes it faster to find the right option.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                  <div style={{ background: '#f3e8ff', color: '#7c3aed', padding: '6px', borderRadius: '8px', marginTop: '2px', display: 'flex', flexShrink: 0 }}>
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Dark Mode & Theme Improvements</h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+                      All new components — breadcrumbs, folder dropdowns, and split cells — have been carefully styled to look great in Light, Dark, and Monitor modes with proper contrast and smooth transitions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : versionTab === '1.8.2' ? (
               <div style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 

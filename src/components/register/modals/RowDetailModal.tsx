@@ -39,6 +39,8 @@ interface RowDetailModalProps {
   setChangeTypeModal: (open: boolean) => void;
   setNewColFormula: (formula: string) => void;
   setNewColDropdownOpts: (opts: string) => void;
+  setNewColMinVal: (v: string) => void;
+  setNewColMaxVal: (v: string) => void;
   openDropdown: (entryId: number, columnId: number, options: string[], rect: DOMRect) => void;
   openDatePicker: (entryId: number, columnId: number, value: string, rect: DOMRect) => void;
   queryClient: any;
@@ -92,6 +94,8 @@ export const RowDetailModal = React.memo(function RowDetailModal({
   setChangeTypeModal,
   setNewColFormula,
   setNewColDropdownOpts,
+  setNewColMinVal,
+  setNewColMaxVal,
   openDropdown,
   openDatePicker,
   queryClient,
@@ -253,6 +257,8 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                         setChangeTypeValue(col.type);
                         if (col.type === 'formula') setNewColFormula(col.formula || '');
                         if (col.type === 'dropdown') setNewColDropdownOpts((col.dropdownOptions || []).join(', '));
+                        setNewColMinVal((col as any).minVal != null ? (col as any).minVal.toString() : '');
+                        setNewColMaxVal((col as any).maxVal != null ? (col as any).maxVal.toString() : '');
                         setChangeTypeModal(true);
                       }}
                     >
@@ -505,6 +511,8 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                         setActiveModalColId(col.id);
                         setNewColFormula(col.formula || '');
                         setChangeTypeValue(col.type);
+                        setNewColMinVal((col as any).minVal != null ? (col as any).minVal.toString() : '');
+                        setNewColMaxVal((col as any).maxVal != null ? (col as any).maxVal.toString() : '');
                         setChangeTypeModal(true);
                       } : undefined}
                       title={_canEditAny ? "Click to edit formula" : undefined}

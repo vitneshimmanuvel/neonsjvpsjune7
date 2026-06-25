@@ -23,6 +23,8 @@ interface RegisterContextMenusProps {
   setNewColType: (v: string) => void;
   setNewColDropdownOpts: (v: string) => void;
   setNewColFormula: (v: string) => void;
+  setNewColMinVal: (v: string) => void;
+  setNewColMaxVal: (v: string) => void;
   setInsertColModal: (v: 'left' | 'right' | null) => void;
   moveColumnMutation: any;
   frozenColumns: Set<number>;
@@ -68,6 +70,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
     setRenameColValue, setRenameColModal, setChangeTypeValue, setChangeTypeModal,
     setDropdownConfigOptions, setDropdownConfigModal, setLinkColumnModal, duplicateColumnMutation,
     setNewColName, setNewColType, setNewColDropdownOpts, setNewColFormula, setInsertColModal,
+    setNewColMinVal, setNewColMaxVal,
     moveColumnMutation, frozenColumns, setFrozenColumns, freezeColumn, registerId,
     hiddenColumns, setHiddenColumns, hideColumn, clearColumnDataMutation, deleteColumnMutation,
     setColumnMandatoryMutation, setColumnUniqueMutation,
@@ -123,6 +126,8 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setNewColName(col?.name || '');
                   setNewColFormula(col?.formula || '');
                   setNewColDropdownOpts(col?.dropdownOptions?.join(', ') || '');
+                  setNewColMinVal(col?.minVal != null ? col.minVal.toString() : '');
+                  setNewColMaxVal(col?.maxVal != null ? col.maxVal.toString() : '');
                   setActiveModalColId(colMenuId);
                   setChangeTypeModal(true); setColMenuId(null);
                 }}>

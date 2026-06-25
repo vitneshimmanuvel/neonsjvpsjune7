@@ -101,11 +101,18 @@ export function FilterModal({
       const val = e.cells?.[colIdStr];
       if (val && val.trim()) set.add(val.trim());
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [selectedColId, entries]);
 
   const selectedCol = columns.find(c => c.id === selectedColId);
   const ops = selectedCol ? getOpsForType(selectedCol.type) : [];
+
+  const sortedDropdownOptions = useMemo(() => {
+    if (!selectedCol || !selectedCol.dropdownOptions) return [];
+    return [...selectedCol.dropdownOptions].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [selectedCol]);
 
   const resetWizard = () => {
     setColSearch('');
@@ -381,7 +388,7 @@ export function FilterModal({
                             <span>(BLANKS)</span>
                           </label>
                         )}
-                        {(selectedCol?.type === 'dropdown' ? (selectedCol.dropdownOptions || []) : uniqueValues)
+                        {(selectedCol?.type === 'dropdown' ? sortedDropdownOptions : uniqueValues)
                           .filter(opt => !filterSearch || opt.toLowerCase().includes(filterSearch.toLowerCase()))
                           .map(opt => (
                           <label key={opt} className="fdp-multi-item">
@@ -454,7 +461,7 @@ export function FilterModal({
                           autoFocus
                         >
                           <option value="">SELECT VALUE...</option>
-                          {(selectedCol.dropdownOptions || []).map(opt => (
+                          {sortedDropdownOptions.map(opt => (
                             <option key={opt} value={opt}>{opt.toUpperCase()}</option>
                           ))}
                         </select>

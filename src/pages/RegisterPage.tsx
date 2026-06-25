@@ -25,11 +25,12 @@ import {
 import { useExport } from '../hooks/useExport';
 import { useColumnStats } from '../hooks/useColumnStats';
 import {
-  Plus, ChevronDown, Calendar,
+  Plus, ChevronDown, ChevronRight, Calendar,
   Hash, FlaskConical, Pin, IndianRupee,
   Mail, Phone, Globe, Star, CheckSquare, Image as ImageIcon, ArrowLeft,
   Search, FileText, Download, ListOrdered, Maximize2, AlertCircle,
-  X, Link as LinkIcon, Info, AlertTriangle, Trash2, ZoomIn, ZoomOut, Bell, Clock, Lock
+  X, Link as LinkIcon, Info, AlertTriangle, Trash2, ZoomIn, ZoomOut, Bell, Clock, Lock, Check,
+  Home, Folder as FolderIcon, FileSpreadsheet
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { RegisterHeader } from '../components/register/RegisterHeader';
@@ -296,6 +297,25 @@ export default function RegisterPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const currentFolder = useMemo(() => {
+    if (!register?.folderId || !allFolders.length) return null;
+    return allFolders.find((f: any) => f.id === register.folderId);
+  }, [register?.folderId, allFolders]);
+
+  const [showFolderDropdown, setShowFolderDropdown] = useState(false);
+  const folderDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showFolderDropdown) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (folderDropdownRef.current && !folderDropdownRef.current.contains(e.target as Node)) {
+        setShowFolderDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showFolderDropdown]);
+
   // ── State ──
   const _uid = (user as any)?.id || 'guest';
   const [search, setSearch] = useState(() => localStorage.getItem(`rb_search_${_uid}_${registerId}`) || '');
@@ -451,6 +471,8 @@ export default function RegisterPage() {
   const [newColType, setNewColType] = useState('text');
   const [newColDropdownOpts, setNewColDropdownOpts] = useState('');
   const [newColFormula, setNewColFormula] = useState('');
+  const [newColMinVal, setNewColMinVal] = useState('');
+  const [newColMaxVal, setNewColMaxVal] = useState('');
 
   // Change column type
   const [changeTypeValue, setChangeTypeValue] = useState('text');
@@ -1211,6 +1233,8 @@ export default function RegisterPage() {
       name: newColName, type: newColType,
       dropdownOptions: newColType === 'dropdown' ? cleanOptions(newColDropdownOpts.split(',')) : undefined,
       formula: newColType === 'formula' ? newColFormula : undefined,
+      minVal: (newColType === 'currency' || newColType === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
+      maxVal: (newColType === 'currency' || newColType === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
     }),
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['register', registerId] });
@@ -1222,6 +1246,8 @@ export default function RegisterPage() {
           position: prev.columns ? prev.columns.length : 0,
           dropdownOptions: newColType === 'dropdown' ? cleanOptions(newColDropdownOpts.split(',')) : undefined,
           formula: newColType === 'formula' ? newColFormula : undefined,
+          minVal: (newColType === 'currency' || newColType === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
+          maxVal: (newColType === 'currency' || newColType === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
           createdAt: new Date().toISOString()
         };
         queryClient.setQueryData(['register', registerId], { ...prev, columns: [...(prev.columns || []), newCol] });
@@ -1242,6 +1268,8 @@ export default function RegisterPage() {
       setNewColType('text');
       setNewColDropdownOpts('');
       setNewColFormula('');
+      setNewColMinVal('');
+      setNewColMaxVal('');
 
       // Auto-scroll to the new column
       const oldCols = columnsRef.current;
@@ -1821,6 +1849,8 @@ export default function RegisterPage() {
       return changeColumnType(registerId, activeModalColId, changeTypeValue, {
         formula: changeTypeValue === 'formula' ? newColFormula : undefined,
         dropdownOptions: changeTypeValue === 'dropdown' ? cleanOptions(newColDropdownOpts.split(',')) : undefined,
+        minVal: (changeTypeValue === 'currency' || changeTypeValue === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
+        maxVal: (changeTypeValue === 'currency' || changeTypeValue === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
       });
     },
     onSuccess: (updatedReg) => {
@@ -1838,6 +1868,8 @@ export default function RegisterPage() {
       }
       
       setChangeTypeModal(false); 
+      setNewColMinVal('');
+      setNewColMaxVal('');
       setActiveModalColId(null);
       setNewColFormula('');
       setNewColDropdownOpts('');
@@ -1993,12 +2025,16 @@ export default function RegisterPage() {
       name: string, 
       type: string, 
       dropdownOpts: string, 
-      formula: string 
+      formula: string,
+      minVal?: string,
+      maxVal?: string
     }) => {
       return insertColumn(registerId, {
         name: vars.name, type: vars.type,
         dropdownOptions: vars.type === 'dropdown' ? cleanOptions(vars.dropdownOpts.split(',')) : undefined,
         formula: vars.type === 'formula' ? vars.formula : undefined,
+        minVal: (vars.type === 'currency' || vars.type === 'number') && vars.minVal ? parseFloat(vars.minVal) : undefined,
+        maxVal: (vars.type === 'currency' || vars.type === 'number') && vars.maxVal ? parseFloat(vars.maxVal) : undefined,
       }, vars.pos);
     },
     onMutate: async (vars) => {
@@ -2014,6 +2050,8 @@ export default function RegisterPage() {
           position: vars.pos,
           dropdownOptions: vars.type === 'dropdown' ? cleanOptions(vars.dropdownOpts.split(',')) : undefined,
           formula: vars.type === 'formula' ? vars.formula : undefined,
+          minVal: (vars.type === 'currency' || vars.type === 'number') && vars.minVal ? parseFloat(vars.minVal) : undefined,
+          maxVal: (vars.type === 'currency' || vars.type === 'number') && vars.maxVal ? parseFloat(vars.maxVal) : undefined,
           createdAt: new Date().toISOString()
         };
         
@@ -2044,6 +2082,8 @@ export default function RegisterPage() {
       setNewColType('text');
       setNewColDropdownOpts('');
       setNewColFormula('');
+      setNewColMinVal('');
+      setNewColMaxVal('');
 
       // Auto-scroll to the newly inserted column
       const oldCols = columnsRef.current;
@@ -2063,7 +2103,7 @@ export default function RegisterPage() {
       if (context?.prev) queryClient.setQueryData(['register', registerId], context.prev);
       toast.error('Failed to insert column');
     },
-    onSettled: () => { setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula(''); },
+    onSettled: () => { setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula(''); setNewColMinVal(''); setNewColMaxVal(''); },
   });
 
 
@@ -2341,41 +2381,59 @@ export default function RegisterPage() {
 
   // ── Validation Helper ──
   const validateCellValue = useCallback((col: any, value: string): { isValid: boolean; error: string | null } => {
-    if (!value || value.trim() === '') return { isValid: true, error: null };
+    const checkVal = (valStr: string): { isValid: boolean; error: string | null } => {
+      if (!valStr || valStr.trim() === '') return { isValid: true, error: null };
 
-    if (col.type === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) return { isValid: false, error: 'Invalid email format' };
-    } else if (col.type === 'phone') {
-      const phoneRegex = /^[\d\s+()-]{7,20}$/;
-      if (!phoneRegex.test(value)) return { isValid: false, error: 'Invalid phone format (e.g. +91 1234567890)' };
-    } else if (col.type === 'date') {
-      // Allow partial typing in grid, but full validation in modal or on blur
-      const dateRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
-      if (!dateRegex.test(value)) return { isValid: false, error: 'Use DD-MM-YYYY format' };
-      
-      const parts = value.split('-');
-      const d = parseInt(parts[0]);
-      const m = parseInt(parts[1]);
-      const y = parseInt(parts[2]);
-      if (m < 1 || m > 12) return { isValid: false, error: 'Invalid month (1-12)' };
-      const daysInMonth = new Date(y, m, 0).getDate();
-      if (d < 1 || d > daysInMonth) return { isValid: false, error: `Invalid day for this month (max ${daysInMonth})` };
-      if (y < 1900 || y > 2100) return { isValid: false, error: 'Year must be between 1900-2100' };
-    } else if (col.type === 'number' || col.type === 'currency') {
-      const numericValue = value.replace(/[^0-9.-]/g, '');
-      if (numericValue === '' || isNaN(parseFloat(numericValue))) return { isValid: false, error: 'Must be a valid number' };
-    } else if (col.type === 'dropdown') {
-      if (col.dropdownOptions && col.dropdownOptions.length > 0) {
-         // Strict single choice: value must exactly match one of the options
-         const isValidOption = col.dropdownOptions.includes(value);
-         if (value.trim() !== '' && !isValidOption) return { isValid: false, error: `'${value}' is not a valid option` };
+      if (valStr.includes(' ||| ')) {
+        const parts = valStr.split(' ||| ');
+        for (const p of parts) {
+          const res = checkVal(p);
+          if (!res.isValid) return res;
+        }
+        return { isValid: true, error: null };
       }
-    } else if (col.type === 'auto_increment') {
-      return { isValid: false, error: 'System generated field' };
-    }
 
-    return { isValid: true, error: null };
+      if (col.type === 'email') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(valStr)) return { isValid: false, error: 'Invalid email format' };
+      } else if (col.type === 'phone') {
+        const phoneRegex = /^[\d\s+()-]{7,20}$/;
+        if (!phoneRegex.test(valStr)) return { isValid: false, error: 'Invalid phone format (e.g. +91 1234567890)' };
+      } else if (col.type === 'date') {
+        const dateRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
+        if (!dateRegex.test(valStr)) return { isValid: false, error: 'Use DD-MM-YYYY format' };
+        
+        const parts = valStr.split('-');
+        const d = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        const y = parseInt(parts[2]);
+        if (m < 1 || m > 12) return { isValid: false, error: 'Invalid month (1-12)' };
+        const daysInMonth = new Date(y, m, 0).getDate();
+        if (d < 1 || d > daysInMonth) return { isValid: false, error: `Invalid day for this month (max ${daysInMonth})` };
+        if (y < 1900 || y > 2100) return { isValid: false, error: 'Year must be between 1900-2100' };
+      } else if (col.type === 'number' || col.type === 'currency') {
+        const numericValue = valStr.replace(/[^0-9.-]/g, '');
+        if (numericValue === '' || isNaN(parseFloat(numericValue))) return { isValid: false, error: 'Must be a valid number' };
+        const parsedVal = parseFloat(numericValue);
+        if (col.minVal !== undefined && col.minVal !== null && parsedVal < col.minVal) {
+          return { isValid: false, error: `Value must be at least ${col.minVal}` };
+        }
+        if (col.maxVal !== undefined && col.maxVal !== null && parsedVal > col.maxVal) {
+          return { isValid: false, error: `Value must be at most ${col.maxVal}` };
+        }
+      } else if (col.type === 'dropdown') {
+        if (col.dropdownOptions && col.dropdownOptions.length > 0) {
+           const isValidOption = col.dropdownOptions.includes(valStr);
+           if (valStr.trim() !== '' && !isValidOption) return { isValid: false, error: `'${valStr}' is not a valid option` };
+        }
+      } else if (col.type === 'auto_increment') {
+        return { isValid: false, error: 'System generated field' };
+      }
+
+      return { isValid: true, error: null };
+    };
+
+    return checkVal(value);
   }, []);
 
   // ── Handlers ──
@@ -2925,6 +2983,24 @@ export default function RegisterPage() {
       });
     });
   }, [formatCell, registerId, queryClient]);
+
+  const handleToggleSplit = useCallback(() => {
+    if (!formatCell) return;
+    const { entryId, colId } = formatCell;
+    const entry = localEntries.find(e => e.id === entryId);
+    const currentVal = entry?.cells?.[colId] || '';
+    
+    let newVal = '';
+    if (currentVal.includes(' ||| ')) {
+      // Merge
+      const parts = currentVal.split(' ||| ');
+      newVal = parts.map(p => p.trim()).filter(Boolean).join(' ');
+    } else {
+      // Split
+      newVal = currentVal + ' ||| ';
+    }
+    handleCellChange(entryId, colId, newVal);
+  }, [formatCell, localEntries, handleCellChange]);
 
   // Excel-like sort: permanently reorders localEntries and persists to Firestore
   const handleSort = useCallback((colId: number, direction: 'asc' | 'desc') => {
@@ -3506,7 +3582,56 @@ export default function RegisterPage() {
           <button className="register-header-back-btn" onClick={() => navigate('/')}>
             <ArrowLeft size={18} />
           </button>
-          <h1 className="register-header-title">{register.name}</h1>
+          <div className="register-breadcrumb">
+            <span className="breadcrumb-item link" onClick={() => navigate('/')}>
+              <Home size={14} className="breadcrumb-icon" />
+              Home
+            </span>
+            <ChevronRight size={14} className="breadcrumb-separator" />
+            {currentFolder && (
+              <>
+                <div className="breadcrumb-folder-wrapper" ref={folderDropdownRef}>
+                  <span 
+                    className={`breadcrumb-item link folder-trigger ${showFolderDropdown ? 'active-trigger' : ''}`} 
+                    onClick={() => setShowFolderDropdown(!showFolderDropdown)}
+                  >
+                    <FolderIcon size={14} className="breadcrumb-icon" />
+                    {currentFolder.name}
+                  </span>
+                  {showFolderDropdown && (
+                    <div className="breadcrumb-folder-dropdown">
+                      <div className="dropdown-header">Registers in {currentFolder.name}</div>
+                      <div className="dropdown-list">
+                        {allRegisters
+                          .filter((r: any) => r.folderId === currentFolder.id)
+                          .map((r: any) => (
+                            <div
+                              key={r.id}
+                              className={`dropdown-item ${r.id === registerId ? 'active' : ''}`}
+                              onClick={() => {
+                                setShowFolderDropdown(false);
+                                navigate(`/register/${r.id}`);
+                              }}
+                            >
+                              <span className="item-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <FileSpreadsheet size={13} className="item-icon" />
+                                {r.name}
+                              </span>
+                              {r.id === registerId && <Check size={14} className="active-check" />}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <ChevronRight size={14} className="breadcrumb-separator" />
+              </>
+            )}
+            <h1 className="register-header-title breadcrumb-item active">
+              <FileSpreadsheet size={14} className="breadcrumb-icon" />
+              {register.name}
+            </h1>
+          </div>
           
           {_canEditAny && (
             <button 
@@ -3969,6 +4094,7 @@ export default function RegisterPage() {
         setDropdownConfigOptions={setDropdownConfigOptions} setDropdownConfigModal={setDropdownConfigModal} setLinkColumnModal={setLinkColumnModal}
         duplicateColumnMutation={duplicateColumnMutation}
         setNewColName={setNewColName} setNewColType={setNewColType} setNewColDropdownOpts={setNewColDropdownOpts} setNewColFormula={setNewColFormula}
+        setNewColMinVal={setNewColMinVal} setNewColMaxVal={setNewColMaxVal}
         setInsertColModal={setInsertColModal} moveColumnMutation={moveColumnMutation}
         frozenColumns={frozenColumns} setFrozenColumns={setFrozenColumns} freezeColumn={freezeColumn} registerId={registerId}
         hiddenColumns={hiddenColumns} setHiddenColumns={setHiddenColumns} hideColumn={hideColumn}
@@ -4002,6 +4128,8 @@ export default function RegisterPage() {
         newColType={newColType} setNewColType={setNewColType}
         newColDropdownOpts={newColDropdownOpts} setNewColDropdownOpts={setNewColDropdownOpts}
         newColFormula={newColFormula} setNewColFormula={setNewColFormula}
+        newColMinVal={newColMinVal} setNewColMinVal={setNewColMinVal}
+        newColMaxVal={newColMaxVal} setNewColMaxVal={setNewColMaxVal}
         addColumnMutation={addColumnMutation} insertColumnMutation={insertColumnMutation}
         renameColModal={renameColModal} setRenameColModal={setRenameColModal}
         renameColValue={renameColValue} setRenameColValue={setRenameColValue} renameColumnMutation={renameColumnMutation}
@@ -4234,6 +4362,8 @@ export default function RegisterPage() {
           setChangeTypeModal={setChangeTypeModal}
           setNewColFormula={setNewColFormula}
           setNewColDropdownOpts={setNewColDropdownOpts}
+          setNewColMinVal={setNewColMinVal}
+          setNewColMaxVal={setNewColMaxVal}
           openDropdown={openDropdown}
           openDatePicker={openDatePicker}
           queryClient={queryClient}
@@ -4301,40 +4431,51 @@ export default function RegisterPage() {
       )}
 
       {/* ── Cell Format Toolbar ── */}
-      {formatCell && (
-        <CellFormatToolbar
-          position={{ top: formatCell.rect.top, left: formatCell.rect.left }}
-          currentStyle={
-            localEntries.find(e => e.id === formatCell.entryId)?.cellStyles?.[formatCell.colId] || {}
-          }
-          onStyleChange={handleCellStyleChange}
-          onClearStyle={handleClearCellStyle}
-          onClose={() => setFormatCell(null)}
-          onAddReminder={() => {
-            const existing = reminders.find(r => r.rowId === formatCell.entryId && r.colId === formatCell.colId && r.registerId === String(registerId));
-            if (existing && existing.triggerTime) {
-              const dt = new Date(existing.triggerTime);
-              const yyyy = dt.getFullYear();
-              const mm = String(dt.getMonth() + 1).padStart(2, '0');
-              const dd = String(dt.getDate()).padStart(2, '0');
-              setReminderDate(`${yyyy}-${mm}-${dd}`);
-              
-              const hh = String(dt.getHours()).padStart(2, '0');
-              const min = String(dt.getMinutes()).padStart(2, '0');
-              setReminderTime(`${hh}:${min}`);
-              
-              setReminderMessage(existing.message);
-              setReminderStatus(existing.status);
-            } else {
-              setReminderDate('');
-              setReminderTime('');
-              setReminderMessage('');
-              setReminderStatus('Pending');
+      {formatCell && (() => {
+        const entryForFormat = localEntries.find(e => e.id === formatCell.entryId);
+        const cellValForFormat = entryForFormat?.cells?.[formatCell.colId] || '';
+        const isCellSplit = cellValForFormat.includes(' ||| ');
+        const colForFormat = columns.find(c => c.id === Number(formatCell.colId));
+        const canCellSplit = !!(colForFormat && ['text', 'number', 'email', 'phone', 'url', 'currency', 'date'].includes(colForFormat.type || 'text'));
+
+        return (
+          <CellFormatToolbar
+            position={{ top: formatCell.rect.top, left: formatCell.rect.left }}
+            currentStyle={
+              entryForFormat?.cellStyles?.[formatCell.colId] || {}
             }
-            setReminderModal({ entryId: formatCell.entryId, colId: formatCell.colId });
-          }}
-        />
-      )}
+            onStyleChange={handleCellStyleChange}
+            onClearStyle={handleClearCellStyle}
+            onClose={() => setFormatCell(null)}
+            isSplit={isCellSplit}
+            canSplit={canCellSplit}
+            onToggleSplit={handleToggleSplit}
+            onAddReminder={() => {
+              const existing = reminders.find(r => r.rowId === formatCell.entryId && r.colId === formatCell.colId && r.registerId === String(registerId));
+              if (existing && existing.triggerTime) {
+                const dt = new Date(existing.triggerTime);
+                const yyyy = dt.getFullYear();
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const dd = String(dt.getDate()).padStart(2, '0');
+                setReminderDate(`${yyyy}-${mm}-${dd}`);
+                
+                const hh = String(dt.getHours()).padStart(2, '0');
+                const min = String(dt.getMinutes()).padStart(2, '0');
+                setReminderTime(`${hh}:${min}`);
+                
+                setReminderMessage(existing.message);
+                setReminderStatus(existing.status);
+              } else {
+                setReminderDate('');
+                setReminderTime('');
+                setReminderMessage('');
+                setReminderStatus('Pending');
+              }
+              setReminderModal({ entryId: formatCell.entryId, colId: formatCell.colId });
+            }}
+          />
+        );
+      })()}
 
       {/* Reminders Summary Modal */}
       <RemindersSummaryModal

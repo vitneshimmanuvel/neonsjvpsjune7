@@ -132,6 +132,8 @@ export interface Column {
   unique?: boolean;
   doubleEntryWarning?: boolean;
   bgColor?: string;
+  minVal?: number;
+  maxVal?: number;
 }
 
 export interface CellStyle {
@@ -1250,7 +1252,7 @@ export function evaluateFormula(formula: string, entry: Entry, columns: Column[]
 
 // ─── Column Operations ──────────────────────────────────────────────────────
 
-export async function addColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string }): Promise<RegisterDetail> {
+export async function addColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number }): Promise<RegisterDetail> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     reg.columns.sort((a, b) => a.position - b.position); // ensure canonical order
@@ -1258,6 +1260,7 @@ export async function addColumn(registerId: number, data: { name: string; type: 
     const col: Column = {
       id: colId, registerId, name: data.name, type: data.type,
       position: reg.columns.length, dropdownOptions: data.dropdownOptions, formula: data.formula,
+      minVal: data.minVal, maxVal: data.maxVal
     };
     reg.columns.push(col);
     reg.columns.forEach((c, i) => c.position = i); // re-normalise
@@ -1547,7 +1550,7 @@ export async function changeColumnType(
   registerId: number,
   columnId: number,
   newType: string,
-  options?: { formula?: string; dropdownOptions?: string[] },
+  options?: { formula?: string; dropdownOptions?: string[]; minVal?: number; maxVal?: number },
   preventSync?: boolean
 ): Promise<RegisterDetail> {
   const result = await runQueuedMutation(registerId, async () => {
@@ -1570,6 +1573,14 @@ export async function changeColumnType(
       col.dropdownOptions = options?.dropdownOptions;
     } else {
       col.dropdownOptions = undefined;
+    }
+
+    if (newType === 'currency' || newType === 'number') {
+      col.minVal = options?.minVal;
+      col.maxVal = options?.maxVal;
+    } else {
+      col.minVal = undefined;
+      col.maxVal = undefined;
     }
 
     // Dynamic Column Formatting Logic: Clean data when switching to currency
@@ -1666,13 +1677,14 @@ export async function clearColumnData(registerId: number, columnId: number): Pro
   });
 }
 
-export async function insertColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string }, position: number): Promise<RegisterDetail> {
+export async function insertColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number }, position: number): Promise<RegisterDetail> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const colId = generateId();
     const col: Column = {
       id: colId, registerId, name: data.name, type: data.type,
       position, dropdownOptions: data.dropdownOptions, formula: data.formula,
+      minVal: data.minVal, maxVal: data.maxVal
     };
     updateColumnSymbol(col, data.type);
     reg.columns.sort((a, b) => a.position - b.position); // ensure array index === position

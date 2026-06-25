@@ -117,6 +117,10 @@ export function OtherModals(props: OtherModalsProps) {
         unique.push(trimmed);
       }
     });
+
+    // Sort options alphabetically (A-Z) case-insensitively
+    unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
     return unique;
   }, [dropdownModal, columns, dropdownColumnId, dropdownOptions, localEntries]);
 

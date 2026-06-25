@@ -57,6 +57,602 @@ interface SpreadsheetTextInputProps {
   scrollToColumn?: (colIdx: number) => void;
 }
 
+const SplitTextInput = React.memo(({ idx, col, entry, visibleColumns, colIdx, totalRows, handleCellChange, type = 'text', placeholder, readOnly, scrollToColumn }: SpreadsheetTextInputProps) => {
+  const initialValue = entry.cells?.[col.id.toString()] || '';
+  const [leftVal, rightVal] = typeof initialValue === 'string' && initialValue.includes(' ||| ') ? initialValue.split(' ||| ') : ['', ''];
+  const [leftState, setLeftState] = useState(leftVal || '');
+  const [rightState, setRightState] = useState(rightVal || '');
+  const [isEditingLeft, setIsEditingLeft] = useState(false);
+  const [isEditingRight, setIsEditingRight] = useState(false);
+
+  useEffect(() => {
+    const [l, r] = typeof initialValue === 'string' && initialValue.includes(' ||| ') ? initialValue.split(' ||| ') : ['', ''];
+    setLeftState(l || '');
+    setRightState(r || '');
+  }, [initialValue]);
+
+  const saveSplitVal = useCallback((left: string, right: string) => {
+    const finalVal = left + ' ||| ' + right;
+    if (finalVal !== initialValue) {
+      handleCellChange(entry.id, col.id.toString(), finalVal);
+    }
+  }, [initialValue, entry.id, col.id, handleCellChange]);
+
+  const handleLeftBlur = () => {
+    setTimeout(() => {
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+    }, 150);
+  };
+
+  const handleRightBlur = () => {
+    setTimeout(() => {
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+    }, 150);
+  };
+
+  const navigateVertical = (direction: 'up' | 'down', isRight: boolean) => {
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx >= 0 && targetIdx < totalRows) {
+      setTimeout(() => {
+        const suffix = isRight ? '-right' : '';
+        const el = document.getElementById(`cell-${targetIdx}-${col.id}${suffix}`);
+        if (el) {
+          el.focus();
+        } else if (isRight) {
+          const fallback = document.getElementById(`cell-${targetIdx}-${col.id}`);
+          if (fallback) fallback.focus();
+        }
+      }, 50);
+    }
+  };
+
+  const navigateHorizontal = (direction: 'left' | 'right', isRight: boolean) => {
+    if (direction === 'left') {
+      if (isRight) {
+        const el = document.getElementById(`cell-${idx}-${col.id}`);
+        if (el) el.focus();
+      } else {
+        const prevCol = visibleColumns[colIdx - 1];
+        if (prevCol) {
+          setTimeout(() => {
+            const el = document.getElementById(`cell-${idx}-${prevCol.id}-right`) || document.getElementById(`cell-${idx}-${prevCol.id}`);
+            if (el) el.focus();
+          }, 50);
+        }
+      }
+    } else {
+      if (!isRight) {
+        const el = document.getElementById(`cell-${idx}-${col.id}-right`);
+        if (el) el.focus();
+      } else {
+        const nextCol = visibleColumns[colIdx + 1];
+        if (nextCol) {
+          setTimeout(() => {
+            const el = document.getElementById(`cell-${idx}-${nextCol.id}`);
+            if (el) el.focus();
+          }, 50);
+        }
+      }
+    }
+  };
+
+  const handleLeftKeyDown = (e: React.KeyboardEvent<any>) => {
+    if (e.key === 'Escape') {
+      setIsEditingLeft(false);
+      setLeftState(leftVal || '');
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateVertical('up', false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      navigateVertical('down', false);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigateHorizontal('left', false);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateHorizontal('right', false);
+    } else if (!isEditingLeft && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      setIsEditingLeft(true);
+      setLeftState(e.key);
+      e.preventDefault();
+      return;
+    }
+  };
+
+  const handleRightKeyDown = (e: React.KeyboardEvent<any>) => {
+    if (e.key === 'Escape') {
+      setIsEditingRight(false);
+      setRightState(rightVal || '');
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateVertical('up', true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      navigateVertical('down', true);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigateHorizontal('left', true);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateHorizontal('right', true);
+    } else if (!isEditingRight && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      setIsEditingRight(true);
+      setRightState(e.key);
+      e.preventDefault();
+      return;
+    }
+  };
+
+  const handleLeftInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+      setTimeout(() => {
+        const el = document.getElementById(`cell-${idx}-${col.id}-right`);
+        if (el) el.focus();
+      }, 50);
+    } else if (e.key === 'Escape') {
+      setIsEditingLeft(false);
+      setLeftState(leftVal || '');
+    }
+  };
+
+  const handleRightInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+      const nextCol = visibleColumns[colIdx + 1];
+      if (nextCol) {
+        setTimeout(() => {
+          const el = document.getElementById(`cell-${idx}-${nextCol.id}`);
+          if (el) el.focus();
+        }, 50);
+      }
+    } else if (e.key === 'Escape') {
+      setIsEditingRight(false);
+      setRightState(rightVal || '');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center' }}>
+      <div style={{ width: '50%', height: '100%', borderRight: '1px solid var(--border-v)', display: 'flex', alignItems: 'center' }}>
+        {isEditingLeft && !readOnly ? (
+          <input
+            id={`cell-${idx}-${col.id}`}
+            className={`cell-input ${readOnly ? 'cell-readonly' : ''}`}
+            value={leftState}
+            onChange={(e) => setLeftState(e.target.value)}
+            onBlur={handleLeftBlur}
+            onKeyDown={handleLeftInputKeyDown}
+            type={type}
+            placeholder={placeholder}
+            autoComplete="off"
+            readOnly={readOnly}
+            autoFocus
+            style={{
+              width: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              border: 'none',
+              outline: 'none',
+              padding: '0 8px',
+              background: 'transparent',
+              color: 'inherit',
+            }}
+          />
+        ) : (
+          <div
+            id={`cell-${idx}-${col.id}`}
+            data-cell={`cell-${idx}-${col.id}`}
+            className={`cell-input cell-display-mode ${readOnly ? 'cell-readonly' : ''}`}
+            tabIndex={readOnly ? -1 : 0}
+            onBlur={handleLeftBlur}
+            onKeyDown={handleLeftKeyDown}
+            onDoubleClick={() => !readOnly && setIsEditingLeft(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 8px',
+              cursor: readOnly ? 'default' : 'cell',
+              userSelect: 'none',
+              outline: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {leftState || <span className="cell-placeholder" style={{ opacity: 0.4 }}>—</span>}
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: '50%', height: '100%', display: 'flex', alignItems: 'center' }}>
+        {isEditingRight && !readOnly ? (
+          <input
+            id={`cell-${idx}-${col.id}-right`}
+            className={`cell-input ${readOnly ? 'cell-readonly' : ''}`}
+            value={rightState}
+            onChange={(e) => setRightState(e.target.value)}
+            onBlur={handleRightBlur}
+            onKeyDown={handleRightInputKeyDown}
+            type={type}
+            placeholder={placeholder}
+            autoComplete="off"
+            readOnly={readOnly}
+            autoFocus
+            style={{
+              width: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              border: 'none',
+              outline: 'none',
+              padding: '0 8px',
+              background: 'transparent',
+              color: 'inherit',
+            }}
+          />
+        ) : (
+          <div
+            id={`cell-${idx}-${col.id}-right`}
+            data-cell={`cell-${idx}-${col.id}-right`}
+            className={`cell-input cell-display-mode ${readOnly ? 'cell-readonly' : ''}`}
+            tabIndex={readOnly ? -1 : 0}
+            onBlur={handleRightBlur}
+            onKeyDown={handleRightKeyDown}
+            onDoubleClick={() => !readOnly && setIsEditingRight(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 8px',
+              cursor: readOnly ? 'default' : 'cell',
+              userSelect: 'none',
+              outline: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {rightState || <span className="cell-placeholder" style={{ opacity: 0.4 }}>—</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+const SplitCurrencyCell = React.memo(({ idx, col, entry, colIdx, totalRows, visibleColumns, handleCellChange, readOnly, scrollToColumn }: SpreadsheetTextInputProps) => {
+  const rawValue = entry.cells?.[col.id.toString()] || '';
+  const [leftAmount, rightAmount] = typeof rawValue === 'string' && rawValue.includes(' ||| ') ? rawValue.split(' ||| ') : ['', ''];
+  const [leftState, setLeftState] = useState(leftAmount || '');
+  const [rightState, setRightState] = useState(rightAmount || '');
+  const [isEditingLeft, setIsEditingLeft] = useState(false);
+  const [isEditingRight, setIsEditingRight] = useState(false);
+
+  useEffect(() => {
+    const [l, r] = typeof rawValue === 'string' && rawValue.includes(' ||| ') ? rawValue.split(' ||| ') : ['', ''];
+    setLeftState(l || '');
+    setRightState(r || '');
+  }, [rawValue]);
+
+  const saveSplitVal = useCallback((left: string, right: string) => {
+    const finalVal = left + ' ||| ' + right;
+    if (finalVal !== rawValue) {
+      handleCellChange(entry.id, col.id.toString(), finalVal);
+    }
+  }, [rawValue, entry.id, col.id, handleCellChange]);
+
+  const handleLeftBlur = () => {
+    setTimeout(() => {
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+    }, 150);
+  };
+
+  const handleRightBlur = () => {
+    setTimeout(() => {
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+    }, 150);
+  };
+
+  const navigateVertical = (direction: 'up' | 'down', isRight: boolean) => {
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx >= 0 && targetIdx < totalRows) {
+      setTimeout(() => {
+        const suffix = isRight ? '-right' : '';
+        const el = document.getElementById(`cell-${targetIdx}-${col.id}${suffix}`);
+        if (el) {
+          el.focus();
+        } else if (isRight) {
+          const fallback = document.getElementById(`cell-${targetIdx}-${col.id}`);
+          if (fallback) fallback.focus();
+        }
+      }, 50);
+    }
+  };
+
+  const navigateHorizontal = (direction: 'left' | 'right', isRight: boolean) => {
+    if (direction === 'left') {
+      if (isRight) {
+        const el = document.getElementById(`cell-${idx}-${col.id}`);
+        if (el) el.focus();
+      } else {
+        const prevCol = visibleColumns[colIdx - 1];
+        if (prevCol) {
+          setTimeout(() => {
+            const el = document.getElementById(`cell-${idx}-${prevCol.id}-right`) || document.getElementById(`cell-${idx}-${prevCol.id}`);
+            if (el) el.focus();
+          }, 50);
+        }
+      }
+    } else {
+      if (!isRight) {
+        const el = document.getElementById(`cell-${idx}-${col.id}-right`);
+        if (el) el.focus();
+      } else {
+        const nextCol = visibleColumns[colIdx + 1];
+        if (nextCol) {
+          setTimeout(() => {
+            const el = document.getElementById(`cell-${idx}-${nextCol.id}`);
+            if (el) el.focus();
+          }, 50);
+        }
+      }
+    }
+  };
+
+  const handleLeftKeyDown = (e: React.KeyboardEvent<any>) => {
+    if (e.key === 'Escape') {
+      setIsEditingLeft(false);
+      setLeftState(leftAmount || '');
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateVertical('up', false);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      navigateVertical('down', false);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigateHorizontal('left', false);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateHorizontal('right', false);
+    } else if (!isEditingLeft && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      setIsEditingLeft(true);
+      setLeftState(e.key);
+      e.preventDefault();
+      return;
+    }
+  };
+
+  const handleRightKeyDown = (e: React.KeyboardEvent<any>) => {
+    if (e.key === 'Escape') {
+      setIsEditingRight(false);
+      setRightState(rightAmount || '');
+      e.currentTarget.blur();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateVertical('up', true);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      navigateVertical('down', true);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      navigateHorizontal('left', true);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      navigateHorizontal('right', true);
+    } else if (!isEditingRight && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      setIsEditingRight(true);
+      setRightState(e.key);
+      e.preventDefault();
+      return;
+    }
+  };
+
+  const handleLeftInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setIsEditingLeft(false);
+      saveSplitVal(leftState, rightState);
+      setTimeout(() => {
+        const el = document.getElementById(`cell-${idx}-${col.id}-right`);
+        if (el) el.focus();
+      }, 50);
+    } else if (e.key === 'Escape') {
+      setIsEditingLeft(false);
+      setLeftState(leftAmount || '');
+    }
+  };
+
+  const handleRightInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      setIsEditingRight(false);
+      saveSplitVal(leftState, rightState);
+      const nextCol = visibleColumns[colIdx + 1];
+      if (nextCol) {
+        setTimeout(() => {
+          const el = document.getElementById(`cell-${idx}-${nextCol.id}`);
+          if (el) el.focus();
+        }, 50);
+      }
+    } else if (e.key === 'Escape') {
+      setIsEditingRight(false);
+      setRightState(rightAmount || '');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center' }}>
+      <div style={{ width: '50%', height: '100%', borderRight: '1px solid var(--border-v)', display: 'flex', alignItems: 'center' }}>
+        {isEditingLeft && !readOnly ? (
+          <input
+            id={`cell-${idx}-${col.id}`}
+            className="cell-input currency-editing"
+            value={leftState}
+            onChange={(e) => setLeftState(e.target.value)}
+            onBlur={handleLeftBlur}
+            onKeyDown={handleLeftInputKeyDown}
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            autoFocus
+            style={{
+              width: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              border: 'none',
+              outline: 'none',
+              padding: '0 8px',
+              background: 'transparent',
+              color: 'inherit',
+            }}
+          />
+        ) : (
+          <div
+            id={`cell-${idx}-${col.id}`}
+            data-cell={`cell-${idx}-${col.id}`}
+            className={`cell-currency ${readOnly ? 'cell-readonly' : ''}`}
+            tabIndex={readOnly ? -1 : 0}
+            onBlur={handleLeftBlur}
+            onKeyDown={handleLeftKeyDown}
+            onDoubleClick={() => !readOnly && setIsEditingLeft(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 8px',
+              cursor: readOnly ? 'default' : 'cell',
+              userSelect: 'none',
+              outline: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {leftState ? formatCurrency(leftState) : <span className="cell-placeholder"><IndianRupee size={11} /> Amount</span>}
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: '50%', height: '100%', display: 'flex', alignItems: 'center' }}>
+        {isEditingRight && !readOnly ? (
+          <input
+            id={`cell-${idx}-${col.id}-right`}
+            className="cell-input currency-editing"
+            value={rightState}
+            onChange={(e) => setRightState(e.target.value)}
+            onBlur={handleRightBlur}
+            onKeyDown={handleRightInputKeyDown}
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            autoFocus
+            style={{
+              width: '100%',
+              height: '100%',
+              boxSizing: 'border-box',
+              border: 'none',
+              outline: 'none',
+              padding: '0 8px',
+              background: 'transparent',
+              color: 'inherit',
+            }}
+          />
+        ) : (
+          <div
+            id={`cell-${idx}-${col.id}-right`}
+            data-cell={`cell-${idx}-${col.id}-right`}
+            className={`cell-currency ${readOnly ? 'cell-readonly' : ''}`}
+            tabIndex={readOnly ? -1 : 0}
+            onBlur={handleRightBlur}
+            onKeyDown={handleRightKeyDown}
+            onDoubleClick={() => !readOnly && setIsEditingRight(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 8px',
+              cursor: readOnly ? 'default' : 'cell',
+              userSelect: 'none',
+              outline: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {rightState ? formatCurrency(rightState) : <span className="cell-placeholder"><IndianRupee size={11} /> Amount</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 // Currency cell: shows ₹ formatted display, edits as raw number
 const CurrencyCell = React.memo(({ idx, col, entry, colIdx, totalRows, visibleColumns, handleCellChange, onKeyDown, readOnly, scrollToColumn }: SpreadsheetTextInputProps & { onKeyDown?: (e: React.KeyboardEvent) => void }) => {
   const rawValue = entry.cells?.[col.id.toString()] || '';
@@ -776,12 +1372,19 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
             <FormulaCell idx={idx} col={col} entry={entry} registerColumns={registerColumns} onKeyDown={(e) => handleCellKeyDown(e, col.id, colIdx)} />
           ) : col.type === 'date' ? (
             <div className="cell-url-wrap cell-date-wrap">
-              <SpreadsheetTextInput 
-                idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange}
-                placeholder="DD-MM-YYYY" searchTerm={searchTerm}
-                readOnly={!isEditable}
-                scrollToColumn={scrollToColumn}
-              />
+              {typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+                <SplitTextInput
+                  idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange}
+                  placeholder="DD-MM-YYYY" readOnly={!isEditable} scrollToColumn={scrollToColumn}
+                />
+              ) : (
+                <SpreadsheetTextInput 
+                  idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange}
+                  placeholder="DD-MM-YYYY" searchTerm={searchTerm}
+                  readOnly={!isEditable}
+                  scrollToColumn={scrollToColumn}
+                />
+              )}
               {isEditable && (
                 <button 
                   className="cell-url-link cell-date-picker-btn" 
@@ -861,31 +1464,31 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
                   const extraCount = images.length - 1;
                   return (
                     <div className="cell-image-inner" style={{ position: 'relative' }}>
-                      <img 
-                        src={firstImage} 
-                        alt="img" 
-                        className="cell-image-thumb" 
-                      />
-                      {extraCount > 0 && (
-                        <div className="cell-image-badge" style={{
-                          position: 'absolute',
-                          top: '-4px',
-                          right: '-4px',
-                          background: 'var(--navy)',
-                          color: 'white',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          padding: '2px 4px',
-                          borderRadius: '4px',
-                          zIndex: 2,
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                        }}>
-                          +{extraCount}
-                        </div>
-                      )}
-                      <div className="cell-image-overlay">
-                        <Maximize2 size={12} />
-                      </div>
+                       <img 
+                         src={firstImage} 
+                         alt="img" 
+                         className="cell-image-thumb" 
+                       />
+                       {extraCount > 0 && (
+                         <div className="cell-image-badge" style={{
+                           position: 'absolute',
+                           top: '-4px',
+                           right: '-4px',
+                           background: 'var(--navy)',
+                           color: 'white',
+                           fontSize: '10px',
+                           fontWeight: 'bold',
+                           padding: '2px 4px',
+                           borderRadius: '4px',
+                           zIndex: 2,
+                           boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                         }}>
+                           +{extraCount}
+                         </div>
+                       )}
+                       <div className="cell-image-overlay">
+                         <Maximize2 size={12} />
+                       </div>
                     </div>
                   );
                 })()
@@ -930,17 +1533,29 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
             </div>
           ) : col.type === 'email' ? (
             <div className="cell-url-wrap">
-              <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="email" placeholder="name@example.com" searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              {typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+                <SplitTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="email" placeholder="name@example.com" readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              ) : (
+                <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="email" placeholder="name@example.com" searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              )}
               {entry.cells?.[col.id.toString()] && <a href={`mailto:${entry.cells[col.id.toString()]}`} className="cell-url-link" title="Send email" tabIndex={-1}><Mail size={11} /></a>}
             </div>
           ) : col.type === 'phone' ? (
             <div className="cell-url-wrap">
-              <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="tel" placeholder="+91 98765 43210" searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              {typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+                <SplitTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="tel" placeholder="+91 98765 43210" readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              ) : (
+                <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="tel" placeholder="+91 98765 43210" searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              )}
               {entry.cells?.[col.id.toString()] && <a href={`tel:${entry.cells[col.id.toString()]}`} className="cell-url-link" title="Call" tabIndex={-1}><Phone size={11} /></a>}
             </div>
           ) : col.type === 'url' ? (
             <div className="cell-url-wrap">
-              <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="url" placeholder="https://..." searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              {typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+                <SplitTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="url" placeholder="https://..." readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              ) : (
+                <SpreadsheetTextInput idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange} type="url" placeholder="https://..." searchTerm={searchTerm} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+              )}
               {entry.cells?.[col.id.toString()] && <a href={entry.cells[col.id.toString()]} target="_blank" rel="noreferrer" className="cell-url-link" title="Open" tabIndex={-1}><Globe size={11} /></a>}
             </div>
           ) : col.type === 'auto_increment' ? (
@@ -966,21 +1581,39 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
               <span><HighlightedText text={entry.cells?.[col.id.toString()] || '–'} searchTerm={searchTerm} /></span>
             </div>
           ) : col.type === 'currency' ? (
-            <CurrencyCell idx={idx} col={col} entry={entry} colIdx={colIdx} handleCellChange={handleCellChange} visibleColumns={visibleColumns} totalRows={totalRows} readOnly={!isEditable} scrollToColumn={scrollToColumn} onKeyDown={(e) => handleCellKeyDown(e, col.id, colIdx)} />
+            typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+              <SplitCurrencyCell idx={idx} col={col} entry={entry} colIdx={colIdx} handleCellChange={handleCellChange} visibleColumns={visibleColumns} totalRows={totalRows} readOnly={!isEditable} scrollToColumn={scrollToColumn} />
+            ) : (
+              <CurrencyCell idx={idx} col={col} entry={entry} colIdx={colIdx} handleCellChange={handleCellChange} visibleColumns={visibleColumns} totalRows={totalRows} readOnly={!isEditable} scrollToColumn={scrollToColumn} onKeyDown={(e) => handleCellKeyDown(e, col.id, colIdx)} />
+            )
           ) : (
-            <SpreadsheetTextInput 
-              idx={idx}
-              col={col}
-              entry={entry}
-              visibleColumns={visibleColumns}
-              colIdx={colIdx}
-              totalRows={totalRows}
-              handleCellChange={handleCellChange}
-              searchTerm={searchTerm}
-              readOnly={!isEditable}
-              suggestions={columnSuggestions?.[col.id.toString()]}
-              scrollToColumn={scrollToColumn}
-            />
+            typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
+              <SplitTextInput
+                idx={idx}
+                col={col}
+                entry={entry}
+                visibleColumns={visibleColumns}
+                colIdx={colIdx}
+                totalRows={totalRows}
+                handleCellChange={handleCellChange}
+                readOnly={!isEditable}
+                scrollToColumn={scrollToColumn}
+              />
+            ) : (
+              <SpreadsheetTextInput 
+                idx={idx}
+                col={col}
+                entry={entry}
+                visibleColumns={visibleColumns}
+                colIdx={colIdx}
+                totalRows={totalRows}
+                handleCellChange={handleCellChange}
+                searchTerm={searchTerm}
+                readOnly={!isEditable}
+                suggestions={columnSuggestions?.[col.id.toString()]}
+                scrollToColumn={scrollToColumn}
+              />
+            )
           )}
           {col.type !== 'formula' && col.type !== 'auto_increment' && isEditable && (
             <div 
