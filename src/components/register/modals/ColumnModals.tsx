@@ -1,16 +1,59 @@
-import { AlertCircle, X, Plus, AlertTriangle, Check, ChevronRight, ChevronDown, FolderClosed, FolderOpen, Database } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { AlertCircle, X, Plus, AlertTriangle, Check, ChevronRight, ChevronDown, FolderClosed, FolderOpen, Database, Save, BookMarked } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Calculator, PlusCircle, MinusCircle, XCircle, DivideCircle, 
   Percent, Settings2, Trash2 
 } from 'lucide-react';
-import { evaluateFormula, getRegister, linkColumn } from '../../../lib/api';
-import type { RegisterSummary, Column as ApiColumn, Folder } from '../../../lib/api';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { evaluateFormula, getRegister, linkColumn, listSavedFormulas, createSavedFormula, deleteSavedFormula, listSavedDropdowns, createSavedDropdown, deleteSavedDropdown } from '../../../lib/api';
+import type { RegisterSummary, Column as ApiColumn, Folder, SavedFormula, SavedDropdown } from '../../../lib/api';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 
-function FormulaBuilder({ formula, onChange, columns, entries, outputName, excludeId }: { formula: string, onChange: (v: string) => void, columns: any[], entries?: any[], outputName?: string, excludeId?: number | null }) {
+function FormulaBuilder({ formula, onChange, columns, entries, outputName, excludeId, businessId }: { formula: string, onChange: (v: string) => void, columns: any[], entries?: any[], outputName?: string, excludeId?: number | null, businessId?: number }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
+
+  // ── Saved Formulas State ──
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSavedList, setShowSavedList] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: savedFormulas = [], isLoading: loadingSaved } = useQuery({
+    queryKey: ['saved-formulas', businessId],
+    queryFn: () => listSavedFormulas(businessId!),
+    enabled: !!businessId,
+    staleTime: 30 * 1000,
+  });
+
+  const handleSaveFormula = useCallback(async () => {
+    if (!businessId || !saveTemplateName.trim() || !formula.trim()) return;
+    setIsSaving(true);
+    try {
+      await createSavedFormula({
+        businessId,
+        name: saveTemplateName.trim(),
+        formula: formula.trim(),
+      });
+      queryClient.invalidateQueries({ queryKey: ['saved-formulas', businessId] });
+      setSaveTemplateName('');
+      setShowSaveInput(false);
+    } catch (err) {
+      console.error('Failed to save formula:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [businessId, saveTemplateName, formula, queryClient]);
+
+  const handleDeleteSavedFormula = useCallback(async (id: string) => {
+    if (!businessId) return;
+    try {
+      await deleteSavedFormula(id);
+      queryClient.invalidateQueries({ queryKey: ['saved-formulas', businessId] });
+    } catch (err) {
+      console.error('Failed to delete saved formula:', err);
+    }
+  }, [businessId, queryClient]);
 
   const insertText = (text: string) => {
     const input = inputRef.current;
@@ -164,6 +207,106 @@ function FormulaBuilder({ formula, onChange, columns, entries, outputName, exclu
 
   return (
     <div className="formula-builder" style={{ marginTop: '12px', padding: '12px', background: 'var(--bg-light)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+      {/* ── Saved Formulas Section ── */}
+      {businessId && (
+        <div style={{ marginBottom: '14px' }}>
+          <button
+            type="button"
+            onClick={() => setShowSavedList(!showSavedList)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+              padding: '10px 14px', fontSize: '13px', fontWeight: 700,
+              borderRadius: '10px', border: '1px solid var(--border)',
+              background: showSavedList ? 'var(--navy)' : 'white',
+              color: showSavedList ? 'white' : 'var(--navy)',
+              cursor: 'pointer', transition: 'all 0.2s',
+              boxShadow: showSavedList ? '0 2px 8px rgba(26,35,126,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <BookMarked size={16} />
+            Saved Formulas
+            {savedFormulas.length > 0 && (
+              <span style={{
+                marginLeft: 'auto', fontSize: '11px', fontWeight: 800,
+                background: showSavedList ? 'rgba(255,255,255,0.2)' : 'var(--bg-light)',
+                padding: '2px 8px', borderRadius: '12px',
+                color: showSavedList ? 'white' : 'var(--muted)'
+              }}>
+                {savedFormulas.length}
+              </span>
+            )}
+            <ChevronDown size={14} style={{ marginLeft: savedFormulas.length > 0 ? '0' : 'auto', transition: 'transform 0.2s', transform: showSavedList ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </button>
+
+          {showSavedList && (
+            <div style={{
+              marginTop: '8px', maxHeight: '220px', overflowY: 'auto',
+              border: '1px solid var(--border)', borderRadius: '10px',
+              background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              {loadingSaved ? (
+                <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }}></span>
+                  Loading saved formulas...
+                </div>
+              ) : savedFormulas.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)' }}>
+                  <BookMarked size={20} style={{ opacity: 0.3, marginBottom: '6px' }} />
+                  <div>No saved formulas yet.</div>
+                  <div style={{ fontSize: '11px', marginTop: '2px' }}>Save a formula below to reuse it across registers.</div>
+                </div>
+              ) : (
+                savedFormulas.map((sf) => (
+                  <div
+                    key={sf.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '10px 14px', borderBottom: '1px solid var(--bg-light)',
+                      cursor: 'pointer', transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-light)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    onClick={() => {
+                      onChange(sf.formula);
+                      setShowSavedList(false);
+                      setMode('custom');
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {sf.name}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+                        {sf.formula}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete saved formula "${sf.name}"?`)) {
+                          handleDeleteSavedFormula(sf.id);
+                        }
+                      }}
+                      style={{
+                        padding: '4px', color: 'var(--muted)', background: 'none',
+                        border: 'none', cursor: 'pointer', opacity: 0.5,
+                        transition: 'opacity 0.2s, color 0.2s', flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--danger)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--muted)'; }}
+                      title="Delete saved formula"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="formula-mode-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
         <button 
           className={`mode-tab ${mode === 'preset' ? 'active' : ''}`} 
@@ -531,6 +674,68 @@ function FormulaBuilder({ formula, onChange, columns, entries, outputName, exclu
           <span>The formula calculates automatically as you type in any row. No manual refresh needed.</span>
         </div>
       </div>
+
+      {/* ── Save as Template Button ── */}
+      {businessId && formula.trim() && (
+        <div style={{ marginTop: '14px', borderTop: '1px solid var(--border)', paddingTop: '14px' }}>
+          {showSaveInput ? (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                className="modal-input"
+                style={{ marginBottom: 0, flex: 1, fontSize: '13px', height: '38px' }}
+                placeholder="Formula template name..."
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && saveTemplateName.trim()) handleSaveFormula();
+                  if (e.key === 'Escape') { setShowSaveInput(false); setSaveTemplateName(''); }
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSaveFormula}
+                disabled={!saveTemplateName.trim() || isSaving}
+                style={{
+                  padding: '8px 16px', fontSize: '12px', fontWeight: 700,
+                  borderRadius: '8px', border: 'none',
+                  background: saveTemplateName.trim() ? 'var(--navy)' : 'var(--bg-light)',
+                  color: saveTemplateName.trim() ? 'white' : 'var(--muted)',
+                  cursor: saveTemplateName.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSaveInput(false); setSaveTemplateName(''); }}
+                style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSaveInput(true)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                width: '100%', padding: '10px', fontSize: '12px', fontWeight: 700,
+                borderRadius: '8px', border: '1px dashed var(--border)',
+                background: 'white', color: 'var(--navy)', cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--navy)'; e.currentTarget.style.background = 'var(--bg-light)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'white'; }}
+            >
+              <Save size={14} />
+              Save as Template
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -542,9 +747,52 @@ const presetBtnStyle = (active: boolean) => ({
   cursor: 'pointer', transition: 'all 0.2s'
 });
 
-function OptionsEditor({ value, onChange, columnData = [] }: { value: string, onChange: (v: string) => void, columnData?: string[] }) {
+function OptionsEditor({ value, onChange, columnData = [], businessId }: { value: string, onChange: (v: string) => void, columnData?: string[], businessId?: number }) {
   const [opts, setOpts] = useState<string[]>(() => value ? value.split(',') : []);
   const lastSentValue = useRef(value);
+
+  // ── Saved Dropdowns State ──
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSavedList, setShowSavedList] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: savedDropdowns = [], isLoading: loadingSaved } = useQuery({
+    queryKey: ['saved-dropdowns', businessId],
+    queryFn: () => listSavedDropdowns(businessId!),
+    enabled: !!businessId,
+    staleTime: 30 * 1000,
+  });
+
+  const handleSaveDropdown = useCallback(async () => {
+    if (!businessId || !saveTemplateName.trim() || opts.length === 0) return;
+    setIsSaving(true);
+    try {
+      await createSavedDropdown({
+        businessId,
+        name: saveTemplateName.trim(),
+        options: opts.join(','),
+      });
+      queryClient.invalidateQueries({ queryKey: ['saved-dropdowns', businessId] });
+      setSaveTemplateName('');
+      setShowSaveInput(false);
+    } catch (err) {
+      console.error('Failed to save dropdown:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [businessId, saveTemplateName, opts, queryClient]);
+
+  const handleDeleteSavedDropdown = useCallback(async (id: string) => {
+    if (!businessId) return;
+    try {
+      await deleteSavedDropdown(id);
+      queryClient.invalidateQueries({ queryKey: ['saved-dropdowns', businessId] });
+    } catch (err) {
+      console.error('Failed to delete saved dropdown:', err);
+    }
+  }, [businessId, queryClient]);
   
   useEffect(() => {
     if (value !== lastSentValue.current) {
@@ -562,6 +810,111 @@ function OptionsEditor({ value, onChange, columnData = [] }: { value: string, on
 
   return (
     <div className="options-editor-container">
+      {/* ── Saved Dropdown Templates ── */}
+      {businessId && (
+        <div style={{ marginBottom: '14px' }}>
+          <button
+            type="button"
+            onClick={() => setShowSavedList(!showSavedList)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+              padding: '10px 14px', fontSize: '13px', fontWeight: 700,
+              borderRadius: '10px', border: '1px solid var(--border)',
+              background: showSavedList ? 'var(--navy)' : 'white',
+              color: showSavedList ? 'white' : 'var(--navy)',
+              cursor: 'pointer', transition: 'all 0.2s',
+              boxShadow: showSavedList ? '0 2px 8px rgba(26,35,126,0.15)' : '0 1px 3px rgba(0,0,0,0.04)'
+            }}
+          >
+            <BookMarked size={16} />
+            Saved Dropdown Templates
+            {savedDropdowns.length > 0 && (
+              <span style={{
+                marginLeft: 'auto', fontSize: '11px', fontWeight: 800,
+                background: showSavedList ? 'rgba(255,255,255,0.2)' : 'var(--bg-light)',
+                padding: '2px 8px', borderRadius: '12px',
+                color: showSavedList ? 'white' : 'var(--muted)'
+              }}>
+                {savedDropdowns.length}
+              </span>
+            )}
+            <ChevronDown size={14} style={{ marginLeft: savedDropdowns.length > 0 ? '0' : 'auto', transition: 'transform 0.2s', transform: showSavedList ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </button>
+
+          {showSavedList && (
+            <div style={{
+              marginTop: '8px', maxHeight: '220px', overflowY: 'auto',
+              border: '1px solid var(--border)', borderRadius: '10px',
+              background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+            }}>
+              {loadingSaved ? (
+                <div style={{ padding: '16px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }}></span>
+                  Loading saved templates...
+                </div>
+              ) : savedDropdowns.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)' }}>
+                  <BookMarked size={20} style={{ opacity: 0.3, marginBottom: '6px' }} />
+                  <div>No saved dropdown templates yet.</div>
+                  <div style={{ fontSize: '11px', marginTop: '2px' }}>Save your options below to reuse them across columns.</div>
+                </div>
+              ) : (
+                savedDropdowns.map((sd) => {
+                  const optList = sd.options ? sd.options.split(',') : [];
+                  return (
+                    <div
+                      key={sd.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '10px 14px', borderBottom: '1px solid var(--bg-light)',
+                        cursor: 'pointer', transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-light)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      onClick={() => {
+                        updateOpts(optList);
+                        setShowSavedList(false);
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {sd.name}
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {optList.slice(0, 4).map((o, i) => (
+                            <span key={i} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '10px', background: 'var(--bg-light)', border: '1px solid var(--border)', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{o}</span>
+                          ))}
+                          {optList.length > 4 && <span style={{ fontSize: '10px', color: 'var(--muted)' }}>+{optList.length - 4} more</span>}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete saved dropdown "${sd.name}"?`)) {
+                            handleDeleteSavedDropdown(sd.id);
+                          }
+                        }}
+                        style={{
+                          padding: '4px', color: 'var(--muted)', background: 'none',
+                          border: 'none', cursor: 'pointer', opacity: 0.5,
+                          transition: 'opacity 0.2s, color 0.2s', flexShrink: 0
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--danger)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--muted)'; }}
+                        title="Delete saved dropdown"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <label className="modal-label" style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
           Predefined Options ({opts.length})
@@ -624,6 +977,68 @@ function OptionsEditor({ value, onChange, columnData = [] }: { value: string, on
       >
         <Plus size={16} /> Add New Option
       </button>
+
+      {/* ── Save as Template ── */}
+      {businessId && opts.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          {showSaveInput ? (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                className="modal-input"
+                style={{ marginBottom: 0, flex: 1, fontSize: '13px', height: '38px' }}
+                placeholder="Dropdown template name..."
+                value={saveTemplateName}
+                onChange={(e) => setSaveTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && saveTemplateName.trim()) handleSaveDropdown();
+                  if (e.key === 'Escape') { setShowSaveInput(false); setSaveTemplateName(''); }
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSaveDropdown}
+                disabled={!saveTemplateName.trim() || isSaving}
+                style={{
+                  padding: '8px 16px', fontSize: '12px', fontWeight: 700,
+                  borderRadius: '8px', border: 'none',
+                  background: saveTemplateName.trim() ? 'var(--navy)' : 'var(--bg-light)',
+                  color: saveTemplateName.trim() ? 'white' : 'var(--muted)',
+                  cursor: saveTemplateName.trim() ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s', whiteSpace: 'nowrap'
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSaveInput(false); setSaveTemplateName(''); }}
+                style={{ padding: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSaveInput(true)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                width: '100%', padding: '10px', fontSize: '12px', fontWeight: 700,
+                borderRadius: '8px', border: '1px dashed var(--border)',
+                background: 'white', color: 'var(--navy)', cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--navy)'; e.currentTarget.style.background = 'var(--bg-light)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'white'; }}
+            >
+              <Save size={14} />
+              Save Options as Template
+            </button>
+          )}
+        </div>
+      )}
 
       {columnData.length > 0 && (
         <div className="suggestions-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginTop: '16px' }}>
@@ -736,6 +1151,7 @@ interface ColumnModalsProps {
   COL_TYPES: any[];
   columns: any[];
   entries: any[];
+  businessId?: number;
 }
 
 export function ColumnModals(props: ColumnModalsProps) {
@@ -751,7 +1167,8 @@ export function ColumnModals(props: ColumnModalsProps) {
     linkColumnModal, setLinkColumnModal,
     activeModalColId,
     COL_TYPES, columns, entries,
-    allRegisters, allFolders, currentRegisterId
+    allRegisters, allFolders, currentRegisterId,
+    businessId
   } = props;
 
   return (
@@ -778,6 +1195,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                   value={newColDropdownOpts} 
                   onChange={setNewColDropdownOpts} 
                   columnData={[]} // No column data for new column
+                  businessId={businessId}
                 />
               </>
             )}
@@ -789,6 +1207,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                 entries={entries}
                 outputName={newColName}
                 excludeId={activeModalColId}
+                businessId={businessId}
               />
             )}
             {(newColType === 'currency' || newColType === 'number') && (
@@ -864,6 +1283,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                 });
                 return unique;
               })()}
+              businessId={businessId}
             />
             <div className="modal-actions">
               <button className="modal-cancel-btn" onClick={() => setDropdownConfigModal(false)}>Cancel</button>
@@ -895,6 +1315,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                 entries={entries}
                 outputName={newColName}
                 excludeId={activeModalColId}
+                businessId={businessId}
               />
             )}
             {(changeTypeValue === 'currency' || changeTypeValue === 'number') && (
@@ -970,6 +1391,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                     });
                     return unique;
                   })()}
+                  businessId={businessId}
                 />
               </>
             )}
@@ -980,6 +1402,7 @@ export function ColumnModals(props: ColumnModalsProps) {
                 columns={columns} 
                 outputName={newColName}
                 excludeId={activeModalColId}
+                businessId={businessId}
               />
             )}
             {(newColType === 'currency' || newColType === 'number') && (

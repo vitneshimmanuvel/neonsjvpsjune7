@@ -981,6 +981,141 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { message: 'Backup deleted successfully' });
     }
 
+    // ─── SAVED FORMULAS ──────────────────────────────────────────────────────
+
+    // Auto-create table if needed (runs once per cold start)
+    if (pathname.startsWith('/api/saved-formulas') && !globalThis._savedFormulasTableCreated) {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS saved_formulas (
+            id TEXT PRIMARY KEY,
+            business_id BIGINT NOT NULL,
+            name TEXT NOT NULL,
+            formula TEXT NOT NULL,
+            created_by TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        globalThis._savedFormulasTableCreated = true;
+      } catch (e) {
+        console.error('Failed to auto-create saved_formulas table:', e);
+      }
+    }
+
+    // GET /api/saved-formulas?businessId=X
+    if (pathname === '/api/saved-formulas' && method === 'GET') {
+      const businessId = parseBigInt(url.searchParams.get('businessId'));
+      if (!businessId) return sendError(res, 400, 'businessId is required');
+      const result = await query('SELECT * FROM saved_formulas WHERE business_id = $1 ORDER BY created_at DESC', [businessId]);
+      return sendJson(res, 200, {
+        formulas: result.rows.map(r => ({
+          id: r.id,
+          businessId: Number(r.business_id),
+          name: r.name,
+          formula: r.formula,
+          createdBy: r.created_by,
+          createdAt: r.created_at
+        }))
+      });
+    }
+
+    // POST /api/saved-formulas
+    if (pathname === '/api/saved-formulas' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (!data.businessId) return sendError(res, 400, 'businessId is required');
+      if (!data.name || !data.name.trim()) return sendError(res, 400, 'name is required');
+      if (!data.formula || !data.formula.trim()) return sendError(res, 400, 'formula is required');
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      await query(`
+        INSERT INTO saved_formulas (id, business_id, name, formula, created_by, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [id, data.businessId, data.name.trim(), data.formula.trim(), data.createdBy || null]);
+
+      return sendJson(res, 201, {
+        id,
+        businessId: Number(data.businessId),
+        name: data.name.trim(),
+        formula: data.formula.trim(),
+        createdBy: data.createdBy || null
+      });
+    }
+
+    // DELETE /api/saved-formulas/:id
+    const savedFormulaMatch = pathname.match(/^\/api\/saved-formulas\/(.+)$/);
+    if (savedFormulaMatch && method === 'DELETE') {
+      const formulaId = savedFormulaMatch[1];
+      await query('DELETE FROM saved_formulas WHERE id = $1', [formulaId]);
+      return sendJson(res, 200, { message: 'Saved formula deleted' });
+    }
+    // ─── SAVED DROPDOWNS ─────────────────────────────────────────────────────
+
+    // Auto-create table if needed (runs once per cold start)
+    if (pathname.startsWith('/api/saved-dropdowns') && !globalThis._savedDropdownsTableCreated) {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS saved_dropdowns (
+            id TEXT PRIMARY KEY,
+            business_id BIGINT NOT NULL,
+            name TEXT NOT NULL,
+            options TEXT NOT NULL,
+            created_by TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        globalThis._savedDropdownsTableCreated = true;
+      } catch (e) {
+        console.error('Failed to auto-create saved_dropdowns table:', e);
+      }
+    }
+
+    // GET /api/saved-dropdowns?businessId=X
+    if (pathname === '/api/saved-dropdowns' && method === 'GET') {
+      const businessId = parseBigInt(url.searchParams.get('businessId'));
+      if (!businessId) return sendError(res, 400, 'businessId is required');
+      const result = await query('SELECT * FROM saved_dropdowns WHERE business_id = $1 ORDER BY created_at DESC', [businessId]);
+      return sendJson(res, 200, {
+        dropdowns: result.rows.map(r => ({
+          id: r.id,
+          businessId: Number(r.business_id),
+          name: r.name,
+          options: r.options,
+          createdBy: r.created_by,
+          createdAt: r.created_at
+        }))
+      });
+    }
+
+    // POST /api/saved-dropdowns
+    if (pathname === '/api/saved-dropdowns' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (!data.businessId) return sendError(res, 400, 'businessId is required');
+      if (!data.name || !data.name.trim()) return sendError(res, 400, 'name is required');
+      if (!data.options) return sendError(res, 400, 'options are required');
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      await query(`
+        INSERT INTO saved_dropdowns (id, business_id, name, options, created_by, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+      `, [id, data.businessId, data.name.trim(), data.options, data.createdBy || null]);
+
+      return sendJson(res, 201, {
+        id,
+        businessId: Number(data.businessId),
+        name: data.name.trim(),
+        options: data.options,
+        createdBy: data.createdBy || null
+      });
+    }
+
+    // DELETE /api/saved-dropdowns/:id
+    const savedDropdownMatch = pathname.match(/^\/api\/saved-dropdowns\/(.+)$/);
+    if (savedDropdownMatch && method === 'DELETE') {
+      const dropdownId = savedDropdownMatch[1];
+      await query('DELETE FROM saved_dropdowns WHERE id = $1', [dropdownId]);
+      return sendJson(res, 200, { message: 'Saved dropdown deleted' });
+    }
+
     // If no route matches, return 404
     return sendError(res, 404, `Route ${pathname} not found`);
 

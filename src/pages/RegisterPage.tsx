@@ -4145,6 +4145,7 @@ export default function RegisterPage() {
         allRegisters={allRegisters}
         allFolders={allFolders}
         currentRegisterId={registerId}
+        businessId={register?.businessId}
       />
 
       {linkInfoModal && (

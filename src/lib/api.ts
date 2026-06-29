@@ -2909,3 +2909,72 @@ export function compressImage(file: File, maxWidth = 600, maxHeight = 600, quali
   });
 }
 
+// ==================== SAVED FORMULAS ====================
+export interface SavedFormula {
+  id: string;
+  businessId: number;
+  name: string;
+  formula: string;
+  createdBy?: string;
+  createdAt?: string;
+}
+
+export async function listSavedFormulas(businessId: number): Promise<SavedFormula[]> {
+  const res = await fetch(apiUrl(`/api/saved-formulas?businessId=${businessId}`));
+  if (!res.ok) throw new Error('Failed to fetch saved formulas');
+  const data = await res.json();
+  return data.formulas || [];
+}
+
+export async function createSavedFormula(data: { businessId: number; name: string; formula: string; createdBy?: string }): Promise<SavedFormula> {
+  const res = await fetch(apiUrl('/api/saved-formulas'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to save formula' }));
+    throw new Error(err.error || 'Failed to save formula');
+  }
+  return res.json();
+}
+
+export async function deleteSavedFormula(id: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/saved-formulas/${id}`), { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete saved formula');
+}
+
+// ==================== SAVED DROPDOWNS ====================
+export interface SavedDropdown {
+  id: string;
+  businessId: number;
+  name: string;
+  options: string; // comma-separated options
+  createdBy?: string;
+  createdAt?: string;
+}
+
+export async function listSavedDropdowns(businessId: number): Promise<SavedDropdown[]> {
+  const res = await fetch(apiUrl(`/api/saved-dropdowns?businessId=${businessId}`));
+  if (!res.ok) throw new Error('Failed to fetch saved dropdowns');
+  const data = await res.json();
+  return data.dropdowns || [];
+}
+
+export async function createSavedDropdown(data: { businessId: number; name: string; options: string; createdBy?: string }): Promise<SavedDropdown> {
+  const res = await fetch(apiUrl('/api/saved-dropdowns'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to save dropdown' }));
+    throw new Error(err.error || 'Failed to save dropdown');
+  }
+  return res.json();
+}
+
+export async function deleteSavedDropdown(id: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/saved-dropdowns/${id}`), { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete saved dropdown');
+}

@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -127,12 +127,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.8.5') !== 'true';
+      return localStorage.getItem('seen_version_1.8.7') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.5');
+  const [versionTab, setVersionTab] = useState<'1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.8.7');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
 
   // Slideshow state
@@ -142,16 +142,17 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.8.5', 'true');
+      localStorage.setItem('seen_version_1.8.7', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
 
   useEffect(() => {
-    if (versionTab !== '1.7.7' || !showVersionModal || !isPlaying) return;
+    if (versionTab !== '1.8.7' && versionTab !== '1.7.7' || !showVersionModal || !isPlaying) return;
+    const slideCount = versionTab === '1.8.7' ? 4 : 5;
     const interval = setInterval(() => {
-      setActiveSlide(prev => (prev + 1) % 5);
+      setActiveSlide(prev => (prev + 1) % slideCount);
     }, 4500);
     return () => clearInterval(interval);
   }, [versionTab, showVersionModal, isPlaying]);
@@ -894,7 +895,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('1.8.5');
+                    setVersionTab('1.8.7');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -904,9 +905,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v1.8.5"
+                  title="View what's new in v1.8.7"
                 >
-                  v1.8.5
+                  v1.8.7
                 </span>
               </div>
             </div>
@@ -1780,11 +1781,11 @@ export const Sidebar = memo(function Sidebar({
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: versionTab === '1.7.7' ? '850px' : '500px',
+              maxWidth: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '850px' : '500px',
               width: '100%',
               borderRadius: '20px',
-              padding: versionTab === '1.7.7' ? '0' : '24px',
-              background: versionTab === '1.7.7' ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
+              padding: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '0' : '24px',
+              background: (versionTab === '1.8.7' || versionTab === '1.7.7') ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               overflow: 'hidden',
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1797,10 +1798,10 @@ export const Sidebar = memo(function Sidebar({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: versionTab === '1.7.7' ? '0' : '16px',
+              marginBottom: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '0' : '16px',
               borderBottom: '1px solid #f1f5f9',
-              padding: versionTab === '1.7.7' ? '16px 24px' : '0 0 12px 0',
-              background: versionTab === '1.7.7' ? '#f8fafc' : 'transparent'
+              padding: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '16px 24px' : '0 0 12px 0',
+              background: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '#f8fafc' : 'transparent'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1826,8 +1827,8 @@ export const Sidebar = memo(function Sidebar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: versionTab === '1.7.7' ? '0' : '20px',
-              padding: versionTab === '1.7.7' ? '12px 24px' : '12px 0',
+              marginBottom: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '0' : '20px',
+              padding: (versionTab === '1.8.7' || versionTab === '1.7.7') ? '12px 24px' : '12px 0',
               background: versionTab === '1.7.7' ? '#f8fafc' : 'transparent',
               borderBottom: versionTab === '1.7.7' ? '1px solid #e2e8f0' : 'none',
               position: 'relative'
@@ -1882,7 +1883,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1913,7 +1914,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '1.8.5' ? 'v1.8.5 (Current)' : `v${v}`}
+                          {v === '1.8.7' ? 'v1.8.7 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1922,7 +1923,448 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '1.8.5' ? (
+            {versionTab === '1.8.7' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes gentlePulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.04); }
+                  }
+                  @keyframes borderGlowBlue {
+                    0%, 100% { border-color: rgba(37, 99, 235, 0.1); }
+                    50% { border-color: rgba(37, 99, 235, 0.4); }
+                  }
+                  @keyframes spinSlow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                  }
+                  @keyframes cursorMoveFormula {
+                    0% { transform: translate(140px, 140px); }
+                    25% { transform: translate(75px, 28px); }
+                    30% { transform: translate(75px, 28px) scale(0.85); }
+                    35% { transform: translate(75px, 28px) scale(1); }
+                    48% { transform: translate(75px, 78px); }
+                    52% { transform: translate(75px, 78px) scale(0.85); }
+                    56% { transform: translate(75px, 78px) scale(1); }
+                    75%, 100% { transform: translate(140px, 140px); }
+                  }
+                  @keyframes formulaDropdownReveal {
+                    0%, 30% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                    35%, 72% { opacity: 1; transform: scale(1) translateY(0); visibility: visible; }
+                    76%, 100% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                  }
+                  @keyframes formulaTextChange {
+                    0%, 50% { opacity: 0.5; }
+                    51%, 100% { opacity: 1; }
+                  }
+                  @keyframes formulaFlashGreen {
+                    0%, 50% { background-color: #ffffff; }
+                    52% { background-color: #dcfce7; border-color: #22c55e; }
+                    68%, 100% { background-color: #ffffff; border-color: #cbd5e1; }
+                  }
+                  @keyframes cursorMoveDropdown {
+                    0% { transform: translate(140px, 140px); }
+                    25% { transform: translate(90px, 28px); }
+                    30% { transform: translate(90px, 28px) scale(0.85); }
+                    35% { transform: translate(90px, 28px) scale(1); }
+                    48% { transform: translate(90px, 72px); }
+                    52% { transform: translate(90px, 72px) scale(0.85); }
+                    56% { transform: translate(90px, 72px) scale(1); }
+                    75%, 100% { transform: translate(140px, 140px); }
+                  }
+                  @keyframes dropdownRevealAnim {
+                    0%, 30% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                    35%, 72% { opacity: 1; transform: scale(1) translateY(0); visibility: visible; }
+                    76%, 100% { opacity: 0; transform: scale(0.95) translateY(-5px); visibility: hidden; }
+                  }
+                  @keyframes optionItemsReveal {
+                    0%, 51% { opacity: 0; transform: translateY(4px); }
+                    58%, 100% { opacity: 1; transform: translateY(0); }
+                  }
+                  @keyframes cloudGlow {
+                    0%, 100% { transform: scale(1); filter: drop-shadow(0 4px 6px rgba(37,99,235,0.15)); }
+                    50% { transform: scale(1.08); filter: drop-shadow(0 6px 14px rgba(37,99,235,0.35)); }
+                  }
+                  @keyframes laserFlowLeft {
+                    0% { stroke-dashoffset: 20; }
+                    100% { stroke-dashoffset: 0; }
+                  }
+                  @keyframes registerPulse {
+                    0%, 48% { border-color: #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+                    55%, 90% { border-color: rgba(37, 99, 235, 0.4); box-shadow: 0 8px 16px rgba(37,99,235,0.08); }
+                    100% { border-color: #e2e8f0; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .progress-bar-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #3b82f6, #10b981);
+                    width: 0%;
+                    border-radius: 2px;
+                  }
+                  .progress-bar-fill-playing {
+                    width: 100%;
+                    transition: width 4.5s linear;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} style={{ animation: 'spinSlow 6s linear infinite' }} />
+                          <span>Version 1.8.7 Live</span>
+                        </div>
+                        <h2 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          Saved Templates Special
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 18px 0', lineHeight: 1.5 }}>
+                          Boost your data management speed! Introducing standard templates for formulas and dropdowns. Save your configurations once and apply them instantly to any column.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>Named Reusable Formula Library</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>Predefined Dropdown Option Templates</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#334155', fontWeight: 600 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', background: '#dcfce7', color: '#15803d', fontSize: '9px' }}>✓</span>
+                            <span>1-Click Apply & Column Name Matching</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: 'linear-gradient(135deg, #eff6ff 0%, #e8faf0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }} className="animate-slide-right">
+                        <div style={{ padding: '24px', background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255, 255, 255, 0.9)', borderRadius: '20px', boxShadow: '0 15px 30px rgba(30, 41, 59, 0.08)', textAlign: 'center', width: '190px', animation: 'gentlePulse 3s ease-in-out infinite' }}>
+                          <div style={{ fontSize: '38px', fontWeight: 900, background: 'linear-gradient(135deg, #2563eb, #10b981)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                            v1.8.7
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginTop: '4px', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                            Templates Update
+                          </div>
+                          <div style={{ height: '1px', background: '#cbd5e1', margin: '12px auto', width: '70%' }} />
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, lineHeight: 1.4 }}>
+                            Save & Reuse Formulas & Dropdowns
+                          </div>
+                        </div>
+                        <div style={{ position: 'absolute', top: '12%', left: '10%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#2563eb', border: '1px solid #dbeafe' }}>🧮 Saved Formulas</div>
+                        <div style={{ position: 'absolute', bottom: '12%', left: '12%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#16a34a', border: '1px solid #dcfce7' }}>📋 Saved Dropdowns</div>
+                        <div style={{ position: 'absolute', top: '15%', right: '8%', background: 'white', padding: '4px 10px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: 600, color: '#7c3aed', border: '1px solid #f3e8ff' }}>⚡ 1-Click Setup</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 2 of 4</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          🧮 Reusable Formula Library
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Save your complex calculations with a simple name and apply them with one click in any register. Column names are matched automatically!
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+                            <span><strong>No Manual Re-entry:</strong> Perfect for balance and total columns.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#2563eb', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Cross-Register Sync:</strong> Use saved formulas across registers.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#f8fafc', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }} className="animate-slide-right">
+                        {/* Mock Formula Builder UI */}
+                        <div style={{ width: '100%', maxWidth: '220px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                          <div style={{ background: '#f8fafc', padding: '8px 12px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#334155' }}>Formula Builder</span>
+                            <span style={{ fontSize: '9px', padding: '2px 6px', background: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontWeight: 600 }}>v1.8.7</span>
+                          </div>
+                          
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
+                            {/* Saved Formulas Dropdown Button */}
+                            <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px 10px', fontSize: '9px', fontWeight: 700, color: '#1e3a8a', background: '#eff6ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <BookMarked size={11} /> Saved Formulas (3)
+                            </div>
+
+                            {/* Dropdown Menu (Fading In and Out) */}
+                            <div style={{
+                              position: 'absolute', top: '38px', left: '12px', right: '12px', zIndex: 5,
+                              background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column',
+                              animation: 'formulaDropdownReveal 5s infinite', overflow: 'hidden'
+                            }}>
+                              <div style={{ padding: '6px 8px', fontSize: '9px', color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>Select a template</div>
+                              <div style={{ padding: '6px 8px', fontSize: '9.5px', fontWeight: 700, color: '#1e293b', borderBottom: '1px solid #f1f5f9', background: '#f1f5f9' }}>Net Profit</div>
+                              <div style={{ padding: '6px 8px', fontSize: '9.5px', color: '#475569', borderBottom: '1px solid #f1f5f9' }}>Student Balance</div>
+                            </div>
+
+                            {/* Input Display Area */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span style={{ fontSize: '8px', color: '#64748b', fontWeight: 600 }}>Formula Expression:</span>
+                              <div style={{
+                                border: '1px solid #cbd5e1', borderRadius: '6px', padding: '8px', height: '36px',
+                                fontSize: '9.5px', fontFamily: 'monospace', color: '#0f172a', wordBreak: 'break-all',
+                                animation: 'formulaFlashGreen 5s infinite', position: 'relative', overflow: 'hidden'
+                              }}>
+                                <span style={{ animation: 'formulaTextChange 5s infinite' }}>
+                                  {"{Total Revenue} - {Expenses} - {Tax}"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cursor Graphic */}
+                        <div style={{
+                          position: 'absolute', width: '10px', height: '15px',
+                          background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 320 512\'%3E%3Cpath fill=\'%23000000\' d=\'M0 55.2V426c0 24.2 27.3 37.2 46.2 22L135 376h121c21 0 38-17 38-38V55.2c0-21-17-38-38-38H38C17 17.2 0 34.2 0 55.2z\'/%3E%3C/svg%3E") no-repeat',
+                          backgroundSize: 'contain', zIndex: 10, animation: 'cursorMoveFormula 5s infinite'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 3 of 4</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          📋 Saved Dropdown Templates
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Save lists of options (e.g. status labels, product lists, state codes) and apply them to any new dropdown column in seconds.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#16a34a', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Instant Options:</strong> Load lists with up to dozens of options instantly.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#16a34a', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Perfect Accuracy:</strong> Avoid spelling mistakes across separate columns.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: '#eff6ff', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', position: 'relative' }} className="animate-slide-right">
+                        {/* Mock Dropdown Editor UI */}
+                        <div style={{ width: '100%', maxWidth: '220px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                          <div style={{ background: '#f8fafc', padding: '8px 12px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: '#334155' }}>Dropdown Config</span>
+                          </div>
+                          
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative' }}>
+                            <div style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px 10px', fontSize: '9px', fontWeight: 700, color: '#16a34a', background: '#f0fdf4', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <BookMarked size={11} /> Saved Templates
+                            </div>
+
+                            {/* Dropdown Menu (Fading In and Out) */}
+                            <div style={{
+                              position: 'absolute', top: '38px', left: '12px', right: '12px', zIndex: 5,
+                              background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column',
+                              animation: 'dropdownRevealAnim 5s infinite', overflow: 'hidden'
+                            }}>
+                              <div style={{ padding: '6px 8px', fontSize: '9px', color: '#64748b', background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>Select a template</div>
+                              <div style={{ padding: '6px 8px', fontSize: '9.5px', fontWeight: 700, color: '#16a34a', borderBottom: '1px solid #f1f5f9', background: '#f0fdf4' }}>Payment Status</div>
+                              <div style={{ padding: '6px 8px', fontSize: '9.5px', color: '#475569', borderBottom: '1px solid #f1f5f9' }}>Grades A-E</div>
+                            </div>
+
+                            {/* Option list displaying sequentially */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '4px' }}>
+                              <span style={{ fontSize: '8px', color: '#64748b', fontWeight: 600 }}>Active Options:</span>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', minHeight: '36px' }}>
+                                <span style={{ fontSize: '9px', padding: '2px 6px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', border: '1px solid #bbf7d0', animation: 'optionItemsReveal 5s infinite' }}>Paid</span>
+                                <span style={{ fontSize: '9px', padding: '2px 6px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', border: '1px solid #fde68a', animation: 'optionItemsReveal 5s infinite' }}>Pending</span>
+                                <span style={{ fontSize: '9px', padding: '2px 6px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', border: '1px solid #fecaca', animation: 'optionItemsReveal 5s infinite' }}>Failed</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cursor Graphic */}
+                        <div style={{
+                          position: 'absolute', width: '10px', height: '15px',
+                          background: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 320 512\'%3E%3Cpath fill=\'%23000000\' d=\'M0 55.2V426c0 24.2 27.3 37.2 46.2 22L135 376h121c21 0 38-17 38-38V55.2c0-21-17-38-38-38H38C17 17.2 0 34.2 0 55.2z\'/%3E%3C/svg%3E") no-repeat',
+                          backgroundSize: 'contain', zIndex: 10, animation: 'cursorMoveDropdown 5s infinite'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <span>Slide 4 of 4</span>
+                        </div>
+                        <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0', lineHeight: 1.2 }}>
+                          ⚡ Speed & Consistency
+                        </h2>
+                        <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                          Synchronize column settings across folders and businesses. Enjoy uniform calculations, clear database mappings, and maximum efficiency.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Uniform Layouts:</strong> Ensure columns look and evaluate identically.</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', fontSize: '12px', color: '#7c3aed', fontWeight: 'bold' }}>
+                            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>•</span>
+                            <span><strong>Instant Setup:</strong> Finish configurations in under 5 seconds.</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ width: '48%', background: 'linear-gradient(135deg, #f3e8ff 0%, #e0f2fe 100%)', borderLeft: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative' }} className="animate-slide-right">
+                        {/* Central Sync Representation */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                          {/* Cloud Icon */}
+                          <div style={{
+                            width: '46px', height: '46px', borderRadius: '12px', background: 'white',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 10px 25px rgba(37,99,235,0.1)', border: '1px solid #dbeafe',
+                            animation: 'cloudGlow 3s ease-in-out infinite'
+                          }}>
+                            <Database size={22} color="#2563eb" />
+                          </div>
+
+                          {/* SVG Laser Flow */}
+                          <svg style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none' }}>
+                            {/* Laser Line 1 */}
+                            <path d="M 120 170 Q 60 170 60 210" fill="none" stroke="#93c5fd" strokeWidth="2" strokeDasharray="6" style={{ animation: 'laserFlowLeft 1.5s linear infinite' }} />
+                            {/* Laser Line 2 */}
+                            <path d="M 120 170 Q 180 170 180 210" fill="none" stroke="#86efac" strokeWidth="2" strokeDasharray="6" style={{ animation: 'laserFlowLeft 1.5s linear infinite', animationDirection: 'reverse' }} />
+                          </svg>
+
+                          {/* Mock Registers */}
+                          <div style={{ display: 'flex', gap: '16px', zIndex: 2 }}>
+                            <div style={{
+                              width: '74px', padding: '6px', background: 'white', border: '1px solid #e2e8f0',
+                              borderRadius: '8px', fontSize: '8px', textAlign: 'center', color: '#475569', fontWeight: 600,
+                              animation: 'registerPulse 3s infinite'
+                            }}>
+                              📘 Register A
+                              <div style={{ height: '3px', background: '#2563eb', borderRadius: '2px', marginTop: '4px' }} />
+                            </div>
+                            <div style={{
+                              width: '74px', padding: '6px', background: 'white', border: '1px solid #e2e8f0',
+                              borderRadius: '8px', fontSize: '8px', textAlign: 'center', color: '#475569', fontWeight: 600,
+                              animation: 'registerPulse 3s infinite'
+                            }}>
+                              📙 Register B
+                              <div style={{ height: '3px', background: '#10b981', borderRadius: '2px', marginTop: '4px' }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Slideshow Progress Bar */}
+                <div style={{ height: '3px', width: '100%', background: '#e2e8f0', position: 'relative' }}>
+                  <div
+                    key={activeSlide + '-' + isPlaying}
+                    className={`progress-bar-fill ${isPlaying ? 'progress-bar-fill-playing' : ''}`}
+                  />
+                </div>
+
+                {/* Slideshow Navigation Controls Footer */}
+                <div style={{ padding: '12px 24px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <button
+                      onClick={() => setIsPlaying(p => !p)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      title={isPlaying ? 'Pause auto-play' : 'Resume auto-play'}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                    </button>
+                    <div style={{ width: '1px', height: '14px', background: '#cbd5e1' }} />
+                    <button
+                      onClick={() => { setActiveSlide(prev => (prev - 1 + 4) % 4); setIsPlaying(false); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      onClick={() => { setActiveSlide(prev => (prev + 1) % 4); setIsPlaying(false); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[0, 1, 2, 3].map(idx => (
+                      <button
+                        key={idx}
+                        onClick={() => { setActiveSlide(idx); setIsPlaying(false); }}
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          background: activeSlide === idx ? '#2563eb' : '#cbd5e1',
+                          transition: 'background-color 0.2s, transform 0.2s',
+                          transform: activeSlide === idx ? 'scale(1.2)' : 'scale(1)'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleCloseVersionModal}
+                    style={{
+                      background: 'linear-gradient(135deg, var(--navy), var(--navy-light))',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '6px 14px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: 'var(--shadow-button)'
+                    }}
+                  >
+                    Got it, thanks!
+                  </button>
+                </div>
+              </div>
+            ) : versionTab === '1.8.5' ? (
               <div style={{ 
                 display: 'flex', 
                 flexDirection: 'column', 
@@ -3461,7 +3903,7 @@ export const Sidebar = memo(function Sidebar({
               </div>
             )}
 
-            {versionTab !== '1.7.7' && (
+            {versionTab !== '1.8.7' && versionTab !== '1.7.7' && (
               <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
                 <button
                   onClick={handleCloseVersionModal}
