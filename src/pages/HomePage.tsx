@@ -208,7 +208,25 @@ export default function HomePage() {
 
             const ws = wb.Sheets[bestSheetName];
 
-            // Pre-process worksheet to extract original URLs from HYPERLINK formulas
+            // Helper: Check if an Excel number format code represents a date
+            function isDateFormat(fmt: string): boolean {
+              if (!fmt || fmt === 'General') return false;
+              const clean = fmt.replace(/\[[^\]]*\]/g, '').replace(/"[^"]*"/g, '');
+              if (/[dmhysDMHYS]/.test(clean)) return true;
+              return false;
+            }
+
+            // Helper: Convert Excel serial number to DD-MM-YYYY string
+            function excelSerialToDateStr(serial: number): string {
+              const daysSinceEpoch = serial > 59 ? serial - 2 : serial - 1;
+              const date = new Date(1900, 0, 1 + daysSinceEpoch);
+              const dd = String(date.getDate()).padStart(2, '0');
+              const mm = String(date.getMonth() + 1).padStart(2, '0');
+              const yyyy = date.getFullYear();
+              return `${dd}-${mm}-${yyyy}`;
+            }
+
+            // Pre-process worksheet: extract URLs from HYPERLINK formulas and convert date serials
             const refForPreprocess = ws['!ref'];
             if (refForPreprocess) {
               const range = XLSX.utils.decode_range(refForPreprocess);
@@ -216,7 +234,10 @@ export default function HomePage() {
                 for (let C = range.s.c; C <= range.e.c; C++) {
                   const addr = XLSX.utils.encode_cell({ r: R, c: C });
                   const cell = ws[addr];
-                  if (cell && cell.f && typeof cell.f === 'string') {
+                  if (!cell) continue;
+
+                  // Convert HYPERLINK formulas to plain URLs
+                  if (cell.f && typeof cell.f === 'string') {
                     const trimmedFormula = cell.f.trim();
                     if (/^HYPERLINK\(/i.test(trimmedFormula)) {
                       const match = trimmedFormula.match(/^HYPERLINK\(\s*"([^"]+)"/i);
@@ -232,6 +253,20 @@ export default function HomePage() {
                         cell.v = url;
                         cell.w = url;
                       }
+                    }
+                  }
+
+                  // Convert Excel date serial numbers to formatted date strings
+                  if (cell.t === 'n' && typeof cell.v === 'number') {
+                    const fmt = cell.z;
+                    if (fmt && isDateFormat(fmt)) {
+                      if (cell.w && !/^\d+(\.\d+)?$/.test(cell.w)) {
+                        cell.v = cell.w;
+                      } else {
+                        cell.v = excelSerialToDateStr(cell.v);
+                        cell.w = cell.v;
+                      }
+                      cell.t = 's';
                     }
                   }
                 }

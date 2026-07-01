@@ -432,7 +432,8 @@ export default function AdminUserSettingsPage() {
             const renderSheet = (reg: RegisterDetail) => {
               const cols = [...reg.columns].sort((a, b) => a.position - b.position);
               const isExpanded = expandedRegId === reg.id;
-              const hasAccess = globalPerms.isAdmin || sheetAccessGranted[reg.id] === true;
+              const hasAccess = globalPerms.isAdmin || globalPerms.fullSheetAccess || sheetAccessGranted[reg.id] === true;
+              const isExplicitlyGranted = sheetAccessGranted[reg.id] === true;
 
               return (
                 <div key={reg.id} className="admin-sheet-card admin-animate-fade-in" style={{ 
@@ -501,20 +502,19 @@ export default function AdminUserSettingsPage() {
                         </>
                       )}
                       
-                      <button disabled={globalPerms.isAdmin} onClick={(e) => { 
+                      <button onClick={(e) => { 
                         e.stopPropagation(); 
-                        if (globalPerms.isAdmin) return; 
-                        setSheetAccessGranted(prev => ({ ...prev, [reg.id]: !hasAccess }));
+                        setSheetAccessGranted(prev => ({ ...prev, [reg.id]: !isExplicitlyGranted }));
                       }} style={{ 
                         padding: '6px 14px', borderRadius: '20px', border: '1.5px solid', fontSize: '11.5px', fontWeight: 700, 
-                        cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', 
-                        background: hasAccess ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)', 
-                        color: hasAccess ? '#10b981' : 'var(--muted)', 
-                        borderColor: hasAccess ? 'rgba(16, 185, 129, 0.25)' : 'var(--border)', 
+                        cursor: 'pointer', 
+                        background: isExplicitlyGranted ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)', 
+                        color: isExplicitlyGranted ? '#10b981' : 'var(--muted)', 
+                        borderColor: isExplicitlyGranted ? 'rgba(16, 185, 129, 0.25)' : 'var(--border)', 
                         flexShrink: 0,
                         transition: 'all 0.2s'
                       }}>
-                        {hasAccess ? <><Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Access Granted</> : 'Grant Access'}
+                        {isExplicitlyGranted ? <><Check size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Access Granted</> : 'Grant Access'}
                       </button>
                       <span className="admin-sheet-cols-badge" style={{ fontSize: '12px', color: 'var(--muted)', background: 'var(--bg-secondary)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border)', flexShrink: 0 }}>{cols.length} Columns</span>
                     </div>
@@ -737,15 +737,13 @@ export default function AdminUserSettingsPage() {
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <button 
-                            disabled={globalPerms.isAdmin} 
                             onClick={(e) => { 
                               e.stopPropagation(); 
-                              if (globalPerms.isAdmin) return; 
                               setFolderAccessGranted(prev => ({ ...prev, [folder.id]: !hasFolderAccess }));
                             }} 
                             style={{ 
                               padding: '6px 14px', borderRadius: '20px', border: '1.5px solid', fontSize: '11px', fontWeight: 700, 
-                              cursor: globalPerms.isAdmin ? 'not-allowed' : 'pointer', 
+                              cursor: 'pointer', 
                               background: hasFolderAccess ? 'rgba(16, 185, 129, 0.08)' : 'var(--surface)', 
                               color: hasFolderAccess ? '#10b981' : 'var(--muted)', 
                               borderColor: hasFolderAccess ? 'rgba(16, 185, 129, 0.25)' : 'var(--border)',
