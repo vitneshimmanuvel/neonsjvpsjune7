@@ -8,14 +8,14 @@ import {
   firebaseGetPendingDownloadRequests,
   firebaseRespondRequest
 } from '../../lib/firebaseAuth';
-import { listBusinesses, listRegisters, deleteRegister, listDeletedRegisters, getAllDeletedItems, getRegister, type RegisterSummary, type Column, type Entry } from '../../lib/api';
+import { listBusinesses, listRegisters, deleteRegister, listDeletedRegisters, getAllDeletedItems, getRegister, type RegisterSummary, type Column, type Entry, listSavedShortcuts, createSavedShortcut, deleteSavedShortcut, type SavedRegisterShortcut, renameSavedShortcut } from '../../lib/api';
 import { cleanActivityLogs } from '../../lib/activityHelper';
 import {
   LayoutDashboard, Users, Activity, ShieldAlert, FileSpreadsheet,
   RefreshCw, TrendingUp, UserCheck, Calendar, ArrowRight, ArrowLeft, UserPlus,
   Clock, CheckCircle, XCircle, Trash2, Download, MessageSquare, Send,
   Search, X, Filter, ChevronDown, ChevronUp, Eye, Hash, Folder,
-  Maximize2, Minimize2, Database, Columns
+  Maximize2, Minimize2, Database, Columns, Plus, Bookmark, MoreVertical
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -76,6 +76,15 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   const [allRegisters, setAllRegisters] = useState<RegisterSummary[]>([]);
   const [showRegistersPanel, setShowRegistersPanel] = useState(false);
   const [regSearch, setRegSearch] = useState('');
+  const [showAllRegisters, setShowAllRegisters] = useState(false);
+  const [initialSearch, setInitialSearch] = useState('');
+  const [initialFilters, setInitialFilters] = useState<Array<{ columnId: number; operator: string; value: string; values?: string[] }>>([]);
+  const [businessId, setBusinessId] = useState<number>(1);
+  const [shortcuts, setShortcuts] = useState<SavedRegisterShortcut[]>([]);
+  const [shortcutCounts, setShortcutCounts] = useState<Record<string, number>>({});
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [renamingShortcut, setRenamingShortcut] = useState<SavedRegisterShortcut | null>(null);
+  const [renameShortcutName, setRenameShortcutName] = useState('');
   // Detail panel
   const [detailReg, setDetailReg] = useState<{ id: number; name: string } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -102,18 +111,22 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       const activitiesList = cleanActivityLogs(activitiesData.activities || []);
 
       // 4. Fetch Registers Count & Recycle Bin count
+      // 4. Fetch Registers Count & Recycle Bin count
       let registersCount = 0;
       let recycleBinCount = 0;
       try {
         const busList = await listBusinesses();
         const busId = busList[0]?.id || 1;
-        const [regs, deletedRegs, deletedRowsCols] = await Promise.all([
+        setBusinessId(busId);
+        const [regs, deletedRegs, deletedRowsCols, dbShortcuts] = await Promise.all([
           listRegisters(busId),
           listDeletedRegisters(busId),
-          getAllDeletedItems(busId)
+          getAllDeletedItems(busId),
+          listSavedShortcuts(busId)
         ]);
         registersCount = regs.length;
         setAllRegisters(regs);
+        setShortcuts(dbShortcuts);
         recycleBinCount = (deletedRegs?.length || 0) + (deletedRowsCols?.length || 0);
       } catch (err) {
         console.error('Error fetching registers or recycle bin counts:', err);
@@ -141,6 +154,40 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    if (shortcuts.length === 0) return;
+    const loadCounts = async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        shortcuts.map(async (s) => {
+          try {
+            const full = await getRegister(s.registerId);
+            const count = getFilteredEntriesCount(
+              full.columns || [],
+              full.entries || [],
+              s.searchQuery || '',
+              s.filters || []
+            );
+            counts[s.id] = count;
+          } catch (e) {
+            console.error(`Failed to load count for shortcut ${s.id}:`, e);
+            counts[s.id] = 0;
+          }
+        })
+      );
+      setShortcutCounts(prev => ({ ...prev, ...counts }));
+    };
+    loadCounts();
+  }, [shortcuts]);
+
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setActiveMenuId(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
   const handleRespond = async (id: string, status: 'approved' | 'rejected') => {
@@ -175,7 +222,13 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     }
   };
 
-  const openRegisterDetail = async (reg: { id: number; name: string }) => {
+  const openRegisterDetail = async (
+    reg: { id: number; name: string },
+    preSearch = '',
+    preFilters: Array<{ columnId: number; operator: string; value: string; values?: string[] }> = []
+  ) => {
+    setInitialSearch(preSearch);
+    setInitialFilters(preFilters);
     setDetailReg(reg);
     setDetailLoading(true);
     try {
@@ -187,6 +240,45 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       setDetailReg(null);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleSaveShortcut = async (name: string, searchQuery: string, filters: any[]) => {
+    if (!detailReg) return;
+    try {
+      const saved = await createSavedShortcut({
+        businessId,
+        name: name || `${detailReg.name} (Filtered)`,
+        registerId: detailReg.id,
+        registerName: detailReg.name,
+        searchQuery,
+        filters
+      });
+      setShortcuts(prev => [saved, ...prev]);
+      toast.success('Shortcut saved successfully!');
+    } catch (e: any) {
+      toast.error(`Failed to save shortcut: ${e.message}`);
+    }
+  };
+
+  const handleDeleteShortcut = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteSavedShortcut(id);
+      setShortcuts(prev => prev.filter(s => s.id !== id));
+      toast.success('Shortcut removed');
+    } catch (e: any) {
+      toast.error(`Failed to delete shortcut: ${e.message}`);
+    }
+  };
+
+  const handleRenameShortcut = async (id: string, newName: string) => {
+    try {
+      await renameSavedShortcut(id, newName);
+      setShortcuts(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
+      toast.success('Shortcut renamed successfully!');
+    } catch (e: any) {
+      toast.error(`Failed to rename shortcut: ${e.message}`);
     }
   };
 
@@ -206,7 +298,10 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
         detailLoading={detailLoading}
         detailColumns={detailColumns}
         detailEntries={detailEntries}
-        onClose={() => { setDetailReg(null); setDetailColumns([]); setDetailEntries([]); }}
+        initialSearch={initialSearch}
+        initialFilters={initialFilters}
+        onSaveShortcut={handleSaveShortcut}
+        onClose={() => { setDetailReg(null); setDetailColumns([]); setDetailEntries([]); setInitialSearch(''); setInitialFilters([]); }}
       />
     );
   }
@@ -335,10 +430,204 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       </div>
 
       {/* ── Registers Drill-Down Panel ── */}
-      {showRegistersPanel && <RegistersListPanel allRegisters={allRegisters} regSearch={regSearch} setRegSearch={setRegSearch} onOpenRegister={(reg) => openRegisterDetail(reg)} />}
+      {showRegistersPanel && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Shortcuts Grid Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Register Shortcuts & Folders
+            </h3>
+          </div>
+
+          {/* Shortcuts Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '16px'
+          }}>
+            {/* The Plus Box */}
+            <div
+              onClick={() => setShowAllRegisters(v => !v)}
+              className="admin-card-glass"
+              style={{
+                border: '2px dashed var(--brand-green)',
+                background: 'rgba(16,185,129,0.01)',
+                borderRadius: '12px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                minHeight: '120px',
+                transition: 'all 0.2s',
+                gap: '8px',
+                boxSizing: 'border-box'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(16,185,129,0.04)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(16,185,129,0.01)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <Plus size={28} color="var(--brand-green)" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-green)' }}>
+                {showAllRegisters ? 'Hide All Registers' : 'See All Registers'}
+              </span>
+            </div>
+
+            {/* Saved Shortcuts */}
+            {shortcuts.map(s => (
+              <div
+                key={s.id}
+                onClick={() => openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters)}
+                className="admin-stat-card-premium"
+                style={{
+                  cursor: 'pointer',
+                  border: '1px solid var(--border)',
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: '130px',
+                  padding: '16px'
+                }}
+              >
+                {/* Top Row: Icon, Register Name, and Options Menu */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', position: 'relative' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-green)', flexShrink: 0 }}>
+                    <FileSpreadsheet size={16} />
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
+                    {s.registerName}
+                  </span>
+                  
+                  {/* Three-dot options menu */}
+                  <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setActiveMenuId(activeMenuId === s.id ? null : s.id)}
+                      title="Options"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--muted)',
+                        padding: '4px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--border-light)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {activeMenuId === s.id && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '24px',
+                        right: '0',
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        boxShadow: 'var(--admin-card-shadow)',
+                        zIndex: 10,
+                        minWidth: '120px',
+                        padding: '4px 0',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}>
+                        <button
+                          onClick={() => {
+                            setRenamingShortcut(s);
+                            setRenameShortcutName(s.name);
+                            setActiveMenuId(null);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            color: 'var(--foreground)',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          Change Name
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            handleDeleteShortcut(s.id, e);
+                            setActiveMenuId(null);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            color: 'var(--danger)',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Middle & Bottom Row: Big entry count & Shortcut Label */}
+                <div>
+                  <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    {shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...'}
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>entries</span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+                    {s.name}
+                  </div>
+                  {s.filters && s.filters.length > 0 && (
+                    <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                      {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* All Registers list - toggled by the plus box */}
+          {showAllRegisters && (
+            <div className="admin-animate-fade-in">
+              <RegistersListPanel
+                allRegisters={allRegisters}
+                regSearch={regSearch}
+                setRegSearch={setRegSearch}
+                onOpenRegister={(reg) => openRegisterDetail(reg)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Grid & Quick Actions */}
-      <>
+      {!showRegistersPanel && (
+        <>
           {/* Main Grid: Activities & Approvals */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1.8fr 1fr))', gap: '20px' }}>
 
@@ -510,7 +799,99 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
 
             </div>
           </div>
-        </>
+        </>)}
+
+      {/* Rename Shortcut Modal */}
+      {renamingShortcut && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999
+        }} onClick={() => setRenamingShortcut(null)}>
+          <div className="admin-card-glass admin-animate-fade-in" style={{
+            width: '400px',
+            padding: '24px',
+            background: 'var(--surface)',
+            border: '1.5px solid var(--border)',
+            borderRadius: '16px',
+            boxShadow: 'var(--admin-card-shadow)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bookmark size={18} color="var(--accent)" /> Rename Shortcut
+              </h3>
+              <button
+                onClick={() => setRenamingShortcut(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>
+              Provide a new custom name for this filter shortcut card.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--navy)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Shortcut Name
+              </label>
+              <input
+                type="text"
+                value={renameShortcutName}
+                onChange={e => setRenameShortcutName(e.target.value)}
+                placeholder="e.g., BE 26 - New Admission"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  width: '100%'
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleRenameShortcut(renamingShortcut.id, renameShortcutName);
+                    setRenamingShortcut(null);
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                onClick={() => setRenamingShortcut(null)}
+                className="admin-btn-secondary-flat"
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleRenameShortcut(renamingShortcut.id, renameShortcutName);
+                  setRenamingShortcut(null);
+                }}
+                className="admin-btn-success-glow"
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', background: 'var(--accent)', color: 'white' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -607,6 +988,84 @@ function parseDateString(dStr: string) {
   return dStr;
 }
 
+/* Helper to get filtered entries count for saved shortcuts */
+function getFilteredEntriesCount(
+  columns: Column[],
+  entries: Entry[],
+  searchQuery: string,
+  filters: Array<{ columnId: number; operator: string; value: string; values?: string[] }>
+) {
+  const s = searchQuery.toLowerCase().trim();
+  const filterLen = filters.length;
+  if (!s && filterLen === 0) return entries.length;
+
+  const preparedFilters = filters.map(f => ({
+    ...f,
+    lFilter: (f.value || '').toLowerCase(),
+    nValue: parseFloat(f.value),
+    nValue2: 0,
+    dValue: f.value,
+    dValue2: '',
+    values: f.values || [],
+  }));
+
+  let matchCount = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+
+    // Search
+    if (s) {
+      let match = false;
+      const cells = e.cells || {};
+      for (const key in cells) {
+        const val = cells[key];
+        if (val && typeof val === 'string' && val.toLowerCase().includes(s)) {
+          match = true;
+          break;
+        }
+      }
+      if (!match) continue;
+    }
+
+    // Filters
+    if (filterLen > 0) {
+      let pass = true;
+      for (let j = 0; j < filterLen; j++) {
+        const f = preparedFilters[j];
+        const val = (e.cells?.[f.columnId.toString()] || '').trim();
+        const lVal = val.toLowerCase();
+        let cond = true;
+        switch (f.operator) {
+          case 'contains': cond = lVal.includes(f.lFilter); break;
+          case 'not_contains': cond = !lVal.includes(f.lFilter); break;
+          case 'equals': cond = lVal === f.lFilter; break;
+          case 'not_equals': cond = lVal !== f.lFilter; break;
+          case 'starts_with': cond = lVal.startsWith(f.lFilter); break;
+          case 'ends_with': cond = lVal.endsWith(f.lFilter); break;
+          case 'eq': cond = parseFloat(val) === f.nValue; break;
+          case 'gt': cond = parseFloat(val) > f.nValue; break;
+          case 'gte': cond = parseFloat(val) >= f.nValue; break;
+          case 'lt': cond = parseFloat(val) < f.nValue; break;
+          case 'lte': cond = parseFloat(val) <= f.nValue; break;
+          case 'between': { const n = parseFloat(val); cond = n >= f.nValue && n <= f.nValue2; break; }
+          case 'date_is': cond = parseDateString(val) === f.dValue; break;
+          case 'date_before': cond = parseDateString(val) < f.dValue; break;
+          case 'date_after': cond = parseDateString(val) > f.dValue; break;
+          case 'date_between': { const dV = parseDateString(val); cond = dV >= f.dValue && dV <= f.dValue2; break; }
+          case 'empty': cond = !val; break;
+          case 'not_empty': cond = !!val; break;
+          case 'multi_select': cond = !val ? (f.values || []).includes('(Blanks)') : (f.values || []).includes(val); break;
+        }
+        if (!cond) { pass = false; break; }
+      }
+      if (!pass) continue;
+    }
+
+    matchCount++;
+  }
+  return matchCount;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    FILTER OPS — same as RegisterPage
    ══════════════════════════════════════════════════════════════════════════ */
@@ -648,26 +1107,75 @@ function getOpsForType(type: string) {
 /* ══════════════════════════════════════════════════════════════════════════
    SUB-COMPONENT: RegisterDetailModal — full-screen modal with data + filters + export
    ══════════════════════════════════════════════════════════════════════════ */
+// Operator label helper
+const opLabel = (op: string) => {
+  const labels: Record<string, string> = {
+    contains: 'contains', not_contains: 'not contains', equals: 'is', not_equals: 'is not',
+    starts_with: 'starts with', ends_with: 'ends with', empty: 'is empty', not_empty: 'is not empty',
+    gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', between: 'between',
+    date_is: 'is', date_before: 'before', date_after: 'after', date_between: 'between',
+    multi_select: 'is any of'
+  };
+  return labels[op] || op;
+};
+
 function RegisterDetailPanel({
-  detailReg, detailLoading, detailColumns, detailEntries, onClose
+  detailReg, detailLoading, detailColumns, detailEntries, onClose,
+  initialSearch = '',
+  initialFilters = [],
+  onSaveShortcut
 }: {
   detailReg: { id: number; name: string };
   detailLoading: boolean;
   detailColumns: Column[];
   detailEntries: Entry[];
   onClose: () => void;
+  initialSearch?: string;
+  initialFilters?: Array<{ columnId: number; operator: string; value: string; values?: string[] }>;
+  onSaveShortcut: (name: string, searchQuery: string, filters: any[]) => void;
 }) {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(!!initialSearch);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Local states to avoid rendering parent component on every keystroke
-  const [detailSearch, setDetailSearch] = useState('');
-  const [detailFilters, setDetailFilters] = useState<Array<{ columnId: number; operator: string; value: string; values?: string[] }>>([]);
+  const [detailSearch, setDetailSearch] = useState(initialSearch);
+  const [detailFilters, setDetailFilters] = useState<Array<{ columnId: number; operator: string; value: string; values?: string[] }>>(initialFilters);
   const [newFilterCol, setNewFilterCol] = useState<number | null>(null);
   const [newFilterOp, setNewFilterOp] = useState('contains');
   const [newFilterVal, setNewFilterVal] = useState('');
   const [newFilterValues, setNewFilterValues] = useState<string[]>([]);
+
+  // Save shortcut modal states
+  const [showSaveShortcutModal, setShowSaveShortcutModal] = useState(false);
+  const [shortcutName, setShortcutName] = useState('');
+
+  // Auto-populate default name when modal opens
+  useEffect(() => {
+    if (showSaveShortcutModal) {
+      let defaultName = '';
+      if (detailSearch) {
+        defaultName = `Search "${detailSearch}"`;
+      }
+      if (detailFilters && detailFilters.length > 0) {
+        const filterNames = detailFilters.map(f => {
+          const col = detailColumns.find(c => c.id === f.columnId);
+          return col ? `${col.name} ${opLabel(f.operator)}` : '';
+        }).filter(Boolean).join(', ');
+        if (defaultName) {
+          defaultName += ` & ${filterNames}`;
+        } else {
+          defaultName = filterNames;
+        }
+      }
+      if (!defaultName) {
+        defaultName = 'Quick Shortcut';
+      }
+      setShortcutName(defaultName);
+    }
+  }, [showSaveShortcutModal, detailSearch, detailFilters, detailColumns]);
 
   // Deferred search string prevents keypress lagging by prioritizing render of input box
   const deferredSearch = useDeferredValue(detailSearch);
@@ -942,17 +1450,7 @@ function RegisterDetailPanel({
     }
   };
 
-  // Operator label helper
-  const opLabel = (op: string) => {
-    const labels: Record<string, string> = {
-      contains: 'contains', not_contains: 'not contains', equals: 'is', not_equals: 'is not',
-      starts_with: 'starts with', ends_with: 'ends with', empty: 'is empty', not_empty: 'is not empty',
-      gt: '>', gte: '≥', lt: '<', lte: '≤', eq: '=', between: 'between',
-      date_is: 'is', date_before: 'before', date_after: 'after', date_between: 'between',
-      multi_select: 'is any of'
-    };
-    return labels[op] || op;
-  };
+
 
   const panelContent = (
     <div className="admin-card-glass admin-animate-fade-in" style={isFullScreen ? {
@@ -1031,25 +1529,48 @@ function RegisterDetailPanel({
 
         {/* ── Search Bar & Filter Chips (Inline in Header) ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0, marginLeft: '12px', marginRight: '12px' }}>
-          <div style={{ position: 'relative', width: '160px', flexShrink: 0 }}>
-            <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
-            <input
-              type="text"
-              placeholder="Search columns..."
-              value={detailSearch}
-              onChange={e => setDetailSearch(e.target.value)}
-              style={{
-                width: '100%', padding: '7px 10px 7px 28px', borderRadius: '6px',
-                border: '1.5px solid var(--border)', background: 'var(--background)',
-                color: 'var(--foreground)', fontSize: '12px', outline: 'none', boxSizing: 'border-box'
-              }}
-            />
-            {detailSearch && (
-              <button onClick={() => setDetailSearch('')} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '2px', display: 'flex' }}>
+          {isSearchExpanded ? (
+            <div style={{ position: 'relative', width: '160px', flexShrink: 0 }} className="admin-animate-fade-in">
+              <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+              <input
+                type="text"
+                placeholder="Search columns..."
+                value={detailSearch}
+                onChange={e => setDetailSearch(e.target.value)}
+                style={{
+                  width: '100%', padding: '7px 10px 7px 28px', borderRadius: '6px',
+                  border: '1.5px solid var(--border)', background: 'var(--background)',
+                  color: 'var(--foreground)', fontSize: '12px', outline: 'none', boxSizing: 'border-box'
+                }}
+                autoFocus
+                onBlur={() => { if (!detailSearch.trim()) setIsSearchExpanded(false); }}
+              />
+              <button
+                onClick={() => {
+                  setDetailSearch('');
+                  setIsSearchExpanded(false);
+                }}
+                style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '2px', display: 'flex' }}
+              >
                 <X size={12} />
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsSearchExpanded(true)}
+              title="Search Columns"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '34px', height: '34px', borderRadius: '8px',
+                border: '1.5px solid var(--border)', background: 'var(--background)',
+                color: 'var(--foreground)', cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--foreground)'; }}
+            >
+              <Search size={15} />
+            </button>
+          )}
 
           {/* Inline Add Filter dropdown and selectors */}
           {showFilterPanel && (
@@ -1128,19 +1649,36 @@ function RegisterDetailPanel({
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+          {/* Save Shortcut */}
+          <button
+            onClick={() => setShowSaveShortcutModal(true)}
+            title="Save Shortcut"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '34px', height: '34px', borderRadius: '8px',
+              border: '1.5px solid var(--border)', background: 'var(--background)',
+              cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+          >
+            <Bookmark size={15} color="var(--accent)" />
+          </button>
+
           {/* Filter toggle */}
           <button
             onClick={() => setShowFilterPanel(v => !v)}
+            title="Filters"
             style={{
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '34px', height: '34px', borderRadius: '8px',
               border: showFilterPanel ? '1.5px solid rgba(99,102,241,0.4)' : '1.5px solid var(--border)',
               background: showFilterPanel ? 'rgba(99,102,241,0.06)' : 'var(--background)',
-              color: showFilterPanel ? '#6366f1' : 'var(--foreground)', fontSize: '12px', fontWeight: 700,
-              cursor: 'pointer', transition: 'all 0.15s', position: 'relative'
+              color: showFilterPanel ? '#6366f1' : 'var(--foreground)',
+              cursor: 'pointer', transition: 'all 0.15s', position: 'relative', flexShrink: 0
             }}
           >
-            <Filter size={14} />
-            Filters
+            <Filter size={15} />
             {detailFilters.length > 0 && (
               <span style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%', background: '#6366f1', color: 'white', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {detailFilters.length}
@@ -1148,35 +1686,97 @@ function RegisterDetailPanel({
             )}
           </button>
 
-          {/* Export CSV */}
-          <button
-            onClick={handleExportCSV}
-            disabled={displayEntries.length === 0}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px',
-              border: '1.5px solid var(--border)', background: 'var(--background)',
-              color: displayEntries.length === 0 ? 'var(--muted)' : 'var(--foreground)',
-              fontSize: '12px', fontWeight: 700, cursor: displayEntries.length === 0 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s', opacity: displayEntries.length === 0 ? 0.5 : 1
-            }}
-          >
-            <Download size={14} /> CSV
-          </button>
+          {/* Export Menu Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={e => { e.stopPropagation(); setShowExportMenu(v => !v); }}
+              title="Export Options"
+              disabled={displayEntries.length === 0}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '34px', height: '34px', borderRadius: '8px',
+                border: showExportMenu ? '1.5px solid var(--accent)' : '1.5px solid var(--border)',
+                background: 'var(--background)',
+                color: displayEntries.length === 0 ? 'var(--muted)' : 'var(--foreground)',
+                cursor: displayEntries.length === 0 ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s', opacity: displayEntries.length === 0 ? 0.5 : 1,
+                flexShrink: 0
+              }}
+              onMouseEnter={e => { if (displayEntries.length > 0) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; } }}
+              onMouseLeave={e => { if (displayEntries.length > 0) { e.currentTarget.style.borderColor = showExportMenu ? 'var(--accent)' : 'var(--border)'; e.currentTarget.style.color = 'var(--foreground)'; } }}
+            >
+              <MoreVertical size={16} />
+            </button>
 
-          {/* Export Excel */}
-          <button
-            onClick={handleExportExcel}
-            disabled={displayEntries.length === 0 || exporting}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px',
-              border: 'none', background: displayEntries.length === 0 ? 'var(--border)' : 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white', fontSize: '12px', fontWeight: 700,
-              cursor: displayEntries.length === 0 ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s', boxShadow: displayEntries.length > 0 ? '0 2px 8px rgba(16,185,129,0.3)' : 'none'
-            }}
-          >
-            <Download size={14} /> {exporting ? 'Exporting...' : 'Excel'}
-          </button>
+            {showExportMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '40px',
+                right: '0',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                boxShadow: 'var(--admin-card-shadow)',
+                zIndex: 100,
+                minWidth: '150px',
+                padding: '4px 0',
+                display: 'flex',
+                flexDirection: 'column'
+              }} onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => {
+                    handleExportExcel();
+                    setShowExportMenu(false);
+                  }}
+                  disabled={exporting}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <Download size={13} color="var(--brand-green)" />
+                  {exporting ? 'Exporting...' : 'Export to Excel'}
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportCSV();
+                    setShowExportMenu(false);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <Download size={13} color="var(--accent)" />
+                  Export to CSV
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Full Screen Toggle */}
           <button
@@ -1545,6 +2145,91 @@ function RegisterDetailPanel({
           <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontWeight: 600, fontSize: '12px', cursor: 'pointer' }}>Close</button>
         </div>
       </div>
+
+      {showSaveShortcutModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999
+        }}>
+          <div className="admin-card-glass admin-animate-fade-in" style={{
+            width: '400px',
+            padding: '24px',
+            background: 'var(--surface)',
+            border: '1.5px solid var(--border)',
+            borderRadius: '16px',
+            boxShadow: 'var(--admin-card-shadow)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bookmark size={18} color="var(--accent)" /> Save Filtered View
+              </h3>
+              <button
+                onClick={() => setShowSaveShortcutModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>
+              Create a quick shortcut on your dashboard to directly open this register with your current search and filters.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--navy)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Shortcut Name
+              </label>
+              <input
+                type="text"
+                value={shortcutName}
+                onChange={e => setShortcutName(e.target.value)}
+                placeholder="e.g., BE 26 - New Admission"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1.5px solid var(--border)',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  width: '100%'
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                onClick={() => setShowSaveShortcutModal(false)}
+                className="admin-btn-secondary-flat"
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onSaveShortcut(shortcutName, detailSearch, detailFilters);
+                  setShowSaveShortcutModal(false);
+                }}
+                className="admin-btn-success-glow"
+                style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '13px', background: 'var(--accent)', color: 'white' }}
+              >
+                Save Shortcut
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

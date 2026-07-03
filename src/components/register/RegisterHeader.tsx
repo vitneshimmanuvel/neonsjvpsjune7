@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { RequestModal } from './modals/RequestModal';
 import { useAuth } from '../../lib/auth';
-import { deleteRegister } from '../../lib/api';
+import { deleteRegister, createSavedTemplate } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 
 interface SavedTemplate {
@@ -35,6 +35,7 @@ export function RegisterHeader({
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [requestModal, setRequestModal] = useState<{ type: 'download' | 'delete_register'; isOpen: boolean }>({ type: 'download', isOpen: false });
   
   const { user } = useAuth();
@@ -65,7 +66,7 @@ export function RegisterHeader({
   }, [showMoreMenu]);
 
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     const name = templateName.trim();
     if (!name) {
       toast.error('Please enter a template name');
@@ -76,29 +77,32 @@ export function RegisterHeader({
       return;
     }
 
-    const template: SavedTemplate = {
-      id: Date.now().toString(),
-      name,
-      columns: register.columns
-        .sort((a: any, b: any) => a.position - b.position)
-        .map((c: any) => ({
-          name: c.name,
-          type: c.type,
-          ...(c.dropdownOptions?.length ? { dropdownOptions: c.dropdownOptions } : {}),
-          ...(c.formula ? { formula: c.formula } : {}),
-        })),
-      createdAt: new Date().toISOString(),
-    };
+    const columnsToSave = register.columns
+      .sort((a: any, b: any) => a.position - b.position)
+      .map((c: any) => ({
+        name: c.name,
+        type: c.type,
+        ...(c.dropdownOptions?.length ? { dropdownOptions: c.dropdownOptions } : {}),
+        ...(c.formula ? { formula: c.formula } : {}),
+      }));
 
-    // Save to localStorage
-    const existing = JSON.parse(localStorage.getItem('rb_saved_templates') || '[]');
-    existing.push(template);
-    localStorage.setItem('rb_saved_templates', JSON.stringify(existing));
+    setSavingTemplate(true);
+    try {
+      await createSavedTemplate({
+        businessId: register.businessId,
+        name,
+        columns: columnsToSave
+      });
 
-    toast.success(`Template "${name}" saved!`);
-    setSaveTemplateModal(false);
-    setTemplateName('');
-    setShowMoreMenu(false);
+      toast.success(`Template "${name}" saved!`);
+      setSaveTemplateModal(false);
+      setTemplateName('');
+      setShowMoreMenu(false);
+    } catch (err: any) {
+      toast.error(`Failed to save template: ${err.message}`);
+    } finally {
+      setSavingTemplate(false);
+    }
   };
 
   const handleDeleteClick = async () => {
@@ -214,8 +218,12 @@ export function RegisterHeader({
             />
             <div className="save-template-actions">
               <button className="save-template-cancel" onClick={() => setSaveTemplateModal(false)}>Cancel</button>
-              <button className="save-template-save" onClick={handleSaveTemplate}>
-                <Bookmark size={14} /> Save Template
+              <button 
+                className="save-template-save" 
+                onClick={handleSaveTemplate}
+                disabled={savingTemplate}
+              >
+                <Bookmark size={14} /> {savingTemplate ? 'Saving...' : 'Save Template'}
               </button>
             </div>
           </div>

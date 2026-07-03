@@ -2981,3 +2981,97 @@ export async function deleteSavedDropdown(id: string): Promise<void> {
   const res = await fetch(apiUrl(`/api/saved-dropdowns/${id}`), { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete saved dropdown');
 }
+
+// ==================== SAVED TEMPLATES ====================
+export interface DBTemplateColumn {
+  name: string;
+  type: string;
+  dropdownOptions?: string[];
+  formula?: string;
+}
+
+export interface DBSavedTemplate {
+  id: string;
+  businessId: number;
+  name: string;
+  columns: DBTemplateColumn[];
+  createdAt?: string;
+}
+
+export async function listSavedTemplates(businessId: number): Promise<DBSavedTemplate[]> {
+  const res = await fetch(apiUrl(`/api/saved-templates?businessId=${businessId}`));
+  if (!res.ok) throw new Error('Failed to fetch saved templates');
+  const data = await res.json();
+  return data.templates || [];
+}
+
+export async function createSavedTemplate(data: { businessId: number; name: string; columns: DBTemplateColumn[] }): Promise<DBSavedTemplate> {
+  const res = await fetch(apiUrl('/api/saved-templates'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to save template' }));
+    throw new Error(err.error || 'Failed to save template');
+  }
+  return res.json();
+}
+
+export async function deleteSavedTemplate(id: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/saved-templates/${id}`), { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete saved template');
+}
+
+// ==================== SAVED REGISTER SHORTCUTS ====================
+export interface SavedRegisterShortcut {
+  id: string;
+  businessId: number;
+  name: string;
+  registerId: number;
+  registerName: string;
+  searchQuery: string;
+  filters: any[];
+  createdAt?: string;
+}
+
+export async function listSavedShortcuts(businessId: number): Promise<SavedRegisterShortcut[]> {
+  const res = await fetch(apiUrl(`/api/saved-shortcuts?businessId=${businessId}`));
+  if (!res.ok) throw new Error('Failed to fetch shortcuts');
+  const data = await res.json();
+  return data.shortcuts || [];
+}
+
+export async function createSavedShortcut(data: {
+  businessId: number;
+  name: string;
+  registerId: number;
+  registerName: string;
+  searchQuery?: string;
+  filters: any[];
+}): Promise<SavedRegisterShortcut> {
+  const res = await fetch(apiUrl('/api/saved-shortcuts'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Failed to save shortcut' }));
+    throw new Error(err.error || 'Failed to save shortcut');
+  }
+  return res.json();
+}
+
+export async function deleteSavedShortcut(id: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/saved-shortcuts/${id}`), { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete shortcut');
+}
+
+export async function renameSavedShortcut(id: string, newName: string): Promise<void> {
+  const res = await fetch(apiUrl(`/api/saved-shortcuts/${id}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName })
+  });
+  if (!res.ok) throw new Error('Failed to rename shortcut');
+}

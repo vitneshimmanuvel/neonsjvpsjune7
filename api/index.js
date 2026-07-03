@@ -1116,6 +1116,165 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { message: 'Saved dropdown deleted' });
     }
 
+    // ─── SAVED TEMPLATES ──────────────────────────────────────────────────────
+
+    // Auto-create table if needed (runs once per cold start)
+    if (pathname.startsWith('/api/saved-templates') && !globalThis._savedTemplatesTableCreated) {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS saved_templates (
+            id TEXT PRIMARY KEY,
+            business_id BIGINT NOT NULL,
+            name TEXT NOT NULL,
+            columns TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        globalThis._savedTemplatesTableCreated = true;
+      } catch (e) {
+        console.error('Failed to auto-create saved_templates table:', e);
+      }
+    }
+
+    // GET /api/saved-templates?businessId=X
+    if (pathname === '/api/saved-templates' && method === 'GET') {
+      const businessId = parseBigInt(url.searchParams.get('businessId'));
+      if (!businessId) return sendError(res, 400, 'businessId is required');
+      const result = await query('SELECT * FROM saved_templates WHERE business_id = $1 ORDER BY created_at DESC', [businessId]);
+      return sendJson(res, 200, {
+        templates: result.rows.map(r => ({
+          id: r.id,
+          businessId: Number(r.business_id),
+          name: r.name,
+          columns: typeof r.columns === 'string' ? JSON.parse(r.columns) : r.columns,
+          createdAt: r.created_at
+        }))
+      });
+    }
+
+    // POST /api/saved-templates
+    if (pathname === '/api/saved-templates' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (!data.businessId) return sendError(res, 400, 'businessId is required');
+      if (!data.name || !data.name.trim()) return sendError(res, 400, 'name is required');
+      if (!data.columns) return sendError(res, 400, 'columns are required');
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      await query(`
+        INSERT INTO saved_templates (id, business_id, name, columns, created_at)
+        VALUES ($1, $2, $3, $4, NOW())
+      `, [id, data.businessId, data.name.trim(), typeof data.columns === 'string' ? data.columns : JSON.stringify(data.columns)]);
+
+      return sendJson(res, 201, {
+        id,
+        businessId: Number(data.businessId),
+        name: data.name.trim(),
+        columns: typeof data.columns === 'string' ? JSON.parse(data.columns) : data.columns
+      });
+    }
+
+    // DELETE /api/saved-templates/:id
+    const savedTemplateMatch = pathname.match(/^\/api\/saved-templates\/(.+)$/);
+    if (savedTemplateMatch && method === 'DELETE') {
+      const templateId = savedTemplateMatch[1];
+      await query('DELETE FROM saved_templates WHERE id = $1', [templateId]);
+      return sendJson(res, 200, { message: 'Saved template deleted' });
+    }
+
+    // ─── SAVED REGISTER SHORTCUTS ────────────────────────────────────────────
+
+    // Auto-create table if needed (runs once per cold start)
+    if (pathname.startsWith('/api/saved-shortcuts') && !globalThis._savedShortcutsTableCreated) {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS saved_register_shortcuts (
+            id TEXT PRIMARY KEY,
+            business_id BIGINT NOT NULL,
+            name TEXT NOT NULL,
+            register_id BIGINT NOT NULL,
+            register_name TEXT NOT NULL,
+            search_query TEXT,
+            filters TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        globalThis._savedShortcutsTableCreated = true;
+      } catch (e) {
+        console.error('Failed to auto-create saved_register_shortcuts table:', e);
+      }
+    }
+
+    // GET /api/saved-shortcuts?businessId=X
+    if (pathname === '/api/saved-shortcuts' && method === 'GET') {
+      const businessId = parseBigInt(url.searchParams.get('businessId'));
+      if (!businessId) return sendError(res, 400, 'businessId is required');
+      const result = await query('SELECT * FROM saved_register_shortcuts WHERE business_id = $1 ORDER BY created_at DESC', [businessId]);
+      return sendJson(res, 200, {
+        shortcuts: result.rows.map(r => ({
+          id: r.id,
+          businessId: Number(r.business_id),
+          name: r.name,
+          registerId: Number(r.register_id),
+          registerName: r.register_name,
+          searchQuery: r.search_query || '',
+          filters: typeof r.filters === 'string' ? JSON.parse(r.filters) : r.filters,
+          createdAt: r.created_at
+        }))
+      });
+    }
+
+    // POST /api/saved-shortcuts
+    if (pathname === '/api/saved-shortcuts' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (!data.businessId) return sendError(res, 400, 'businessId is required');
+      if (!data.name || !data.name.trim()) return sendError(res, 400, 'name is required');
+      if (!data.registerId) return sendError(res, 400, 'registerId is required');
+      if (!data.registerName) return sendError(res, 400, 'registerName is required');
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      await query(`
+        INSERT INTO saved_register_shortcuts (id, business_id, name, register_id, register_name, search_query, filters, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      `, [
+        id, 
+        data.businessId, 
+        data.name.trim(), 
+        data.registerId, 
+        data.registerName, 
+        data.searchQuery || '', 
+        typeof data.filters === 'string' ? data.filters : JSON.stringify(data.filters || [])
+      ]);
+
+      return sendJson(res, 201, {
+        id,
+        businessId: Number(data.businessId),
+        name: data.name.trim(),
+        registerId: Number(data.registerId),
+        registerName: data.registerName,
+        searchQuery: data.searchQuery || '',
+        filters: typeof data.filters === 'string' ? JSON.parse(data.filters) : (data.filters || [])
+      });
+    }
+
+    // PUT /api/saved-shortcuts/:id
+    const savedShortcutPutMatch = pathname.match(/^\/api\/saved-shortcuts\/(.+)$/);
+    if (savedShortcutPutMatch && method === 'PUT') {
+      const shortcutId = savedShortcutPutMatch[1];
+      const data = await getRequestBody(req);
+      if (!data.name || !data.name.trim()) return sendError(res, 400, 'name is required');
+
+      await query('UPDATE saved_register_shortcuts SET name = $1 WHERE id = $2', [data.name.trim(), shortcutId]);
+      return sendJson(res, 200, { id: shortcutId, name: data.name.trim() });
+    }
+
+    // DELETE /api/saved-shortcuts/:id
+    const savedShortcutMatch = pathname.match(/^\/api\/saved-shortcuts\/(.+)$/);
+    if (savedShortcutMatch && method === 'DELETE') {
+      const shortcutId = savedShortcutMatch[1];
+      await query('DELETE FROM saved_register_shortcuts WHERE id = $1', [shortcutId]);
+      return sendJson(res, 200, { message: 'Saved shortcut deleted' });
+    }
+
     // If no route matches, return 404
     return sendError(res, 404, `Route ${pathname} not found`);
 

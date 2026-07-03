@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { listBusinesses, createBusiness, createRegister, type RegisterSummary } from '../lib/api';
+import { listBusinesses, createBusiness, createRegister, type RegisterSummary, listSavedTemplates, deleteSavedTemplate } from '../lib/api';
 import { CATEGORIES, TEMPLATES, type Template, DEFAULT_BLANK_COLUMNS } from '../lib/templates';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft, FileText, Hash, Calendar, ChevronDown, FlaskConical, Type,
   Building, GraduationCap, Store, Bus, Warehouse, Package, CalendarIcon, HeartPulse,
   Utensils, Dumbbell, Building2, User, ShieldCheck, Leaf, Plane,
   Phone, Mail, Globe, Star, CheckSquare, Image, Plus, Bookmark, Trash2
 } from 'lucide-react';
-import { useEffect } from 'react';
 
 import { CategoryCard } from '../components/templates/CategoryCard';
 import { TemplateModal } from '../components/templates/TemplateModal';
@@ -50,25 +50,32 @@ export default function TemplatesPage() {
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryId || null);
   const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null);
-  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
 
   const { data: businesses } = useQuery({ queryKey: ['businesses'], queryFn: listBusinesses });
   const businessId = businesses?.[0]?.id;
+
+  const { data: savedTemplates = [] } = useQuery({
+    queryKey: ['savedTemplates', businessId],
+    queryFn: () => listSavedTemplates(businessId!),
+    enabled: !!businessId,
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: string) => deleteSavedTemplate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['savedTemplates', businessId] });
+      toast.success('Template deleted!');
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to delete template: ${err.message}`);
+    }
+  });
 
   useEffect(() => {
     if (businesses && businesses.length === 0) {
       createBusiness('My Business').then(() => queryClient.invalidateQueries({ queryKey: ['businesses'] }));
     }
   }, [businesses, queryClient]);
-
-  useEffect(() => {
-    try {
-      const loaded = JSON.parse(localStorage.getItem('rb_saved_templates') || '[]');
-      setSavedTemplates(loaded);
-    } catch (e) {
-      console.error('Failed to load saved templates', e);
-    }
-  }, []);
 
   const createMutation = useMutation({
     mutationFn: (tpl: { name: string; columns: any[]; icon: string; iconColor?: string; category?: string }) => {
@@ -178,9 +185,7 @@ export default function TemplatesPage() {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (window.confirm(`Are you sure you want to delete the template "${tpl.name}"?`)) {
-                    const updated = savedTemplates.filter(t => t.id !== tpl.id);
-                    localStorage.setItem('rb_saved_templates', JSON.stringify(updated));
-                    setSavedTemplates(updated);
+                    deleteTemplateMutation.mutate(tpl.id);
                   }
                 }}
                 style={{
