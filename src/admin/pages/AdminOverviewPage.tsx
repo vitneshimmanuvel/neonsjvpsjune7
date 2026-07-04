@@ -346,17 +346,14 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     );
   }
 
-  const countShortcuts = shortcuts.filter(s => {
-    const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
-    return modeSetting.mode === 'count';
-  });
+  const countShortcuts = shortcuts;
 
   const sumShortcuts = shortcuts.filter(s => {
     const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
     return modeSetting.mode === 'sum' || modeSetting.mode === 'average';
   });
 
-  const renderShortcutCard = (s: SavedRegisterShortcut) => {
+  const renderShortcutCard = (s: SavedRegisterShortcut, forceCountMode = false) => {
     return (
       <div
         key={s.id}
@@ -720,7 +717,9 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
 
         {/* Middle & Bottom Row: Big entry count / sum / average & Shortcut Label */}
         {(() => {
-          const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
+          const modeSetting: { mode: 'count' | 'sum' | 'average'; columnId?: number } = forceCountMode 
+            ? { mode: 'count' } 
+            : (shortcutDisplayModes[s.id] || { mode: 'count' });
           let displayVal: string | number = '...';
           let displayLabel = 'entries';
 
@@ -763,23 +762,18 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
               <div
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (forceCountMode) {
+                    openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters);
+                    return;
+                  }
                   const data = shortcutData[s.id];
                   const numericCols = data?.columns.filter(isNumericColumn) || [];
-                  if (modeSetting.mode === 'count') {
-                    if (numericCols.length > 0) {
-                      const targetColId = modeSetting.columnId ?? numericCols[0].id;
-                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: targetColId } };
-                      setShortcutDisplayModes(nextModes);
-                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                    } else {
-                      toast.error("No numeric columns available in this register to sum.");
-                    }
-                  } else if (modeSetting.mode === 'sum') {
+                  if (modeSetting.mode === 'sum') {
                     const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: modeSetting.columnId } };
                     setShortcutDisplayModes(nextModes);
                     localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
                   } else {
-                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: modeSetting.columnId } };
+                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: modeSetting.columnId } };
                     setShortcutDisplayModes(nextModes);
                     localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
                   }
@@ -789,21 +783,25 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   alignItems: 'baseline',
                   gap: '4px',
                   flexWrap: 'wrap',
-                  cursor: 'pointer',
+                  cursor: forceCountMode ? 'default' : 'pointer',
                   userSelect: 'none',
                   padding: '2px 6px',
                   marginLeft: '-6px',
                   borderRadius: '6px',
                   transition: 'all 0.15s'
                 }}
-                title="Click to toggle Count/Sum/Average"
+                title={forceCountMode ? undefined : "Click to toggle Sum/Average"}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'var(--border-light)';
-                  e.currentTarget.style.transform = 'scale(1.02)';
+                  if (!forceCountMode) {
+                    e.currentTarget.style.background = 'var(--border-light)';
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                  }
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'none';
-                  e.currentTarget.style.transform = 'none';
+                  if (!forceCountMode) {
+                    e.currentTarget.style.background = 'none';
+                    e.currentTarget.style.transform = 'none';
+                  }
                 }}
               >
                 <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
@@ -1002,7 +1000,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             </div>
 
             {/* Saved Shortcuts */}
-            {countShortcuts.map(s => renderShortcutCard(s))}
+            {countShortcuts.map(s => renderShortcutCard(s, true))}
           </div>
 
           {/* All Registers list - toggled by the plus box */}
