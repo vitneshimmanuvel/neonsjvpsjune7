@@ -2430,8 +2430,8 @@ function getFilteredEntriesCount(
   const preparedFilters = filters.map(f => ({
     ...f,
     lFilter: (f.value || '').toLowerCase(),
-    nValue: parseFloat(f.value),
-    nValue2: parseFloat(f.value2 || '0'),
+    nValue: parseFloat((f.value || '').replace(/[^0-9.-]/g, '')),
+    nValue2: parseFloat((f.value2 || '0').replace(/[^0-9.-]/g, '')),
     dValue: f.value,
     dValue2: f.value2 || '',
     values: f.values || [],
@@ -2462,6 +2462,7 @@ function getFilteredEntriesCount(
         const f = preparedFilters[j];
         const val = (e.cells?.[f.columnId.toString()] || '').trim();
         const lVal = val.toLowerCase();
+        const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
         let cond = true;
         switch (f.operator) {
           case 'contains': cond = lVal.includes(f.lFilter); break;
@@ -2470,12 +2471,12 @@ function getFilteredEntriesCount(
           case 'not_equals': cond = lVal !== f.lFilter; break;
           case 'starts_with': cond = lVal.startsWith(f.lFilter); break;
           case 'ends_with': cond = lVal.endsWith(f.lFilter); break;
-          case 'eq': cond = parseFloat(val) === f.nValue; break;
-          case 'gt': cond = parseFloat(val) > f.nValue; break;
-          case 'gte': cond = parseFloat(val) >= f.nValue; break;
-          case 'lt': cond = parseFloat(val) < f.nValue; break;
-          case 'lte': cond = parseFloat(val) <= f.nValue; break;
-          case 'between': { const n = parseFloat(val); cond = n >= f.nValue && n <= f.nValue2; break; }
+          case 'eq': cond = !isNaN(valNum) && valNum === f.nValue; break;
+          case 'gt': cond = !isNaN(valNum) && valNum > f.nValue; break;
+          case 'gte': cond = !isNaN(valNum) && valNum >= f.nValue; break;
+          case 'lt': cond = !isNaN(valNum) && valNum < f.nValue; break;
+          case 'lte': cond = !isNaN(valNum) && valNum <= f.nValue; break;
+          case 'between': { cond = !isNaN(valNum) && valNum >= f.nValue && valNum <= f.nValue2; break; }
           case 'date_is': cond = parseDateString(val) === f.dValue; break;
           case 'date_before': cond = parseDateString(val) < f.dValue; break;
           case 'date_after': cond = parseDateString(val) > f.dValue; break;
@@ -2508,8 +2509,8 @@ function getFilteredEntriesList(
   const preparedFilters = filters.map(f => ({
     ...f,
     lFilter: (f.value || '').toLowerCase(),
-    nValue: parseFloat(f.value),
-    nValue2: parseFloat(f.value2 || '0'),
+    nValue: parseFloat((f.value || '').replace(/[^0-9.-]/g, '')),
+    nValue2: parseFloat((f.value2 || '0').replace(/[^0-9.-]/g, '')),
     dValue: f.value,
     dValue2: f.value2 || '',
     values: f.values || [],
@@ -2540,6 +2541,7 @@ function getFilteredEntriesList(
         const f = preparedFilters[j];
         const val = (e.cells?.[f.columnId.toString()] || '').trim();
         const lVal = val.toLowerCase();
+        const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
         let cond = true;
         switch (f.operator) {
           case 'contains': cond = lVal.includes(f.lFilter); break;
@@ -2548,12 +2550,12 @@ function getFilteredEntriesList(
           case 'not_equals': cond = lVal !== f.lFilter; break;
           case 'starts_with': cond = lVal.startsWith(f.lFilter); break;
           case 'ends_with': cond = lVal.endsWith(f.lFilter); break;
-          case 'eq': cond = parseFloat(val) === f.nValue; break;
-          case 'gt': cond = parseFloat(val) > f.nValue; break;
-          case 'gte': cond = parseFloat(val) >= f.nValue; break;
-          case 'lt': cond = parseFloat(val) < f.nValue; break;
-          case 'lte': cond = parseFloat(val) <= f.nValue; break;
-          case 'between': { const n = parseFloat(val); cond = n >= f.nValue && n <= f.nValue2; break; }
+          case 'eq': cond = !isNaN(valNum) && valNum === f.nValue; break;
+          case 'gt': cond = !isNaN(valNum) && valNum > f.nValue; break;
+          case 'gte': cond = !isNaN(valNum) && valNum >= f.nValue; break;
+          case 'lt': cond = !isNaN(valNum) && valNum < f.nValue; break;
+          case 'lte': cond = !isNaN(valNum) && valNum <= f.nValue; break;
+          case 'between': { cond = !isNaN(valNum) && valNum >= f.nValue && valNum <= f.nValue2; break; }
           case 'date_is': cond = parseDateString(val) === f.dValue; break;
           case 'date_before': cond = parseDateString(val) < f.dValue; break;
           case 'date_after': cond = parseDateString(val) > f.dValue; break;
@@ -2771,13 +2773,13 @@ function RegisterDetailPanel({
       if (!col) continue;
 
       const lFilter = (f.value || '').toLowerCase();
-      const nValue = parseFloat(f.value);
+      const nValue = parseFloat((f.value || '').replace(/[^0-9.-]/g, ''));
       const values = f.values || [];
 
       currentEntries = currentEntries.filter(entry => {
         const val = (entry.cells?.[col.id.toString()] || '').trim();
         const valLower = val.toLowerCase();
-        const valNum = parseFloat(val);
+        const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
 
         switch (f.operator) {
           case 'contains': return valLower.includes(lFilter);
@@ -2812,8 +2814,8 @@ function RegisterDetailPanel({
     const preparedFilters = detailFilters.map(f => ({
       ...f,
       lFilter: (f.value || '').toLowerCase(),
-      nValue: parseFloat(f.value),
-      nValue2: parseFloat(f.value2 || '0'),
+      nValue: parseFloat((f.value || '').replace(/[^0-9.-]/g, '')),
+      nValue2: parseFloat((f.value2 || '0').replace(/[^0-9.-]/g, '')),
       dValue: f.value,
       dValue2: f.value2 || '',
       values: f.values || [],
@@ -2844,6 +2846,7 @@ function RegisterDetailPanel({
           const f = preparedFilters[j];
           const val = (e.cells?.[f.columnId.toString()] || '').trim();
           const lVal = val.toLowerCase();
+          const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
           let cond = true;
           switch (f.operator) {
             case 'contains': cond = lVal.includes(f.lFilter); break;
@@ -2852,12 +2855,12 @@ function RegisterDetailPanel({
             case 'not_equals': cond = lVal !== f.lFilter; break;
             case 'starts_with': cond = lVal.startsWith(f.lFilter); break;
             case 'ends_with': cond = lVal.endsWith(f.lFilter); break;
-            case 'eq': cond = parseFloat(val) === f.nValue; break;
-            case 'gt': cond = parseFloat(val) > f.nValue; break;
-            case 'gte': cond = parseFloat(val) >= f.nValue; break;
-            case 'lt': cond = parseFloat(val) < f.nValue; break;
-            case 'lte': cond = parseFloat(val) <= f.nValue; break;
-            case 'between': { const n = parseFloat(val); cond = n >= f.nValue && n <= f.nValue2; break; }
+            case 'eq': cond = !isNaN(valNum) && valNum === f.nValue; break;
+            case 'gt': cond = !isNaN(valNum) && valNum > f.nValue; break;
+            case 'gte': cond = !isNaN(valNum) && valNum >= f.nValue; break;
+            case 'lt': cond = !isNaN(valNum) && valNum < f.nValue; break;
+            case 'lte': cond = !isNaN(valNum) && valNum <= f.nValue; break;
+            case 'between': { cond = !isNaN(valNum) && valNum >= f.nValue && valNum <= f.nValue2; break; }
             case 'date_is': cond = parseDateString(val) === f.dValue; break;
             case 'date_before': cond = parseDateString(val) < f.dValue; break;
             case 'date_after': cond = parseDateString(val) > f.dValue; break;

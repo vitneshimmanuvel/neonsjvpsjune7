@@ -1056,8 +1056,8 @@ export default function RegisterPage() {
     const preparedFilters = deferredActiveFilters.map(f => ({
       ...f,
       lFilter: (f.value || '').toLowerCase(),
-      nValue: parseFloat(f.value),
-      nValue2: parseFloat(f.value2 || '0'),
+      nValue: parseFloat((f.value || '').replace(/[^0-9.-]/g, '')),
+      nValue2: parseFloat((f.value2 || '0').replace(/[^0-9.-]/g, '')),
       dValue: f.value, // Date filters use YYYY-MM-DD string
       dValue2: f.value2 || '',
       values: f.values || [],
@@ -1107,6 +1107,7 @@ export default function RegisterPage() {
             const f = preparedFilters[j];
             const val = (e.cells?.[f.columnId.toString()] || '').trim();
             const lVal = val.toLowerCase();
+            const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
 
             let condition = true;
             switch (f.operator) {
@@ -1116,19 +1117,17 @@ export default function RegisterPage() {
               case 'not_equals': condition = lVal !== f.lFilter; break;
               case 'starts_with': condition = lVal.startsWith(f.lFilter); break;
               case 'ends_with': condition = lVal.endsWith(f.lFilter); break;
-              case 'eq': condition = parseFloat(val) === f.nValue; break;
-              case 'gt': condition = parseFloat(val) > f.nValue; break;
-              case 'gte': condition = parseFloat(val) >= f.nValue; break;
-              case 'lt': condition = parseFloat(val) < f.nValue; break;
-              case 'lte': condition = parseFloat(val) <= f.nValue; break;
+              case 'eq': condition = !isNaN(valNum) && valNum === f.nValue; break;
+              case 'gt': condition = !isNaN(valNum) && valNum > f.nValue; break;
+              case 'gte': condition = !isNaN(valNum) && valNum >= f.nValue; break;
+              case 'lt': condition = !isNaN(valNum) && valNum < f.nValue; break;
+              case 'lte': condition = !isNaN(valNum) && valNum <= f.nValue; break;
               case 'between': {
-                const n = parseFloat(val);
-                condition = n >= f.nValue && n <= f.nValue2;
+                condition = !isNaN(valNum) && valNum >= f.nValue && valNum <= f.nValue2;
                 break;
               }
               case 'not_between': {
-                const n = parseFloat(val);
-                condition = n < f.nValue || n > f.nValue2;
+                condition = !isNaN(valNum) && (valNum < f.nValue || valNum > f.nValue2);
                 break;
               }
               case 'date_is': condition = parseDateString(val) === f.dValue; break;
