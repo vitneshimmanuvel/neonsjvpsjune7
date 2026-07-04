@@ -392,8 +392,14 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
         setAllRegisters(regs);
         setShortcuts(dbShortcuts);
         if (dbConfig && dbConfig.configuredSumMetrics && dbConfig.configuredSumMetrics.length > 0) {
-          setConfiguredSumMetrics(dbConfig.configuredSumMetrics);
-          localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(dbConfig.configuredSumMetrics));
+          const typedMetrics: ConfiguredSumMetric[] = dbConfig.configuredSumMetrics.map((m: any) => ({
+            id: String(m.id),
+            shortcutId: String(m.shortcutId),
+            columnId: Number(m.columnId),
+            mode: (m.mode === 'average' ? 'average' : 'sum') as 'sum' | 'average'
+          }));
+          setConfiguredSumMetrics(typedMetrics);
+          localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(typedMetrics));
         }
         if (dbConfig && dbConfig.shortcutsOrder && dbConfig.shortcutsOrder.length > 0) {
           setShortcutsOrder(dbConfig.shortcutsOrder);
@@ -1411,7 +1417,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             <div
               onClick={(e) => {
                 e.stopPropagation();
-                const nextMode = metric.mode === 'sum' ? 'average' : 'sum';
+                const nextMode: 'sum' | 'average' = metric.mode === 'sum' ? 'average' : 'sum';
                 const updated = configuredSumMetrics.map(m =>
                   m.id === metric.id ? { ...m, mode: nextMode } : m
                 );
