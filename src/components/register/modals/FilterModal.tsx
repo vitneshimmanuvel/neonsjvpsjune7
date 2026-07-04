@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, X, ChevronRight, Filter, Plus, ChevronDown } from 'lucide-react';
-import { type Column } from '../../../lib/api';
+import { type Column, evaluateFormula } from '../../../lib/api';
 import { ColumnIcon } from '../ColumnIcon';
 
 
@@ -99,7 +99,11 @@ export function FilterModal({
     if (filters.length === 0) return entries;
     return entries.filter(e => {
       for (const f of filters) {
-        const val = (e.cells?.[f.columnId.toString()] || '').trim();
+        // For formula columns, compute the value dynamically
+        const filterCol = columns.find(c => c.id === f.columnId);
+        const val = (filterCol?.type === 'formula' && filterCol.formula)
+          ? evaluateFormula(filterCol.formula, e, columns).trim()
+          : (e.cells?.[f.columnId.toString()] || '').trim();
         const lVal = val.toLowerCase();
         const lFilter = (f.value || '').toLowerCase();
         const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
@@ -129,18 +133,24 @@ export function FilterModal({
       }
       return true;
     });
-  }, [entries, filters]);
+  }, [entries, filters, columns]);
 
   const uniqueValues = useMemo(() => {
     if (!selectedColId) return [];
     const set = new Set<string>();
     const colIdStr = selectedColId.toString();
+    const col = columns.find(c => c.id === selectedColId);
     preFilteredEntries.forEach(e => {
-      const val = e.cells?.[colIdStr];
+      let val: string | undefined;
+      if (col?.type === 'formula' && col.formula) {
+        val = evaluateFormula(col.formula, e, columns);
+      } else {
+        val = e.cells?.[colIdStr];
+      }
       if (val && val.trim()) set.add(val.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [selectedColId, preFilteredEntries]);
+  }, [selectedColId, preFilteredEntries, columns]);
 
   const selectedCol = columns.find(c => c.id === selectedColId);
   const ops = selectedCol ? getOpsForType(selectedCol.type) : [];

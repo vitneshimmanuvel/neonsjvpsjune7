@@ -1105,7 +1105,14 @@ export default function RegisterPage() {
           let passFilters = true;
           for (let j = 0; j < filterLen; j++) {
             const f = preparedFilters[j];
-            const val = (e.cells?.[f.columnId.toString()] || '').trim();
+            // For formula columns, compute the value dynamically instead of reading from cells
+            const filterCol = columns.find(c => c.id === f.columnId);
+            let val: string;
+            if (filterCol?.type === 'formula' && filterCol.formula) {
+              val = evaluateFormula(filterCol.formula, e, columns).trim();
+            } else {
+              val = (e.cells?.[f.columnId.toString()] || '').trim();
+            }
             const lVal = val.toLowerCase();
             const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
 
