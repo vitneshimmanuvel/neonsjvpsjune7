@@ -114,11 +114,16 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
 
   const [renamingShortcut, setRenamingShortcut] = useState<SavedRegisterShortcut | null>(null);
   const [renameShortcutName, setRenameShortcutName] = useState('');
-  // Detail panel
   const [detailReg, setDetailReg] = useState<{ id: number; name: string } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailColumns, setDetailColumns] = useState<Column[]>([]);
   const [detailEntries, setDetailEntries] = useState<Entry[]>([]);
+
+  // Shortcut Sums creation states
+  const [showSumRegistersList, setShowSumRegistersList] = useState(false);
+  const [addingSumReg, setAddingSumReg] = useState<RegisterSummary | null>(null);
+  const [addingSumCols, setAddingSumCols] = useState<Column[]>([]);
+  const [loadingSumCols, setLoadingSumCols] = useState(false);
 
   const loadData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -1026,7 +1031,11 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
           }}>
             {/* The Plus Box for Sums Section */}
             <div
-              onClick={() => setShowAllRegisters(v => !v)}
+              onClick={() => {
+                setShowSumRegistersList(v => !v);
+                setAddingSumReg(null);
+                setAddingSumCols([]);
+              }}
               className="admin-card-glass"
               style={{
                 border: '2px dashed var(--brand-green)',
@@ -1054,7 +1063,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             >
               <Plus size={28} color="var(--brand-green)" />
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-green)' }}>
-                {showAllRegisters ? 'Hide All Registers' : 'See All Registers'}
+                {showSumRegistersList ? 'Hide Sum Config' : 'Configure Sum Metric'}
               </span>
             </div>
 
@@ -1088,6 +1097,137 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
               sumShortcuts.map(s => renderShortcutCard(s))
             )}
           </div>
+
+          {/* Sums Registers list - toggled by the sums plus box */}
+          {showSumRegistersList && (
+            <div className="admin-animate-fade-in" style={{ marginTop: '16px' }}>
+              <div className="admin-card-glass" style={{ padding: '20px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: 'var(--navy)' }}>
+                    Select a Register with Active Filters to Configure Sum Metric
+                  </h4>
+                </div>
+                
+                {/* List of filtered registers */}
+                {(() => {
+                  const filteredRegs = allRegisters.filter(r => 
+                    shortcuts.some(s => s.registerId === r.id && s.filters && s.filters.length > 0)
+                  );
+
+                  if (filteredRegs.length === 0) {
+                    return (
+                      <div style={{ padding: '12px', color: 'var(--muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                        No registers currently have shortcuts with active filters. 
+                        Please create a filtered shortcut in the workspace first.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                      {filteredRegs.map(reg => {
+                        const matchingShortcuts = shortcuts.filter(s => s.registerId === reg.id && s.filters && s.filters.length > 0);
+                        return (
+                          <div
+                            key={reg.id}
+                            onClick={async () => {
+                              setAddingSumReg(reg);
+                              setLoadingSumCols(true);
+                              try {
+                                const full = await getRegister(reg.id);
+                                setAddingSumCols((full.columns || []).filter(isNumericColumn));
+                              } catch (err) {
+                                console.error('Failed to load columns:', err);
+                                toast.error('Failed to load columns for the selected register');
+                              } finally {
+                                setLoadingSumCols(false);
+                              }
+                            }}
+                            className="admin-list-item-hover"
+                            style={{
+                              border: addingSumReg?.id === reg.id ? '2px solid var(--brand-green)' : '1px solid var(--border)',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px',
+                              background: 'var(--surface)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <FileSpreadsheet size={16} color="var(--brand-green)" />
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>{reg.name}</span>
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 500 }}>
+                              {matchingShortcuts.length} filtered shortcut{matchingShortcuts.length > 1 ? 's' : ''} available
+                            </div>
+                            {matchingShortcuts.map((ms, idx) => (
+                              <div key={ms.id} style={{ fontSize: '10px', color: 'var(--accent)', marginLeft: '12px' }}>
+                                • {ms.name} ({ms.filters.length} filters)
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {/* Column Selection Sub-panel */}
+                {addingSumReg && (
+                  <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }} className="admin-animate-fade-in">
+                    <h5 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 800, color: 'var(--navy)' }}>
+                      Choose Column for Sum: <span style={{ color: 'var(--brand-green)' }}>{addingSumReg.name}</span>
+                    </h5>
+
+                    {loadingSumCols ? (
+                      <div style={{ fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                        Loading available columns...
+                      </div>
+                    ) : addingSumCols.length === 0 ? (
+                      <div style={{ fontSize: '12px', color: 'var(--danger)', fontStyle: 'italic' }}>
+                        No numeric/summable columns found in this register.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {addingSumCols.map(col => (
+                          <button
+                            key={col.id}
+                            onClick={() => {
+                              // Find first filtered shortcut
+                              const targetShortcut = shortcuts.find(s => s.registerId === addingSumReg.id && s.filters && s.filters.length > 0);
+                              if (targetShortcut) {
+                                const nextModes = { ...shortcutDisplayModes, [targetShortcut.id]: { mode: 'sum' as const, columnId: col.id } };
+                                setShortcutDisplayModes(nextModes);
+                                localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                toast.success(`Added display of Sum of ${col.name} to dashboard`);
+                              }
+                              // reset
+                              setAddingSumReg(null);
+                              setAddingSumCols([]);
+                              setShowSumRegistersList(false);
+                            }}
+                            className="admin-btn-secondary-flat"
+                            style={{
+                              padding: '8px 14px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Sum of {col.name} ({col.type || 'number'})
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
