@@ -1024,14 +1024,48 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
             gap: '16px'
           }}>
+            {/* The Plus Box for Sums Section */}
+            <div
+              onClick={() => setShowAllRegisters(v => !v)}
+              className="admin-card-glass"
+              style={{
+                border: '2px dashed var(--brand-green)',
+                background: 'rgba(16,185,129,0.01)',
+                borderRadius: '12px',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                minHeight: '120px',
+                transition: 'all 0.2s',
+                gap: '8px',
+                boxSizing: 'border-box'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(16,185,129,0.04)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(16,185,129,0.01)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <Plus size={28} color="var(--brand-green)" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand-green)' }}>
+                {showAllRegisters ? 'Hide All Registers' : 'See All Registers'}
+              </span>
+            </div>
+
             {sumShortcuts.length === 0 ? (
               <div 
                 className="admin-card-glass"
                 style={{
-                  gridColumn: '1 / -1',
+                  gridColumn: 'span 2',
                   border: '1.5px dashed var(--border)',
                   borderRadius: '12px',
-                  padding: '24px',
+                  padding: '20px 24px',
                   textAlign: 'center',
                   color: 'var(--muted)',
                   fontSize: '13px',
@@ -1039,7 +1073,10 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '8px'
+                  justifyContent: 'center',
+                  gap: '8px',
+                  minHeight: '120px',
+                  boxSizing: 'border-box'
                 }}
               >
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--navy)' }}>No shortcut sums configured</div>
