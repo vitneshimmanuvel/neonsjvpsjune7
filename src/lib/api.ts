@@ -3075,3 +3075,23 @@ export async function renameSavedShortcut(id: string, newName: string): Promise<
   });
   if (!res.ok) throw new Error('Failed to rename shortcut');
 }
+
+export interface DashboardConfig {
+  configuredSumMetrics: any[];
+  shortcutsOrder: string[];
+}
+
+export async function getDashboardConfig(businessId: number): Promise<DashboardConfig> {
+  const res = await fetch(apiUrl(`/api/dashboard-config?businessId=${businessId}`));
+  if (!res.ok) throw new Error('Failed to fetch dashboard configuration');
+  return res.json();
+}
+
+export async function saveDashboardConfig(businessId: number, configuredSumMetrics: any[], shortcutsOrder: string[]): Promise<void> {
+  const res = await fetch(apiUrl('/api/dashboard-config'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ businessId, configuredSumMetrics, shortcutsOrder })
+  });
+  if (!res.ok) throw new Error('Failed to save dashboard configuration');
+}

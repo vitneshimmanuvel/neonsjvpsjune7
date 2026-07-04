@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
@@ -8,7 +8,7 @@ import {
   firebaseGetPendingDownloadRequests,
   firebaseRespondRequest
 } from '../../lib/firebaseAuth';
-import { listBusinesses, listRegisters, deleteRegister, listDeletedRegisters, getAllDeletedItems, getRegister, type RegisterSummary, type Column, type Entry, listSavedShortcuts, createSavedShortcut, deleteSavedShortcut, type SavedRegisterShortcut, renameSavedShortcut } from '../../lib/api';
+import { listBusinesses, listRegisters, deleteRegister, listDeletedRegisters, getAllDeletedItems, getRegister, type RegisterSummary, type Column, type Entry, listSavedShortcuts, createSavedShortcut, deleteSavedShortcut, type SavedRegisterShortcut, renameSavedShortcut, evaluateFormula, getDashboardConfig, saveDashboardConfig } from '../../lib/api';
 import { cleanActivityLogs } from '../../lib/activityHelper';
 import {
   LayoutDashboard, Users, Activity, ShieldAlert, FileSpreadsheet,
@@ -37,6 +37,13 @@ interface PendingRequest {
   createdAt: string;
 }
 
+interface ConfiguredSumMetric {
+  id: string;
+  shortcutId: string;
+  columnId: number;
+  mode: 'sum' | 'average';
+}
+
 const ACTION_ICONS: Record<string, any> = {
   login: <LogInIcon size={14} color="#10b981" />,
   admin_login: <ShieldIcon size={14} color="#ef4444" />,
@@ -55,6 +62,108 @@ function EditIcon(props: any) { return <Activity {...props} />; }
 function PlusIcon(props: any) { return <Activity {...props} />; }
 function TrashIcon(props: any) { return <Activity {...props} />; }
 function DownloadIcon(props: any) { return <Activity {...props} />; }
+
+// Helper to render user initials avatar
+const renderUserAvatar = (name: string, size = 28) => {
+  const firstChar = name ? name.charAt(0).toUpperCase() : 'U';
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colors = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+  const color = colors[Math.abs(hash) % colors.length];
+  return (
+    <div style={{
+      width: `${size}px`, height: `${size}px`, borderRadius: '50%', backgroundColor: color,
+      color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size > 24 ? '11px' : '9.5px', fontWeight: 800, flexShrink: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}>
+      {firstChar}
+    </div>
+  );
+};
+
+// Helper to format activity details nicely with inline elements and badges
+const renderActivityDetails = (details: string) => {
+  // Check for "Updated row #XXX in "RegisterName": Column changed from "Old" to "New""
+  const updateRowRegex = /^Updated row #(\d+) in "([^"]+)":\s+([a-zA-Z0-9_\s/\-()]+)\s+changed from\s+([\s\S]*?)\s+to\s+([\s\S]*)$/;
+  const match = details.match(updateRowRegex);
+  if (match) {
+    const [_, rowNum, registerName, colName, oldVal, newVal] = match;
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)', lineHeight: '1.5' }}>
+        <span>Updated</span>
+        <span style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+          Row #{rowNum}
+        </span>
+        <span>in</span>
+        <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+          {registerName}
+        </span>
+        <span>:</span>
+        <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{colName}</span>
+        <span style={{ color: 'var(--muted)', fontSize: '11.5px' }}>changed from</span>
+        <span style={{ background: 'var(--border-light)', color: 'var(--muted)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', textDecoration: 'line-through', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {oldVal === '""' || !oldVal ? '""' : oldVal}
+        </span>
+        <span style={{ color: 'var(--muted)' }}>➔</span>
+        <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {newVal === '""' || !newVal ? '""' : newVal}
+        </span>
+      </div>
+    );
+  }
+
+  // Check for "Added new row #XXX in "RegisterName""
+  const addRowRegex = /^Added new row #(\d+) in "([^"]+)"/;
+  const matchAdd = details.match(addRowRegex);
+  if (matchAdd) {
+    const [_, rowNum, registerName] = matchAdd;
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)' }}>
+        <span style={{ color: 'var(--brand-green)', fontWeight: 700 }}>Added new row</span>
+        <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+          Row #{rowNum}
+        </span>
+        <span>in</span>
+        <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+          {registerName}
+        </span>
+      </div>
+    );
+  }
+
+  // Check for "Deleted row #XXX from "RegisterName""
+  const deleteRowRegex = /^Deleted row #(\d+) from "([^"]+)"/;
+  const matchDelete = details.match(deleteRowRegex);
+  if (matchDelete) {
+    const [_, rowNum, registerName] = matchDelete;
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)' }}>
+        <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Deleted row</span>
+        <span style={{ background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+          Row #{rowNum}
+        </span>
+        <span>from</span>
+        <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+          {registerName}
+        </span>
+      </div>
+    );
+  }
+
+  const parts = details.split(/(".*?")/g);
+  return (
+    <div style={{ fontSize: '13px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4 }}>
+      {parts.map((part, i) => {
+        if (part.startsWith('"') && part.endsWith('"')) {
+          return <strong key={i} style={{ color: 'var(--navy)', fontWeight: 700 }}>{part.replace(/"/g, '')}</strong>;
+        }
+        return part;
+      })}
+    </div>
+  );
+};
 
 export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (tab: any) => void }) {
   const { user } = useAuth();
@@ -83,23 +192,142 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   const [initialFilters, setInitialFilters] = useState<Array<{ columnId: number; operator: string; value: string; values?: string[] }>>([]);
   const [businessId, setBusinessId] = useState<number>(1);
   const [shortcuts, setShortcuts] = useState<SavedRegisterShortcut[]>([]);
+  const [countShortcutSearch, setCountShortcutSearch] = useState('');
+  const [sumShortcutSearch, setSumShortcutSearch] = useState('');
   const [shortcutCounts, setShortcutCounts] = useState<Record<string, number>>({});
   const [shortcutData, setShortcutData] = useState<Record<string, { columns: Column[]; filteredEntries: Entry[] }>>({});
-  const [shortcutDisplayModes, setShortcutDisplayModes] = useState<Record<string, { mode: 'count' | 'sum' | 'average'; columnId?: number }>>(() => {
+  const [configuredSumMetrics, setConfiguredSumMetrics] = useState<ConfiguredSumMetric[]>(() => {
     try {
-      const saved = localStorage.getItem('dashboard_shortcut_display_modes');
-      return saved ? JSON.parse(saved) : {};
+      const saved = localStorage.getItem('dashboard_configured_sum_metrics');
+      if (saved) return JSON.parse(saved);
+      
+      // Fallback/Migration: scan shortcutDisplayModes for existing sum/average configurations
+      const displayModesSaved = localStorage.getItem('dashboard_shortcut_display_modes');
+      if (displayModesSaved) {
+        const modes = JSON.parse(displayModesSaved);
+        const migrated: ConfiguredSumMetric[] = [];
+        Object.entries(modes).forEach(([shId, config]: [string, any]) => {
+          if (config && (config.mode === 'sum' || config.mode === 'average') && config.columnId !== undefined) {
+            migrated.push({
+              id: `sum-metric-${shId}`,
+              shortcutId: shId,
+              columnId: config.columnId,
+              mode: config.mode
+            });
+          }
+        });
+        if (migrated.length > 0) {
+          localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(migrated));
+          return migrated;
+        }
+      }
+      return [];
     } catch {
-      return {};
+      return [];
     }
   });
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<'sum' | 'average' | null>(null);
+  const activeSumMetrics = useMemo(() => {
+    return configuredSumMetrics.filter(metric => shortcuts.some(s => s.id === metric.shortcutId));
+  }, [configuredSumMetrics, shortcuts]);
+
+  const filteredSumMetrics = useMemo(() => {
+    return activeSumMetrics.filter(metric => {
+      const s = shortcuts.find(sh => sh.id === metric.shortcutId);
+      if (!s) return false;
+      return !sumShortcutSearch.trim() ||
+        s.name.toLowerCase().includes(sumShortcutSearch.toLowerCase()) ||
+        s.registerName.toLowerCase().includes(sumShortcutSearch.toLowerCase());
+    });
+  }, [activeSumMetrics, shortcuts, sumShortcutSearch]);
+
+  const [shortcutsOrder, setShortcutsOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_shortcuts_order');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [draggedShortcutIndex, setDraggedShortcutIndex] = useState<number | null>(null);
+  const [draggedSumIndex, setDraggedSumIndex] = useState<number | null>(null);
+
+  const filteredCountShortcuts = useMemo(() => {
+    const list = shortcuts.filter(s => 
+      !countShortcutSearch.trim() || 
+      s.name.toLowerCase().includes(countShortcutSearch.toLowerCase()) ||
+      s.registerName.toLowerCase().includes(countShortcutSearch.toLowerCase())
+    );
+    if (shortcutsOrder.length > 0) {
+      return [...list].sort((a, b) => {
+        const idxA = shortcutsOrder.indexOf(a.id);
+        const idxB = shortcutsOrder.indexOf(b.id);
+        if (idxA === -1 && idxB === -1) return 0;
+        if (idxA === -1) return 1;
+        if (idxB === -1) return -1;
+        return idxA - idxB;
+      });
+    }
+    return list;
+  }, [shortcuts, countShortcutSearch, shortcutsOrder]);
+
+  const handleDragStartCount = (e: React.DragEvent, index: number) => {
+    setDraggedShortcutIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOverCount = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedShortcutIndex === null || draggedShortcutIndex === index) return;
+    
+    const items = [...filteredCountShortcuts];
+    const draggedItem = items[draggedShortcutIndex];
+    items.splice(draggedShortcutIndex, 1);
+    items.splice(index, 0, draggedItem);
+    
+    const newOrder = items.map(item => item.id);
+    setShortcutsOrder(newOrder);
+    localStorage.setItem('dashboard_shortcuts_order', JSON.stringify(newOrder));
+    setDraggedShortcutIndex(index);
+  };
+
+  const handleDragEndCount = () => {
+    setDraggedShortcutIndex(null);
+  };
+
+  const handleDragStartSum = (e: React.DragEvent, index: number) => {
+    setDraggedSumIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOverSum = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedSumIndex === null || draggedSumIndex === index) return;
+    
+    const items = [...filteredSumMetrics];
+    const draggedItem = items[draggedSumIndex];
+    items.splice(draggedSumIndex, 1);
+    items.splice(index, 0, draggedItem);
+    
+    const remainingInactive = configuredSumMetrics.filter(m => !shortcuts.some(s => s.id === m.shortcutId));
+    const newConfigured = [...items, ...remainingInactive];
+    
+    setConfiguredSumMetrics(newConfigured);
+    localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(newConfigured));
+    setDraggedSumIndex(index);
+  };
+
+  const handleDragEndSum = () => {
+    setDraggedSumIndex(null);
+  };
 
   useEffect(() => {
     // When menu changes, auto-expand the section containing the current mode
     if (activeMenuId) {
-      const currentModeSetting = shortcutDisplayModes[activeMenuId]?.mode;
+      const metric = configuredSumMetrics.find(m => m.id === activeMenuId);
+      const currentModeSetting = metric?.mode;
       if (currentModeSetting === 'sum') {
         setExpandedSection('sum');
       } else if (currentModeSetting === 'average') {
@@ -110,7 +338,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     } else {
       setExpandedSection(null);
     }
-  }, [activeMenuId, shortcutDisplayModes]);
+  }, [activeMenuId, configuredSumMetrics]);
 
   const [renamingShortcut, setRenamingShortcut] = useState<SavedRegisterShortcut | null>(null);
   const [renameShortcutName, setRenameShortcutName] = useState('');
@@ -124,6 +352,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   const [addingSumReg, setAddingSumReg] = useState<RegisterSummary | null>(null);
   const [addingSumCols, setAddingSumCols] = useState<Column[]>([]);
   const [loadingSumCols, setLoadingSumCols] = useState(false);
+  const [sumRegSearch, setSumRegSearch] = useState('');
 
   const loadData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -152,15 +381,24 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
         const busList = await listBusinesses();
         const busId = busList[0]?.id || 1;
         setBusinessId(busId);
-        const [regs, deletedRegs, deletedRowsCols, dbShortcuts] = await Promise.all([
+        const [regs, deletedRegs, deletedRowsCols, dbShortcuts, dbConfig] = await Promise.all([
           listRegisters(busId),
           listDeletedRegisters(busId),
           getAllDeletedItems(busId),
-          listSavedShortcuts(busId)
+          listSavedShortcuts(busId),
+          getDashboardConfig(busId).catch(() => ({ configuredSumMetrics: [], shortcutsOrder: [] }))
         ]);
         registersCount = regs.length;
         setAllRegisters(regs);
         setShortcuts(dbShortcuts);
+        if (dbConfig && dbConfig.configuredSumMetrics && dbConfig.configuredSumMetrics.length > 0) {
+          setConfiguredSumMetrics(dbConfig.configuredSumMetrics);
+          localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(dbConfig.configuredSumMetrics));
+        }
+        if (dbConfig && dbConfig.shortcutsOrder && dbConfig.shortcutsOrder.length > 0) {
+          setShortcutsOrder(dbConfig.shortcutsOrder);
+          localStorage.setItem('dashboard_shortcuts_order', JSON.stringify(dbConfig.shortcutsOrder));
+        }
         recycleBinCount = (deletedRegs?.length || 0) + (deletedRowsCols?.length || 0);
       } catch (err) {
         console.error('Error fetching registers or recycle bin counts:', err);
@@ -221,6 +459,25 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     };
     loadCounts();
   }, [shortcuts]);
+
+  // Synchronize dashboard configuration changes to backend Postgres database
+  const firstSyncRef = useRef(true);
+  useEffect(() => {
+    if (firstSyncRef.current) {
+      firstSyncRef.current = false;
+      return;
+    }
+    const saveConfig = async () => {
+      try {
+        await saveDashboardConfig(businessId, configuredSumMetrics, shortcutsOrder);
+      } catch (e) {
+        console.error('Failed to sync dashboard config to database:', e);
+      }
+    };
+    if (businessId) {
+      saveConfig();
+    }
+  }, [configuredSumMetrics, shortcutsOrder, businessId]);
 
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -321,6 +578,70 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       toast.error(`Failed to rename shortcut: ${e.message}`);
     }
   };
+ 
+  const handleExportShortcutExcel = async (s: SavedRegisterShortcut) => {
+    const data = shortcutData[s.id];
+    if (!data || data.filteredEntries.length === 0) {
+      toast.error('No data available to export');
+      return;
+    }
+
+    try {
+      const XLSX = await import('xlsx');
+
+      const dataAOA: any[][] = [];
+      // Title row
+      dataAOA.push([s.registerName]);
+      dataAOA.push([`Shortcut: ${s.name}`]);
+      dataAOA.push([`Exported on ${new Date().toLocaleString()} (Filtered)`]);
+      dataAOA.push([]); // blank row
+
+      // Header
+      const headerRow = ['S.No', ...data.columns.map(c => c.name)];
+      dataAOA.push(headerRow);
+
+      // Data rows
+      data.filteredEntries.forEach((entry, idx) => {
+        const row: any[] = [idx + 1];
+        data.columns.forEach(col => {
+          const val = entry.cells?.[col.id.toString()] || '';
+          if (['number', 'currency', 'formula'].includes(col.type)) {
+            const cleaned = val.replace(/[^\d.-]/g, '');
+            const n = parseFloat(cleaned);
+            row.push(isNaN(n) ? val : n);
+          } else {
+            row.push(val);
+          }
+        });
+        dataAOA.push(row);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(dataAOA);
+
+      // Auto-size columns
+      const colWidths = headerRow.map((h, i) => {
+        let max = h.length;
+        dataAOA.forEach(row => {
+          const cell = row[i];
+          if (cell != null) {
+            const len = String(cell).length;
+            if (len > max) max = len;
+          }
+        });
+        return { wch: Math.min(max + 2, 40) };
+      });
+      ws['!cols'] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Data');
+      
+      const safeName = s.name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      XLSX.writeFile(wb, `${s.registerName}_${safeName}.xlsx`);
+      toast.success(`Exported ${data.filteredEntries.length} entries as Excel`);
+    } catch (err: any) {
+      toast.error(`Export failed: ${err.message}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -346,14 +667,169 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     );
   }
 
+  const handleDownloadAllCountShortcuts = async () => {
+    if (countShortcuts.length === 0) {
+      toast.error('No shortcuts to export');
+      return;
+    }
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+
+      const summaryData: any[][] = [
+        ['Register Shortcuts & Folders Overview Summary'],
+        [`Exported on ${new Date().toLocaleString()}`],
+        [],
+        ['S.No', 'Register Name', 'Shortcut Name', 'Active Filters', 'Entry Count']
+      ];
+
+      countShortcuts.forEach((s, idx) => {
+        const count = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : 0;
+        summaryData.push([
+          idx + 1,
+          s.registerName,
+          s.name,
+          s.filters ? `${s.filters.length} active filters` : 'No filters',
+          count
+        ]);
+      });
+
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Overview Summary');
+
+      countShortcuts.forEach(s => {
+        const data = shortcutData[s.id];
+        if (data && data.filteredEntries.length > 0) {
+          const sheetData: any[][] = [
+            [s.registerName],
+            [`Shortcut: ${s.name} (${data.filteredEntries.length} entries)`],
+            [],
+            ['S.No', ...data.columns.map(c => c.name)]
+          ];
+
+          data.filteredEntries.forEach((entry, idx) => {
+            const row: any[] = [idx + 1];
+            data.columns.forEach(col => {
+              const val = entry.cells?.[col.id.toString()] || '';
+              if (['number', 'currency', 'formula'].includes(col.type)) {
+                const cleaned = val.replace(/[^\d.-]/g, '');
+                const n = parseFloat(cleaned);
+                row.push(isNaN(n) ? val : n);
+              } else {
+                row.push(val);
+              }
+            });
+            sheetData.push(row);
+          });
+
+          const ws = XLSX.utils.aoa_to_sheet(sheetData);
+          const safeSheetName = s.name.replace(/[*?:\\/\[\]]/g, '').substring(0, 30) || `Shortcut ${s.id}`;
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        }
+      });
+
+      XLSX.writeFile(wb, `Register_Shortcuts_and_Folders_Export.xlsx`);
+      toast.success('Successfully exported all shortcuts to Excel');
+    } catch (err: any) {
+      toast.error(`Export failed: ${err.message}`);
+    }
+  };
+
+  const handleDownloadAllSumShortcuts = async () => {
+    if (activeSumMetrics.length === 0) {
+      toast.error('No sum metrics to export');
+      return;
+    }
+    try {
+      const XLSX = await import('xlsx');
+      const wb = XLSX.utils.book_new();
+
+      const summaryData: any[][] = [
+        ['Register Shortcut Sums Overview Summary'],
+        [`Exported on ${new Date().toLocaleString()}`],
+        [],
+        ['S.No', 'Register Name', 'Shortcut Name', 'Metric Type', 'Column Name', 'Value']
+      ];
+
+      activeSumMetrics.forEach((metric, idx) => {
+        const s = shortcuts.find(sh => sh.id === metric.shortcutId);
+        if (!s) return;
+
+        const data = shortcutData[s.id];
+        let valStr = '...';
+        let colName = 'N/A';
+        if (data) {
+          const col = data.columns.find(c => c.id === metric.columnId);
+          if (col) {
+            colName = col.name;
+            const valNum = metric.mode === 'sum'
+              ? calculateSumForColumn(data.filteredEntries, col.id, col, data.columns)
+              : calculateAverageForColumn(data.filteredEntries, col.id, col, data.columns);
+            valStr = col.type?.toLowerCase() === 'currency' ? formatCurrency(valNum) : valNum.toLocaleString();
+          }
+        }
+
+        summaryData.push([
+          idx + 1,
+          s.registerName,
+          s.name,
+          metric.mode === 'sum' ? 'Sum' : 'Average',
+          colName,
+          valStr
+        ]);
+      });
+
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Sums Summary');
+
+      activeSumMetrics.forEach(metric => {
+        const s = shortcuts.find(sh => sh.id === metric.shortcutId);
+        if (!s) return;
+        const data = shortcutData[s.id];
+        if (data && data.filteredEntries.length > 0) {
+          const col = data.columns.find(c => c.id === metric.columnId);
+          const colName = col ? col.name : 'N/A';
+          const sheetData: any[][] = [
+            [s.registerName],
+            [`Shortcut: ${s.name} (Calculated ${metric.mode === 'sum' ? 'Sum' : 'Average'} of ${colName})`],
+            [],
+            ['S.No', ...data.columns.map(c => c.name)]
+          ];
+
+          data.filteredEntries.forEach((entry, idx) => {
+            const row: any[] = [idx + 1];
+            data.columns.forEach(c => {
+              const val = entry.cells?.[c.id.toString()] || '';
+              if (['number', 'currency', 'formula'].includes(c.type)) {
+                const cleaned = val.replace(/[^\d.-]/g, '');
+                const n = parseFloat(cleaned);
+                row.push(isNaN(n) ? val : n);
+              } else {
+                row.push(val);
+              }
+            });
+            sheetData.push(row);
+          });
+
+          const ws = XLSX.utils.aoa_to_sheet(sheetData);
+          const safeSheetName = `${s.name.substring(0, 20)}_${metric.mode === 'sum' ? 'Sum' : 'Avg'}`.replace(/[*?:\\/\[\]]/g, '').substring(0, 30);
+          XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+        }
+      });
+
+      XLSX.writeFile(wb, `Register_Shortcut_Sums_Export.xlsx`);
+      toast.success('Successfully exported all shortcut sums to Excel');
+    } catch (err: any) {
+      toast.error(`Export failed: ${err.message}`);
+    }
+  };
+
   const countShortcuts = shortcuts;
 
-  const sumShortcuts = shortcuts.filter(s => {
-    const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
-    return modeSetting.mode === 'sum' || modeSetting.mode === 'average';
-  });
-
   const renderShortcutCard = (s: SavedRegisterShortcut, forceCountMode = false) => {
+    const displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+    const displayLabel = 'entries';
+
     return (
       <div
         key={s.id}
@@ -381,7 +857,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
           </span>
           
           {/* Three-dot options menu */}
-          <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}>
+          <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }} className="no-print">
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -420,14 +896,38 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   borderRadius: '8px',
                   boxShadow: 'var(--admin-card-shadow)',
                   zIndex: 10,
-                  minWidth: '160px',
-                  maxHeight: '260px',
-                  overflowY: 'auto',
+                  minWidth: '140px',
                   padding: '4px 0',
                   display: 'flex',
                   flexDirection: 'column'
                 }}
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleExportShortcutExcel(s);
+                    setActiveMenuId(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <Download size={13} color="var(--brand-green)" /> Download Data
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -475,360 +975,498 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                 >
                   Delete
                 </button>
-
-                {/* Display Metric Section */}
-                {(() => {
-                  const data = shortcutData[s.id];
-                  const numericCols = data?.columns.filter(isNumericColumn) || [];
-                  const currentMode = shortcutDisplayModes[s.id] || { mode: 'count' };
-
-                  return (
-                    <>
-                      <div style={{ borderTop: '1px solid var(--border-light)', margin: '4px 0' }} />
-                      <div style={{ padding: '4px 12px', fontSize: '9.5px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        Display Metric
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: currentMode.columnId } };
-                          setShortcutDisplayModes(nextModes);
-                          localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                          setActiveMenuId(null);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          fontSize: '12px',
-                          color: currentMode.mode === 'count' ? 'var(--brand-green)' : 'var(--foreground)',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s',
-                          width: '100%',
-                          boxSizing: 'border-box'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                      >
-                        <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                          {currentMode.mode === 'count' ? '✓' : ''}
-                        </span>
-                        Count (Entries)
-                      </button>
-
-                      {/* Sum Section */}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setExpandedSection(expandedSection === 'sum' ? null : 'sum');
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            color: currentMode.mode === 'sum' ? 'var(--brand-green)' : 'var(--foreground)',
-                            cursor: 'pointer',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            transition: 'all 0.15s',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                              {currentMode.mode === 'sum' ? '✓' : ''}
-                            </span>
-                            Sum
-                          </span>
-                          <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'sum' ? '▼' : '▶'}</span>
-                        </button>
-
-                        {expandedSection === 'sum' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
-                            {!data ? (
-                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                Loading columns...
-                              </div>
-                            ) : numericCols.length === 0 ? (
-                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                No numeric columns
-                              </div>
-                            ) : (
-                              numericCols.map(col => {
-                                const isActive = currentMode.mode === 'sum' && currentMode.columnId === col.id;
-                                return (
-                                  <button
-                                    key={`sum-${col.id}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: col.id } };
-                                      setShortcutDisplayModes(nextModes);
-                                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                      setActiveMenuId(null);
-                                    }}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      padding: '6px 12px 6px 16px',
-                                      textAlign: 'left',
-                                      fontSize: '11.5px',
-                                      color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
-                                      cursor: 'pointer',
-                                      fontWeight: 600,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      transition: 'all 0.15s',
-                                      width: '100%',
-                                      boxSizing: 'border-box'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                  >
-                                    <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                      {isActive ? '✓' : ''}
-                                    </span>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
-                                      {col.name}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Average Section */}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setExpandedSection(expandedSection === 'average' ? null : 'average');
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            color: currentMode.mode === 'average' ? 'var(--brand-green)' : 'var(--foreground)',
-                            cursor: 'pointer',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            transition: 'all 0.15s',
-                            width: '100%',
-                            boxSizing: 'border-box'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                              {currentMode.mode === 'average' ? '✓' : ''}
-                            </span>
-                            Average
-                          </span>
-                          <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'average' ? '▼' : '▶'}</span>
-                        </button>
-
-                        {expandedSection === 'average' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
-                            {!data ? (
-                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                Loading columns...
-                              </div>
-                            ) : numericCols.length === 0 ? (
-                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                No numeric columns
-                              </div>
-                            ) : (
-                              numericCols.map(col => {
-                                const isActive = currentMode.mode === 'average' && currentMode.columnId === col.id;
-                                return (
-                                  <button
-                                    key={`avg-${col.id}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: col.id } };
-                                      setShortcutDisplayModes(nextModes);
-                                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                      setActiveMenuId(null);
-                                    }}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      padding: '6px 12px 6px 16px',
-                                      textAlign: 'left',
-                                      fontSize: '11.5px',
-                                      color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
-                                      cursor: 'pointer',
-                                      fontWeight: 600,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px',
-                                      transition: 'all 0.15s',
-                                      width: '100%',
-                                      boxSizing: 'border-box'
-                                    }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                  >
-                                    <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                      {isActive ? '✓' : ''}
-                                    </span>
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
-                                      {col.name}
-                                    </span>
-                                  </button>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
               </div>
             )}
           </div>
         </div>
 
-        {/* Middle & Bottom Row: Big entry count / sum / average & Shortcut Label */}
-        {(() => {
-          const modeSetting: { mode: 'count' | 'sum' | 'average'; columnId?: number } = forceCountMode 
-            ? { mode: 'count' } 
-            : (shortcutDisplayModes[s.id] || { mode: 'count' });
-          let displayVal: string | number = '...';
-          let displayLabel = 'entries';
+        {/* Middle & Bottom Row: Big entry count & Shortcut Label */}
+        <div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'baseline',
+              gap: '4px',
+              flexWrap: 'wrap',
+              cursor: 'default',
+              userSelect: 'none',
+              padding: '2px 0',
+              borderRadius: '6px'
+            }}
+          >
+            <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
+              {displayVal}
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>
+              {displayLabel}
+            </span>
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+            {s.name}
+          </div>
+          {s.filters && s.filters.length > 0 && (
+            <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+              {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-          if (modeSetting.mode === 'sum' && modeSetting.columnId !== undefined) {
-            const data = shortcutData[s.id];
-            if (data) {
-              const col = data.columns.find(c => c.id === modeSetting.columnId);
-              if (col) {
-                const sum = calculateSumForColumn(data.filteredEntries, col.id);
-                const isCurrency = col.type?.toLowerCase() === 'currency';
-                displayVal = isCurrency ? formatCurrency(sum) : sum.toLocaleString();
-                displayLabel = `sum of ${col.name}`;
-              } else {
-                displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-                displayLabel = 'entries';
-              }
-            }
-          } else if (modeSetting.mode === 'average' && modeSetting.columnId !== undefined) {
-            const data = shortcutData[s.id];
-            if (data) {
-              const col = data.columns.find(c => c.id === modeSetting.columnId);
-              if (col) {
-                const avg = calculateAverageForColumn(data.filteredEntries, col.id);
-                const isCurrency = col.type?.toLowerCase() === 'currency';
-                const formattedAvg = Number(avg.toFixed(2));
-                displayVal = isCurrency ? formatCurrency(formattedAvg) : formattedAvg.toLocaleString();
-                displayLabel = `avg of ${col.name}`;
-              } else {
-                displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-                displayLabel = 'entries';
-              }
-            }
-          } else {
-            displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-            displayLabel = 'entries';
-          }
+  const renderSumMetricCard = (metric: ConfiguredSumMetric) => {
+    const s = shortcuts.find(sh => sh.id === metric.shortcutId);
+    if (!s) return null;
 
-          return (
-            <div>
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (forceCountMode) {
-                    openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters);
-                    return;
-                  }
-                  const data = shortcutData[s.id];
-                  const numericCols = data?.columns.filter(isNumericColumn) || [];
-                  if (modeSetting.mode === 'sum') {
-                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: modeSetting.columnId } };
-                    setShortcutDisplayModes(nextModes);
-                    localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                  } else {
-                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: modeSetting.columnId } };
-                    setShortcutDisplayModes(nextModes);
-                    localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                  }
-                }}
+    const data = shortcutData[s.id];
+    const numericCols = data?.columns.filter(isNumericColumn) || [];
+
+    let displayVal: string | number = '...';
+    let displayLabel = 'entries';
+    let columnName = 'N/A';
+
+    if (data) {
+      const col = data.columns.find(c => c.id === metric.columnId);
+      if (col) {
+        columnName = col.name;
+        const valNum = metric.mode === 'sum'
+          ? calculateSumForColumn(data.filteredEntries, col.id, col, data.columns)
+          : calculateAverageForColumn(data.filteredEntries, col.id, col, data.columns);
+        const isCurrency = col.type?.toLowerCase() === 'currency';
+        if (metric.mode === 'sum') {
+          displayVal = isCurrency ? formatCurrency(valNum) : valNum.toLocaleString();
+          displayLabel = `sum of ${col.name}`;
+        } else {
+          const formattedAvg = Number(valNum.toFixed(2));
+          displayVal = isCurrency ? formatCurrency(formattedAvg) : formattedAvg.toLocaleString();
+          displayLabel = `avg of ${col.name}`;
+        }
+      } else {
+        displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+        displayLabel = 'entries';
+      }
+    }
+
+    return (
+      <div
+        key={metric.id}
+        onClick={() => openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters)}
+        className="admin-stat-card-premium"
+        style={{
+          cursor: 'pointer',
+          border: '1px solid var(--border)',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: '130px',
+          padding: '16px',
+          overflow: 'visible'
+        }}
+      >
+        {/* Top Row: Icon, Register Name, and Options Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', position: 'relative' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-green)', flexShrink: 0 }}>
+            <FileSpreadsheet size={16} />
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
+            {s.registerName}
+          </span>
+          
+          {/* Three-dot options menu */}
+          <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }} className="no-print">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setActiveMenuId(activeMenuId === metric.id ? null : metric.id);
+              }}
+              title="Options"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--muted)',
+                padding: '4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--border-light)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {activeMenuId === metric.id && (
+              <div 
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'baseline',
-                  gap: '4px',
-                  flexWrap: 'wrap',
-                  cursor: forceCountMode ? 'default' : 'pointer',
-                  userSelect: 'none',
-                  padding: '2px 6px',
-                  marginLeft: '-6px',
-                  borderRadius: '6px',
-                  transition: 'all 0.15s'
-                }}
-                title={forceCountMode ? undefined : "Click to toggle Sum/Average"}
-                onMouseEnter={e => {
-                  if (!forceCountMode) {
-                    e.currentTarget.style.background = 'var(--border-light)';
-                    e.currentTarget.style.transform = 'scale(1.02)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!forceCountMode) {
-                    e.currentTarget.style.background = 'none';
-                    e.currentTarget.style.transform = 'none';
-                  }
+                  position: 'absolute',
+                  top: '24px',
+                  right: '0',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--admin-card-shadow)',
+                  zIndex: 10,
+                  minWidth: '160px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  padding: '4px 0',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}
               >
-                <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
-                  {displayVal}
-                </span>
-                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>
-                  {displayLabel}
-                </span>
-              </div>
-              <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
-                {s.name}
-              </div>
-              {s.filters && s.filters.length > 0 && (
-                <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
-                  {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleExportShortcutExcel(s);
+                    setActiveMenuId(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <Download size={13} color="var(--brand-green)" /> Download Data
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    // Delete ONLY this configured sum metric, not the saved shortcut!
+                    const updated = configuredSumMetrics.filter(m => m.id !== metric.id);
+                    setConfiguredSumMetrics(updated);
+                    localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(updated));
+                    setActiveMenuId(null);
+                    toast.success('Sum metric removed from dashboard');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--danger)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Delete
+                </button>
+
+                {/* Display Metric Section */}
+                <div style={{ borderTop: '1px solid var(--border-light)', margin: '4px 0' }} />
+                <div style={{ padding: '4px 12px', fontSize: '9.5px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Display Metric
                 </div>
-              )}
+
+                {/* Sum Option */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setExpandedSection(expandedSection === 'sum' ? null : 'sum');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      color: metric.mode === 'sum' ? 'var(--brand-green)' : 'var(--foreground)',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.15s',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                        {metric.mode === 'sum' ? '✓' : ''}
+                      </span>
+                      Sum
+                    </span>
+                    <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'sum' ? '▼' : '▶'}</span>
+                  </button>
+
+                  {expandedSection === 'sum' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                      {!data ? (
+                        <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          Loading columns...
+                        </div>
+                      ) : numericCols.length === 0 ? (
+                        <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          No numeric columns
+                        </div>
+                      ) : (
+                        numericCols.map(col => {
+                          const isActive = metric.mode === 'sum' && metric.columnId === col.id;
+                          return (
+                            <button
+                              key={`sum-${col.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const updated = configuredSumMetrics.map(m =>
+                                  m.id === metric.id ? { ...m, mode: 'sum' as const, columnId: col.id } : m
+                                );
+                                setConfiguredSumMetrics(updated);
+                                localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(updated));
+                                setActiveMenuId(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '6px 12px 6px 16px',
+                                textAlign: 'left',
+                                fontSize: '11.5px',
+                                color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                {isActive ? '✓' : ''}
+                              </span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                {col.name}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Average Option */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setExpandedSection(expandedSection === 'average' ? null : 'average');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: '8px 12px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      color: metric.mode === 'average' ? 'var(--brand-green)' : 'var(--foreground)',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.15s',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                        {metric.mode === 'average' ? '✓' : ''}
+                      </span>
+                      Average
+                    </span>
+                    <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'average' ? '▼' : '▶'}</span>
+                  </button>
+
+                  {expandedSection === 'average' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                      {!data ? (
+                        <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          Loading columns...
+                        </div>
+                      ) : numericCols.length === 0 ? (
+                        <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          No numeric columns
+                        </div>
+                      ) : (
+                        numericCols.map(col => {
+                          const isActive = metric.mode === 'average' && metric.columnId === col.id;
+                          return (
+                            <button
+                              key={`avg-${col.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const updated = configuredSumMetrics.map(m =>
+                                  m.id === metric.id ? { ...m, mode: 'average' as const, columnId: col.id } : m
+                                );
+                                setConfiguredSumMetrics(updated);
+                                localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(updated));
+                                setActiveMenuId(null);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: '6px 12px 6px 16px',
+                                textAlign: 'left',
+                                fontSize: '11.5px',
+                                color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: 'all 0.15s',
+                                width: '100%',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                            >
+                              <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                {isActive ? '✓' : ''}
+                              </span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                {col.name}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Middle & Bottom Row: Big sum/avg & Shortcut Label */}
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '4px' }}>
+            {columnName === 'N/A' || displayLabel === 'entries' ? (
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {displayLabel}
+              </span>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', overflow: 'hidden' }}>
+                <span style={{ fontSize: '9px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>
+                  {metric.mode === 'sum' ? 'SUM OF' : 'AVG OF'}
+                </span>
+                <span style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 800, 
+                  color: 'var(--brand-green)', 
+                  background: 'rgba(16, 185, 129, 0.08)', 
+                  padding: '2px 8px', 
+                  borderRadius: '4px',
+                  border: '1px solid rgba(16, 185, 129, 0.15)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em',
+                  maxWidth: '130px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-block'
+                }} title={columnName}>
+                  {columnName}
+                </span>
+              </div>
+            )}
+            
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextMode = metric.mode === 'sum' ? 'average' : 'sum';
+                const updated = configuredSumMetrics.map(m =>
+                  m.id === metric.id ? { ...m, mode: nextMode } : m
+                );
+                setConfiguredSumMetrics(updated);
+                localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(updated));
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                cursor: 'pointer',
+                userSelect: 'none',
+                padding: '2px 4px',
+                marginLeft: '-4px',
+                borderRadius: '6px',
+                transition: 'all 0.15s',
+                width: 'fit-content'
+              }}
+              title="Click to toggle Sum/Average"
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--border-light)';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'none';
+                e.currentTarget.style.transform = 'none';
+              }}
+            >
+              <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--foreground)' }}>
+                {displayVal}
+              </span>
             </div>
-          );
-        })()}
+          </div>
+          
+          <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+            {s.name}
+          </div>
+          {s.filters && s.filters.length > 0 && (
+            <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+              {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
   return (
     <div className="admin-animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
+      <style>{`
+        .admin-dashboard-activity-row:hover {
+          border-color: var(--accent) !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.04) !important;
+          transform: translateY(-1px);
+        }
+      `}</style>
       {/* Title & Refresh */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
@@ -859,22 +1497,6 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       {/* Stats Cards Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
 
-        {/* Total Employees */}
-        <div className="admin-stat-card-premium" onClick={() => onNavigateTab('users')} style={{ cursor: 'pointer' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', color: '#6366f1' }}>
-              <Users size={16} />
-            </div>
-            <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Employees</span>
-          </div>
-          <div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>{stats.totalUsers}</div>
-            <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <UserCheck size={12} /> {stats.activeUsers} Active Accounts
-            </div>
-          </div>
-        </div>
-
         {/* Workspace Sheets — toggles register drill-down panel */}
         <div className="admin-stat-card-premium" onClick={() => setShowRegistersPanel(v => !v)} style={{ cursor: 'pointer', border: showRegistersPanel ? '1.5px solid rgba(16,185,129,0.4)' : '1px solid var(--border)', boxShadow: showRegistersPanel ? '0 0 0 3px rgba(16,185,129,0.08)' : 'var(--admin-card-shadow)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -888,6 +1510,22 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>{stats.totalRegisters}</div>
             <div style={{ fontSize: '11.5px', color: showRegistersPanel ? 'var(--brand-green)' : 'var(--muted)', fontWeight: 500, marginTop: '2px' }}>
               {showRegistersPanel ? 'Click a register to drill down ↓' : 'Total Active Workspace Sheets'}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Employees */}
+        <div className="admin-stat-card-premium" onClick={() => onNavigateTab('users')} style={{ cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', color: '#6366f1' }}>
+              <Users size={16} />
+            </div>
+            <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Employees</span>
+          </div>
+          <div>
+            <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>{stats.totalUsers}</div>
+            <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <UserCheck size={12} /> {stats.activeUsers} Active Accounts
             </div>
           </div>
         </div>
@@ -953,10 +1591,55 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       {showRegistersPanel && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Shortcuts Grid Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <h3 style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Register Shortcuts & Folders
             </h3>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="no-print">
+              {/* Search input */}
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search shortcuts..."
+                  value={countShortcutSearch}
+                  onChange={e => setCountShortcutSearch(e.target.value)}
+                  style={{
+                    padding: '6px 10px 6px 26px', borderRadius: '6px', border: '1.5px solid var(--border)',
+                    background: 'var(--background)', color: 'var(--foreground)', fontSize: '11.5px',
+                    outline: 'none', width: '160px', transition: 'all 0.15s'
+                  }}
+                />
+                {countShortcutSearch && (
+                  <button onClick={() => setCountShortcutSearch('')} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', padding: 0, cursor: 'pointer', display: 'flex' }}>
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Download all button */}
+              <button
+                onClick={handleDownloadAllCountShortcuts}
+                title="Download all shortcut data to Excel"
+                className="admin-btn-secondary-flat"
+                style={{ 
+                  padding: '6px 10px', 
+                  borderRadius: '6px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  color: 'var(--brand-green)',
+                  border: '1px solid rgba(16, 185, 129, 0.15)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Download size={13} /> Export All (Excel)
+              </button>
+            </div>
           </div>
 
           {/* Shortcuts Grid */}
@@ -968,7 +1651,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             {/* The Plus Box */}
             <div
               onClick={() => setShowAllRegisters(v => !v)}
-              className="admin-card-glass"
+              className="admin-card-glass no-print"
               style={{
                 border: '2px dashed var(--brand-green)',
                 background: 'rgba(16,185,129,0.01)',
@@ -1000,12 +1683,29 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             </div>
 
             {/* Saved Shortcuts */}
-            {countShortcuts.map(s => renderShortcutCard(s, true))}
+            {filteredCountShortcuts.map((s, index) => (
+              <div
+                key={s.id}
+                draggable
+                onDragStart={(e) => handleDragStartCount(e, index)}
+                onDragOver={(e) => handleDragOverCount(e, index)}
+                onDragEnd={handleDragEndCount}
+                style={{
+                  cursor: draggedShortcutIndex === index ? 'grabbing' : 'grab',
+                  opacity: draggedShortcutIndex === index ? 0.4 : 1,
+                  transition: 'opacity 0.2s, transform 0.2s',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                {renderShortcutCard(s, true)}
+              </div>
+            ))}
           </div>
 
           {/* All Registers list - toggled by the plus box */}
           {showAllRegisters && (
-            <div className="admin-animate-fade-in">
+            <div className="admin-animate-fade-in no-print">
               <RegistersListPanel
                 allRegisters={allRegisters}
                 regSearch={regSearch}
@@ -1016,10 +1716,55 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
           )}
 
           {/* Register Shortcut Sums Section */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <h3 style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Register Shortcut Sums
             </h3>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="no-print">
+              {/* Search input */}
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search shortcut sums..."
+                  value={sumShortcutSearch}
+                  onChange={e => setSumShortcutSearch(e.target.value)}
+                  style={{
+                    padding: '6px 10px 6px 26px', borderRadius: '6px', border: '1.5px solid var(--border)',
+                    background: 'var(--background)', color: 'var(--foreground)', fontSize: '11.5px',
+                    outline: 'none', width: '160px', transition: 'all 0.15s'
+                  }}
+                />
+                {sumShortcutSearch && (
+                  <button onClick={() => setSumShortcutSearch('')} style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', padding: 0, cursor: 'pointer', display: 'flex' }}>
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Download all button */}
+              <button
+                onClick={handleDownloadAllSumShortcuts}
+                title="Download all sum metrics data to Excel"
+                className="admin-btn-secondary-flat"
+                style={{ 
+                  padding: '6px 10px', 
+                  borderRadius: '6px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  fontSize: '11.5px',
+                  fontWeight: 700,
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  color: 'var(--brand-green)',
+                  border: '1px solid rgba(16, 185, 129, 0.15)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Download size={13} /> Export All (Excel)
+              </button>
+            </div>
           </div>
 
           <div style={{
@@ -1034,7 +1779,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                 setAddingSumReg(null);
                 setAddingSumCols([]);
               }}
-              className="admin-card-glass"
+              className="admin-card-glass no-print"
               style={{
                 border: '2px dashed var(--brand-green)',
                 background: 'rgba(16,185,129,0.01)',
@@ -1064,8 +1809,167 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                 {showSumRegistersList ? 'Hide Sum Config' : 'Configure Sum Metric'}
               </span>
             </div>
+ 
+            {/* Sums Registers list - toggled by the sums plus box, rendered inline next to the plus box */}
+            {showSumRegistersList && (
+              <div className="admin-animate-fade-in no-print" style={{ gridColumn: '2 / -1', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="admin-card-glass" style={{ padding: '20px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                    <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileSpreadsheet size={18} color="var(--brand-green)" /> Select a Register with Active Filters
+                    </h3>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                      <input
+                        type="text"
+                        placeholder="Search registers..."
+                        value={sumRegSearch}
+                        onChange={e => setSumRegSearch(e.target.value)}
+                        style={{
+                          padding: '8px 12px 8px 32px', borderRadius: '8px', border: '1.5px solid var(--border)',
+                          background: 'var(--background)', color: 'var(--foreground)', fontSize: '13px',
+                          outline: 'none', width: '240px', transition: 'all 0.15s'
+                        }}
+                      />
+                    </div>
+                  </div>
 
-            {sumShortcuts.length === 0 ? (
+                  {/* List of filtered registers in the same row-based list style */}
+                  {(() => {
+                    const filteredRegs = allRegisters.filter(r => 
+                      shortcuts.some(s => s.registerId === r.id && s.filters && s.filters.length > 0)
+                    ).filter(r => 
+                      !sumRegSearch.trim() || r.name.toLowerCase().includes(sumRegSearch.toLowerCase())
+                    );
+
+                    if (filteredRegs.length === 0) {
+                      return (
+                        <div style={{ padding: '12px', color: 'var(--muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                          No registers match your search or have shortcuts with active filters.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {filteredRegs.map(reg => {
+                          const matchingShortcuts = shortcuts.filter(s => s.registerId === reg.id && s.filters && s.filters.length > 0);
+                          const isSelected = addingSumReg?.id === reg.id;
+                          return (
+                            <div
+                              key={reg.id}
+                              onClick={async () => {
+                                setAddingSumReg(reg);
+                                setLoadingSumCols(true);
+                                try {
+                                  const full = await getRegister(reg.id);
+                                  setAddingSumCols((full.columns || []).filter(isNumericColumn));
+                                } catch (err) {
+                                  console.error('Failed to load columns:', err);
+                                  toast.error('Failed to load columns for the selected register');
+                                } finally {
+                                  setLoadingSumCols(false);
+                                }
+                              }}
+                              className="admin-list-item-hover"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                border: isSelected ? '1.5px solid var(--brand-green)' : '1px solid var(--border-light)',
+                                background: isSelected ? 'rgba(16,185,129,0.02)' : 'var(--surface)',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(16,185,129,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-green)' }}>
+                                  <FileSpreadsheet size={14} />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>{reg.name}</div>
+                                  <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px', fontWeight: 500 }}>
+                                    {matchingShortcuts.length} filtered shortcut{matchingShortcuts.length > 1 ? 's' : ''} available
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '50%' }}>
+                                {matchingShortcuts.map((ms) => (
+                                  <span key={ms.id} style={{ fontSize: '9.5px', background: 'var(--border-light)', color: 'var(--accent)', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                    {ms.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Column Selection Sub-panel */}
+                  {addingSumReg && (
+                    <div style={{ marginTop: '8px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }} className="admin-animate-fade-in">
+                      <h5 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 800, color: 'var(--navy)' }}>
+                        Choose Column for Sum: <span style={{ color: 'var(--brand-green)' }}>{addingSumReg.name}</span>
+                      </h5>
+
+                      {loadingSumCols ? (
+                        <div style={{ fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                          Loading available columns...
+                        </div>
+                      ) : addingSumCols.length === 0 ? (
+                        <div style={{ fontSize: '12px', color: 'var(--danger)', fontStyle: 'italic' }}>
+                          No numeric/summable columns found in this register.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {addingSumCols.map(col => (
+                            <button
+                              key={col.id}
+                              onClick={() => {
+                                // Find first filtered shortcut
+                                const targetShortcut = shortcuts.find(s => s.registerId === addingSumReg.id && s.filters && s.filters.length > 0);
+                                if (targetShortcut) {
+                                  const newMetric: ConfiguredSumMetric = {
+                                    id: `sum-metric-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                                    shortcutId: targetShortcut.id,
+                                    columnId: col.id,
+                                    mode: 'sum'
+                                  };
+                                  const updated = [...configuredSumMetrics, newMetric];
+                                  setConfiguredSumMetrics(updated);
+                                  localStorage.setItem('dashboard_configured_sum_metrics', JSON.stringify(updated));
+                                  toast.success(`Added display of Sum of ${col.name} to dashboard`);
+                                }
+                                // reset
+                                setAddingSumReg(null);
+                                setAddingSumCols([]);
+                                setShowSumRegistersList(false);
+                              }}
+                              className="admin-btn-secondary-flat"
+                              style={{
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Sum of {col.name} ({col.type || 'number'})
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+ 
+            {filteredSumMetrics.length === 0 ? (
               <div 
                 className="admin-card-glass"
                 style={{
@@ -1086,146 +1990,36 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   boxSizing: 'border-box'
                 }}
               >
-                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--navy)' }}>No shortcut sums configured</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--navy)' }}>
+                  {activeSumMetrics.length === 0 ? 'No shortcut sums configured' : 'No matching sums found'}
+                </div>
                 <div style={{ maxWidth: '400px', margin: '0 auto', fontSize: '12px' }}>
-                  Use the 3-dot options menu on any shortcut above to change its display metric to Sum or Average.
+                  {activeSumMetrics.length === 0 
+                    ? 'Use the green "+ Configure Sum Metric" box to add and configure sum or average metrics for your registers.'
+                    : 'Adjust your search query to find other configured sums.'}
                 </div>
               </div>
             ) : (
-              sumShortcuts.map(s => renderShortcutCard(s))
+              filteredSumMetrics.map((metric, index) => (
+                <div
+                  key={metric.id}
+                  draggable
+                  onDragStart={(e) => handleDragStartSum(e, index)}
+                  onDragOver={(e) => handleDragOverSum(e, index)}
+                  onDragEnd={handleDragEndSum}
+                  style={{
+                    cursor: draggedSumIndex === index ? 'grabbing' : 'grab',
+                    opacity: draggedSumIndex === index ? 0.4 : 1,
+                    transition: 'opacity 0.2s, transform 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                >
+                  {renderSumMetricCard(metric)}
+                </div>
+              ))
             )}
           </div>
-
-          {/* Sums Registers list - toggled by the sums plus box */}
-          {showSumRegistersList && (
-            <div className="admin-animate-fade-in" style={{ marginTop: '16px' }}>
-              <div className="admin-card-glass" style={{ padding: '20px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
-                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: 'var(--navy)' }}>
-                    Select a Register with Active Filters to Configure Sum Metric
-                  </h4>
-                </div>
-                
-                {/* List of filtered registers */}
-                {(() => {
-                  const filteredRegs = allRegisters.filter(r => 
-                    shortcuts.some(s => s.registerId === r.id && s.filters && s.filters.length > 0)
-                  );
-
-                  if (filteredRegs.length === 0) {
-                    return (
-                      <div style={{ padding: '12px', color: 'var(--muted)', fontSize: '13px', fontStyle: 'italic' }}>
-                        No registers currently have shortcuts with active filters. 
-                        Please create a filtered shortcut in the workspace first.
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                      {filteredRegs.map(reg => {
-                        const matchingShortcuts = shortcuts.filter(s => s.registerId === reg.id && s.filters && s.filters.length > 0);
-                        return (
-                          <div
-                            key={reg.id}
-                            onClick={async () => {
-                              setAddingSumReg(reg);
-                              setLoadingSumCols(true);
-                              try {
-                                const full = await getRegister(reg.id);
-                                setAddingSumCols((full.columns || []).filter(isNumericColumn));
-                              } catch (err) {
-                                console.error('Failed to load columns:', err);
-                                toast.error('Failed to load columns for the selected register');
-                              } finally {
-                                setLoadingSumCols(false);
-                              }
-                            }}
-                            className="admin-list-item-hover"
-                            style={{
-                              border: addingSumReg?.id === reg.id ? '2px solid var(--brand-green)' : '1px solid var(--border)',
-                              borderRadius: '8px',
-                              padding: '12px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px',
-                              background: 'var(--surface)',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <FileSpreadsheet size={16} color="var(--brand-green)" />
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>{reg.name}</span>
-                            </div>
-                            <div style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 500 }}>
-                              {matchingShortcuts.length} filtered shortcut{matchingShortcuts.length > 1 ? 's' : ''} available
-                            </div>
-                            {matchingShortcuts.map((ms, idx) => (
-                              <div key={ms.id} style={{ fontSize: '10px', color: 'var(--accent)', marginLeft: '12px' }}>
-                                • {ms.name} ({ms.filters.length} filters)
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-
-                {/* Column Selection Sub-panel */}
-                {addingSumReg && (
-                  <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-light)', paddingTop: '16px' }} className="admin-animate-fade-in">
-                    <h5 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 800, color: 'var(--navy)' }}>
-                      Choose Column for Sum: <span style={{ color: 'var(--brand-green)' }}>{addingSumReg.name}</span>
-                    </h5>
-
-                    {loadingSumCols ? (
-                      <div style={{ fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                        Loading available columns...
-                      </div>
-                    ) : addingSumCols.length === 0 ? (
-                      <div style={{ fontSize: '12px', color: 'var(--danger)', fontStyle: 'italic' }}>
-                        No numeric/summable columns found in this register.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        {addingSumCols.map(col => (
-                          <button
-                            key={col.id}
-                            onClick={() => {
-                              // Find first filtered shortcut
-                              const targetShortcut = shortcuts.find(s => s.registerId === addingSumReg.id && s.filters && s.filters.length > 0);
-                              if (targetShortcut) {
-                                const nextModes = { ...shortcutDisplayModes, [targetShortcut.id]: { mode: 'sum' as const, columnId: col.id } };
-                                setShortcutDisplayModes(nextModes);
-                                localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                toast.success(`Added display of Sum of ${col.name} to dashboard`);
-                              }
-                              // reset
-                              setAddingSumReg(null);
-                              setAddingSumCols([]);
-                              setShowSumRegistersList(false);
-                            }}
-                            className="admin-btn-secondary-flat"
-                            style={{
-                              padding: '8px 14px',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sum of {col.name} ({col.type || 'number'})
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1253,27 +2047,51 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                 {recentActivities.map((a: any) => (
                   <div
                     key={a.id}
+                    className="admin-dashboard-activity-row"
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
+                      alignItems: 'flex-start',
                       gap: '12px',
                       padding: '12px',
                       borderRadius: '10px',
                       background: 'var(--background)',
-                      border: '1px solid var(--border-light)'
+                      border: '1px solid var(--border-light)',
+                      transition: 'all 0.15s ease-in-out'
                     }}
                   >
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {ACTION_ICONS[a.action] || <Activity size={14} color="var(--muted)" />}
+                    {/* Left Icon Node */}
+                    <div style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '50%',
+                      background: 'var(--surface)',
+                      border: '1.5px solid var(--border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                    }}>
+                      {ACTION_ICONS[a.action] || <Activity size={12} color="var(--muted)" />}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--foreground)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {a.details}
+
+                    {/* Right Content */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Details parsed */}
+                      <div style={{ wordBreak: 'break-word' }}>
+                        {renderActivityDetails(a.details)}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '11px', color: 'var(--muted)', fontWeight: 500 }}>
-                        <span style={{ color: 'var(--navy)', fontWeight: 700 }}>{a.userName}</span>
-                        <span>•</span>
-                        <span>{new Date(a.timestamp).toLocaleDateString()} {new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                      {/* User Badge & Time */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', paddingTop: '4px', borderTop: '1px solid rgba(0,0,0,0.02)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,45,93,0.04)', padding: '1px 6px 1px 3px', borderRadius: '10px' }}>
+                          {renderUserAvatar(a.userName, 18)}
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--navy)' }}>{a.userName}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10.5px', color: 'var(--muted)', fontWeight: 500 }}>
+                          <Clock size={10} />
+                          <span>{new Date(a.timestamp).toLocaleDateString()} {new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1755,10 +2573,17 @@ function isNumericColumn(col: Column) {
 }
 
 /* Helper to calculate the sum of a numeric column for entries */
-function calculateSumForColumn(entries: Entry[], columnId: number) {
+function calculateSumForColumn(entries: Entry[], columnId: number, col?: Column, columns?: Column[]) {
   let sum = 0;
+  const isFormula = col?.type === 'formula';
   for (let i = 0; i < entries.length; i++) {
-    const val = entries[i].cells?.[columnId.toString()];
+    let val: string;
+    if (isFormula && col?.formula && columns) {
+      // Formula columns must be evaluated on-the-fly (cells may be empty/stale)
+      val = evaluateFormula(col.formula, entries[i], columns);
+    } else {
+      val = entries[i].cells?.[columnId.toString()] || '';
+    }
     if (val) {
       // Strip all characters except digits, decimal points, and minus signs (e.g. removes currency symbols, commas, spaces)
       const cleanVal = val.replace(/[^0-9.-]/g, '');
@@ -1772,11 +2597,17 @@ function calculateSumForColumn(entries: Entry[], columnId: number) {
 }
 
 /* Helper to calculate the average of a numeric column for entries */
-function calculateAverageForColumn(entries: Entry[], columnId: number) {
+function calculateAverageForColumn(entries: Entry[], columnId: number, col?: Column, columns?: Column[]) {
   let sum = 0;
   let count = 0;
+  const isFormula = col?.type === 'formula';
   for (let i = 0; i < entries.length; i++) {
-    const val = entries[i].cells?.[columnId.toString()];
+    let val: string;
+    if (isFormula && col?.formula && columns) {
+      val = evaluateFormula(col.formula, entries[i], columns);
+    } else {
+      val = entries[i].cells?.[columnId.toString()] || '';
+    }
     if (val) {
       const cleanVal = val.replace(/[^0-9.-]/g, '');
       const parsed = parseFloat(cleanVal);

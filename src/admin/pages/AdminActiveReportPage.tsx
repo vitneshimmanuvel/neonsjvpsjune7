@@ -349,6 +349,108 @@ export default function AdminActiveReportPage() {
     }
   };
 
+  // Helper to render user initials avatar
+  const renderUserAvatar = (name: string, size = 28) => {
+    const firstChar = name ? name.charAt(0).toUpperCase() : 'U';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+    const color = colors[Math.abs(hash) % colors.length];
+    return (
+      <div style={{
+        width: `${size}px`, height: `${size}px`, borderRadius: '50%', backgroundColor: color,
+        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size > 24 ? '11px' : '9.5px', fontWeight: 800, flexShrink: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        {firstChar}
+      </div>
+    );
+  };
+
+  // Helper to format activity details nicely with inline elements and badges
+  const renderActivityDetails = (details: string) => {
+    // Check for "Updated row #XXX in "RegisterName": Column changed from "Old" to "New""
+    const updateRowRegex = /^Updated row #(\d+) in "([^"]+)":\s+([a-zA-Z0-9_\s/\-()]+)\s+changed from\s+([\s\S]*?)\s+to\s+([\s\S]*)$/;
+    const match = details.match(updateRowRegex);
+    if (match) {
+      const [_, rowNum, registerName, colName, oldVal, newVal] = match;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)', lineHeight: '1.5' }}>
+          <span>Updated</span>
+          <span style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>in</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+          <span>:</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{colName}</span>
+          <span style={{ color: 'var(--muted)', fontSize: '11.5px' }}>changed from</span>
+          <span style={{ background: 'var(--border-light)', color: 'var(--muted)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', textDecoration: 'line-through', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {oldVal === '""' || !oldVal ? '""' : oldVal}
+          </span>
+          <span style={{ color: 'var(--muted)' }}>➔</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {newVal === '""' || !newVal ? '""' : newVal}
+          </span>
+        </div>
+      );
+    }
+
+    // Check for "Added new row #XXX in "RegisterName""
+    const addRowRegex = /^Added new row #(\d+) in "([^"]+)"/;
+    const matchAdd = details.match(addRowRegex);
+    if (matchAdd) {
+      const [_, rowNum, registerName] = matchAdd;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)' }}>
+          <span style={{ color: 'var(--brand-green)', fontWeight: 700 }}>Added new row</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>in</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+        </div>
+      );
+    }
+
+    // Check for "Deleted row #XXX from "RegisterName""
+    const deleteRowRegex = /^Deleted row #(\d+) from "([^"]+)"/;
+    const matchDelete = details.match(deleteRowRegex);
+    if (matchDelete) {
+      const [_, rowNum, registerName] = matchDelete;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--foreground)' }}>
+          <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Deleted row</span>
+          <span style={{ background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', padding: '2px 6px', borderRadius: '4px', fontSize: '10.5px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>from</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+        </div>
+      );
+    }
+
+    const parts = details.split(/(".*?")/g);
+    return (
+      <div style={{ fontSize: '13px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4 }}>
+        {parts.map((part, i) => {
+          if (part.startsWith('"') && part.endsWith('"')) {
+            return <strong key={i} style={{ color: 'var(--navy)', fontWeight: 700 }}>{part.replace(/"/g, '')}</strong>;
+          }
+          return part;
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="admin-animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Title Header */}
@@ -582,9 +684,7 @@ export default function AdminActiveReportPage() {
                       <td style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 500 }}>{idx + 1}</td>
                       <td style={{ fontSize: '13.5px', fontWeight: 600 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(0,45,93,0.05)', color: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>
-                            {a.userName?.charAt(0).toUpperCase()}
-                          </div>
+                          {renderUserAvatar(a.userName || 'Unknown')}
                           <span style={{ color: 'var(--foreground)' }}>{a.userName || 'Unknown'}</span>
                         </div>
                       </td>
@@ -600,8 +700,8 @@ export default function AdminActiveReportPage() {
                           {ACTION_LABELS[a.action] || a.action.replace(/_/g, ' ')}
                         </span>
                       </td>
-                      <td style={{ fontSize: '13px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
-                        {a.details}
+                      <td style={{ verticalAlign: 'middle', padding: '12px 16px' }}>
+                        {renderActivityDetails(a.details)}
                       </td>
                       <td style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 500, textAlign: 'right' }}>
                         <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{new Date(a.timestamp).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
@@ -652,10 +752,17 @@ export default function AdminActiveReportPage() {
         </>
       )}
 
-      {/* Inject simple row hovering stylesheet */}
+      {/* Inject premium table stylesheet */}
       <style>{`
+        .report-row {
+          transition: all 0.15s ease-in-out;
+        }
         .report-row:hover td {
-          background-color: rgba(0, 45, 93, 0.015) !important;
+          background-color: rgba(99, 102, 241, 0.02) !important;
+          border-color: rgba(99, 102, 241, 0.1) !important;
+        }
+        th, td {
+          vertical-align: middle !important;
         }
       `}</style>
     </div>

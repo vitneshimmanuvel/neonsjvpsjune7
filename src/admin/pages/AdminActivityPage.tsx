@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { firebaseGetUsers } from '../../lib/firebaseAuth';
 import { apiUrl } from '../../lib/apiBase';
-import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown, Plus } from 'lucide-react';
+import { Activity, User, LogIn, LogOut, Shield, Trash2, Edit3, Download, Key, RefreshCw, Filter, X, Calendar, ChevronDown, Plus, Clock, FileSpreadsheet } from 'lucide-react';
 import { cleanActivityLogs } from '../../lib/activityHelper';
 
 const ICONS: Record<string, any> = {
@@ -191,6 +191,135 @@ export default function AdminActivityPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
   };
+
+  // Helper to render user initials avatar
+  const renderUserAvatar = (name: string) => {
+    const firstChar = name ? name.charAt(0).toUpperCase() : 'U';
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
+    const color = colors[Math.abs(hash) % colors.length];
+    return (
+      <div style={{
+        width: '24px', height: '24px', borderRadius: '50%', backgroundColor: color,
+        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '10.5px', fontWeight: 800, flexShrink: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        {firstChar}
+      </div>
+    );
+  };
+
+  // Helper to format activity details nicely with inline elements and badges
+  const renderActivityDetails = (details: string) => {
+    // Check for "Updated row #XXX in "RegisterName": Column changed from "Old" to "New""
+    const updateRowRegex = /^Updated row #(\d+) in "([^"]+)":\s+([a-zA-Z0-9_\s/\-()]+)\s+changed from\s+([\s\S]*?)\s+to\s+([\s\S]*)$/;
+    const match = details.match(updateRowRegex);
+    if (match) {
+      const [_, rowNum, registerName, colName, oldVal, newVal] = match;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: 'var(--foreground)', lineHeight: '1.5' }}>
+          <span>Updated</span>
+          <span style={{ background: 'rgba(99, 102, 241, 0.08)', color: '#6366f1', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>in</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+          <span>:</span>
+          <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{colName}</span>
+          <span style={{ color: 'var(--muted)', fontSize: '12px' }}>changed from</span>
+          <span style={{ background: 'var(--border-light)', color: 'var(--muted)', padding: '2px 6px', borderRadius: '4px', fontSize: '11.5px', textDecoration: 'line-through', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {oldVal === '""' || !oldVal ? '""' : oldVal}
+          </span>
+          <span style={{ color: 'var(--muted)' }}>➔</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11.5px', fontWeight: 600, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {newVal === '""' || !newVal ? '""' : newVal}
+          </span>
+        </div>
+      );
+    }
+
+    // Check for "Added new row #XXX in "RegisterName""
+    const addRowRegex = /^Added new row #(\d+) in "([^"]+)"/;
+    const matchAdd = details.match(addRowRegex);
+    if (matchAdd) {
+      const [_, rowNum, registerName] = matchAdd;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: 'var(--foreground)' }}>
+          <span style={{ color: 'var(--brand-green)', fontWeight: 700 }}>Added new row</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.08)', color: 'var(--brand-green)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>in</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+        </div>
+      );
+    }
+
+    // Check for "Deleted row #XXX from "RegisterName""
+    const deleteRowRegex = /^Deleted row #(\d+) from "([^"]+)"/;
+    const matchDelete = details.match(deleteRowRegex);
+    if (matchDelete) {
+      const [_, rowNum, registerName] = matchDelete;
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: 'var(--foreground)' }}>
+          <span style={{ color: 'var(--danger)', fontWeight: 700 }}>Deleted row</span>
+          <span style={{ background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+            Row #{rowNum}
+          </span>
+          <span>from</span>
+          <span style={{ fontWeight: 700, color: 'var(--navy)' }}>
+            {registerName}
+          </span>
+        </div>
+      );
+    }
+
+    // Generic highlight logic for quoted text
+    const parts = details.split(/(".*?")/g);
+    return (
+      <div style={{ fontSize: '13.5px', color: 'var(--foreground)', fontWeight: 500, lineHeight: 1.4 }}>
+        {parts.map((part, i) => {
+          if (part.startsWith('"') && part.endsWith('"')) {
+            return <strong key={i} style={{ color: 'var(--navy)', fontWeight: 700 }}>{part.replace(/"/g, '')}</strong>;
+          }
+          return part;
+        })}
+      </div>
+    );
+  };
+
+  // Group filtered items by date (e.g. "Today", "Yesterday", "July 4, 2026")
+  const groupedActivities = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    filtered.forEach(a => {
+      const date = new Date(a.timestamp);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      let groupKey = '';
+      if (date.toDateString() === today.toDateString()) {
+        groupKey = 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        groupKey = 'Yesterday';
+      } else {
+        groupKey = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(a);
+    });
+    return groups;
+  }, [filtered]);
 
   return (
     <div className="admin-animate-fade-in">
@@ -399,55 +528,171 @@ export default function AdminActivityPage() {
         )}
       </div>
 
-      {/* Activities Container */}
-      <div className="admin-card-glass" style={{padding:0, overflow:'hidden', border:'1px solid var(--border)'}}>
-        {loading ? <div style={{padding:'60px',textAlign:'center',color:'var(--muted)',fontWeight:600}}><RefreshCw className="animate-spin" style={{display:'inline-block',marginRight:'8px'}} size={16}/> Loading activities...</div> : (
-          <div style={{maxHeight:'calc(100vh - 270px)',overflowY:'auto'}} ref={containerRef} onScroll={handleScroll}>
-            {filtered.map(a => (
-              <div key={a.id} className="admin-activity-item" style={{display:'flex',alignItems:'center',gap:'16px',padding:'16px 20px',borderBottom:'1px solid var(--border-light)',transition:'all 0.2s'}}>
-                <div style={{width:'38px',height:'38px',borderRadius:'12px',background:'var(--background)',border:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                  {ICONS[a.action] || <Activity size={16} color="var(--muted)"/>}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:'14px',color:'var(--foreground)',fontWeight:600}}>{a.details}</div>
-                  <div style={{fontSize:'12px',color:'var(--muted)',marginTop:'6px',display:'flex',flexWrap:'wrap',gap:'6px',alignItems:'center'}}>
-                    <span className="admin-badge-pill" style={{
-                      background:'rgba(0,45,93,0.06)',color:'var(--navy)',fontWeight:700,fontSize:'11px',padding:'3px 10px'
-                    }}>
-                      {a.userName}
-                    </span>
-                    <span>•</span>
-                    <span className="admin-badge-pill" style={{
-                      background:`${ICONS[a.action] ? 'rgba(99,102,241,0.08)' : 'rgba(71,85,105,0.08)'}`,
-                      color:`${ICONS[a.action] ? 'var(--primary)' : 'var(--muted)'}`,
-                      fontWeight:600,fontSize:'11px',padding:'3px 10px'
-                    }}>
-                      {ACTION_LABELS[a.action] || a.action.replace(/_/g, ' ')}
-                    </span>
+      {/* Activities Timeline Container */}
+      <div className="admin-card-glass" style={{ padding: '24px 20px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+        {loading ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--muted)', fontWeight: 600 }}>
+            <RefreshCw className="animate-spin" style={{ display: 'inline-block', marginRight: '8px' }} size={16} />
+            Loading activities...
+          </div>
+        ) : (
+          <div style={{ maxHeight: 'calc(100vh - 270px)', overflowY: 'auto', paddingRight: '8px' }} ref={containerRef} onScroll={handleScroll}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--muted)', fontWeight: 500 }}>
+                {activeFilterCount > 0 ? 'No activity matches your filters' : 'No activity logs found'}
+              </div>
+            ) : (
+              Object.entries(groupedActivities).map(([day, items]) => (
+                <div key={day} style={{ marginBottom: '28px', position: 'relative' }}>
+                  {/* Sticky Date Header */}
+                  <div style={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 2,
+                    background: 'var(--surface)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    color: 'var(--navy)',
+                    boxShadow: 'var(--admin-card-shadow)',
+                    border: '1px solid var(--border-light)',
+                    marginBottom: '20px'
+                  }}>
+                    <Calendar size={13} color="var(--accent)" />
+                    {day}
+                  </div>
+
+                  {/* Vertical line connecting the timeline nodes of this day */}
+                  <div style={{
+                    position: 'absolute',
+                    left: '21px',
+                    top: '38px',
+                    bottom: '8px',
+                    width: '2px',
+                    background: 'linear-gradient(to bottom, var(--border), var(--border-light))',
+                    zIndex: 0
+                  }} />
+
+                  {/* Day's Activities List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {items.map(a => {
+                      const iconBg = ICONS[a.action] ? 'var(--surface)' : 'rgba(71,85,105,0.04)';
+                      return (
+                        <div 
+                          key={a.id} 
+                          className="admin-timeline-item" 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '16px',
+                            position: 'relative',
+                            zIndex: 1,
+                            paddingLeft: '6px',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {/* Circular Timeline Node */}
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: iconBg,
+                            border: '1.5px solid var(--border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                            zIndex: 2
+                          }}>
+                            {ICONS[a.action] || <Activity size={14} color="var(--muted)" />}
+                          </div>
+
+                          {/* Activity Detail Card Content */}
+                          <div 
+                            className="admin-timeline-content"
+                            style={{
+                              flex: 1,
+                              background: 'var(--surface)',
+                              border: '1px solid var(--border-light)',
+                              borderRadius: '12px',
+                              padding: '14px 18px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '10px',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {/* Upper: Formatted Description Details */}
+                            {renderActivityDetails(a.details)}
+
+                            {/* Lower: User, Action tag and Time stamp details */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '10px',
+                              paddingTop: '8px',
+                              borderTop: '1px solid var(--border-light)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {/* User avatar and Name badge */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,45,93,0.04)', padding: '2px 8px 2px 4px', borderRadius: '12px' }}>
+                                  {renderUserAvatar(a.userName)}
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--navy)' }}>
+                                    {a.userName}
+                                  </span>
+                                </div>
+
+                                {/* Action Category Badge */}
+                                <span style={{
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.04em',
+                                  color: 'var(--muted)',
+                                  background: 'var(--border-light)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px'
+                                }}>
+                                  {ACTION_LABELS[a.action] || a.action.replace(/_/g, ' ')}
+                                </span>
+                              </div>
+
+                              {/* Time badge */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--muted)', fontWeight: 500 }}>
+                                <Clock size={11} />
+                                <span>{new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <div style={{fontSize:'12px',color:'var(--muted)',whiteSpace:'nowrap',flexShrink:0,fontWeight:500,textAlign:'right'}}>
-                  <div style={{fontWeight:600,color:'var(--foreground)'}}>{new Date(a.timestamp).toLocaleDateString()}</div>
-                  <div style={{fontSize:'11px',opacity:0.7,marginTop:'2px'}}>{new Date(a.timestamp).toLocaleTimeString()}</div>
-                </div>
-              </div>
-            ))}
-            {filtered.length===0 && <div style={{padding:'60px',textAlign:'center',color:'var(--muted)',fontWeight:500}}>
-              {activeFilterCount > 0 ? 'No activity matches your filters' : 'No activity logs found'}
-            </div>}
+              ))
+            )}
+
             {loadingMore && (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--muted)', background: 'var(--background)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--navy)', display: 'inline-block' }} />
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', background: 'var(--background)', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '12px', marginTop: '16px' }}>
+                <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--navy)' }} />
                 Loading older activities...
               </div>
             )}
             {!loadingMore && hasMore && filtered.length > 0 && (
-              <div style={{ padding: '16px', textAlign: 'center', background: 'var(--bg-light)' }}>
+              <div style={{ padding: '16px 0', textAlign: 'center' }}>
                 <button 
                   onClick={() => fetch_(false)}
                   className="admin-btn-secondary-flat"
                   style={{
-                    padding: '8px 20px', fontSize: '12px', fontWeight: 700, display: 'inline-flex', margin: '0 auto'
+                    padding: '10px 24px', fontSize: '13px', fontWeight: 700, borderRadius: '8px', cursor: 'pointer'
                   }}
                 >
                   Load More Activities
@@ -458,8 +703,13 @@ export default function AdminActivityPage() {
         )}
       </div>
       <style>{`
-        .admin-activity-item:hover {
-          background-color: rgba(0, 45, 93, 0.015) !important;
+        .admin-timeline-item:hover .admin-timeline-content {
+          border-color: var(--accent) !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+          transform: translateX(3px);
+        }
+        .admin-timeline-content {
+          transition: all 0.2s ease-in-out !important;
         }
       `}</style>
     </div>

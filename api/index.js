@@ -1280,6 +1280,58 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { message: 'Saved shortcut deleted' });
     }
 
+    // ─── DASHBOARD CONFIGURATION ─────────────────────────────────────────────
+
+    // Auto-create table if needed (runs once per cold start)
+    if (pathname.startsWith('/api/dashboard-config') && !globalThis._dashboardConfigTableCreated) {
+      try {
+        await query(`
+          CREATE TABLE IF NOT EXISTS dashboard_configurations (
+            business_id BIGINT PRIMARY KEY,
+            configured_sum_metrics TEXT NOT NULL,
+            shortcuts_order TEXT NOT NULL
+          )
+        `);
+        globalThis._dashboardConfigTableCreated = true;
+      } catch (e) {
+        console.error('Failed to auto-create dashboard_configurations table:', e);
+      }
+    }
+
+    // GET /api/dashboard-config?businessId=X
+    if (pathname === '/api/dashboard-config' && method === 'GET') {
+      const businessId = parseBigInt(url.searchParams.get('businessId'));
+      if (!businessId) return sendError(res, 400, 'businessId is required');
+      const result = await query('SELECT * FROM dashboard_configurations WHERE business_id = $1', [businessId]);
+      if (result.rowCount === 0) {
+        return sendJson(res, 200, { configuredSumMetrics: [], shortcutsOrder: [] });
+      }
+      const row = result.rows[0];
+      return sendJson(res, 200, {
+        configuredSumMetrics: typeof row.configured_sum_metrics === 'string' ? JSON.parse(row.configured_sum_metrics) : row.configured_sum_metrics,
+        shortcutsOrder: typeof row.shortcuts_order === 'string' ? JSON.parse(row.shortcuts_order) : row.shortcuts_order
+      });
+    }
+
+    // POST /api/dashboard-config
+    if (pathname === '/api/dashboard-config' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (!data.businessId) return sendError(res, 400, 'businessId is required');
+      
+      const metricsJson = JSON.stringify(data.configuredSumMetrics || []);
+      const orderJson = JSON.stringify(data.shortcutsOrder || []);
+
+      await query(`
+        INSERT INTO dashboard_configurations (business_id, configured_sum_metrics, shortcuts_order)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (business_id) DO UPDATE SET
+          configured_sum_metrics = EXCLUDED.configured_sum_metrics,
+          shortcuts_order = EXCLUDED.shortcuts_order
+      `, [data.businessId, metricsJson, orderJson]);
+
+      return sendJson(res, 200, { message: 'Dashboard configuration updated successfully' });
+    }
+
     // If no route matches, return 404
     return sendError(res, 404, `Route ${pathname} not found`);
 
