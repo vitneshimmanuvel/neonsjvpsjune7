@@ -93,16 +93,54 @@ export function FilterModal({
     return columns.filter(c => c.name.toLowerCase().includes(q));
   }, [columns, colSearch]);
   
+  // Excel-style cascading filter: pre-filter entries by all existing filters
+  // so the value list for the next filter only shows values from matching rows
+  const preFilteredEntries = useMemo(() => {
+    if (filters.length === 0) return entries;
+    return entries.filter(e => {
+      for (const f of filters) {
+        const val = (e.cells?.[f.columnId.toString()] || '').trim();
+        const lVal = val.toLowerCase();
+        const lFilter = (f.value || '').toLowerCase();
+        const valNum = parseFloat(val.replace(/[^0-9.-]/g, ''));
+        const nValue = parseFloat((f.value || '').replace(/[^0-9.-]/g, ''));
+        const nValue2 = parseFloat((f.value2 || '0').replace(/[^0-9.-]/g, ''));
+        let cond = true;
+        switch (f.operator) {
+          case 'contains': cond = lVal.includes(lFilter); break;
+          case 'not_contains': cond = !lVal.includes(lFilter); break;
+          case 'equals': cond = lVal === lFilter; break;
+          case 'not_equals': cond = lVal !== lFilter; break;
+          case 'starts_with': cond = lVal.startsWith(lFilter); break;
+          case 'ends_with': cond = lVal.endsWith(lFilter); break;
+          case 'eq': cond = !isNaN(valNum) && valNum === nValue; break;
+          case 'gt': cond = !isNaN(valNum) && valNum > nValue; break;
+          case 'gte': cond = !isNaN(valNum) && valNum >= nValue; break;
+          case 'lt': cond = !isNaN(valNum) && valNum < nValue; break;
+          case 'lte': cond = !isNaN(valNum) && valNum <= nValue; break;
+          case 'between': cond = !isNaN(valNum) && valNum >= nValue && valNum <= nValue2; break;
+          case 'not_between': cond = !isNaN(valNum) && (valNum < nValue || valNum > nValue2); break;
+          case 'empty': cond = !val; break;
+          case 'not_empty': cond = !!val; break;
+          case 'multi_select': cond = !val ? (f.values || []).includes('(Blanks)') : (f.values || []).includes(val); break;
+          default: cond = true;
+        }
+        if (!cond) return false;
+      }
+      return true;
+    });
+  }, [entries, filters]);
+
   const uniqueValues = useMemo(() => {
     if (!selectedColId) return [];
     const set = new Set<string>();
     const colIdStr = selectedColId.toString();
-    entries.forEach(e => {
+    preFilteredEntries.forEach(e => {
       const val = e.cells?.[colIdStr];
       if (val && val.trim()) set.add(val.trim());
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [selectedColId, entries]);
+  }, [selectedColId, preFilteredEntries]);
 
   const selectedCol = columns.find(c => c.id === selectedColId);
   const ops = selectedCol ? getOpsForType(selectedCol.type) : [];
