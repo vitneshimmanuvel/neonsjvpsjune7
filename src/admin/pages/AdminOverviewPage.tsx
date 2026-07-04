@@ -18,6 +18,8 @@ import {
   Maximize2, Minimize2, Database, Columns, Plus, Bookmark, MoreVertical
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '../../lib/formatters';
+import { FilterModal } from '../../components/register/modals/FilterModal';
 
 interface ServerUser {
   id: string; name: string; email: string; role: string; status: string;
@@ -82,7 +84,34 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   const [businessId, setBusinessId] = useState<number>(1);
   const [shortcuts, setShortcuts] = useState<SavedRegisterShortcut[]>([]);
   const [shortcutCounts, setShortcutCounts] = useState<Record<string, number>>({});
+  const [shortcutData, setShortcutData] = useState<Record<string, { columns: Column[]; filteredEntries: Entry[] }>>({});
+  const [shortcutDisplayModes, setShortcutDisplayModes] = useState<Record<string, { mode: 'count' | 'sum' | 'average'; columnId?: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_shortcut_display_modes');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [expandedSection, setExpandedSection] = useState<'sum' | 'average' | null>(null);
+
+  useEffect(() => {
+    // When menu changes, auto-expand the section containing the current mode
+    if (activeMenuId) {
+      const currentModeSetting = shortcutDisplayModes[activeMenuId]?.mode;
+      if (currentModeSetting === 'sum') {
+        setExpandedSection('sum');
+      } else if (currentModeSetting === 'average') {
+        setExpandedSection('average');
+      } else {
+        setExpandedSection(null);
+      }
+    } else {
+      setExpandedSection(null);
+    }
+  }, [activeMenuId, shortcutDisplayModes]);
+
   const [renamingShortcut, setRenamingShortcut] = useState<SavedRegisterShortcut | null>(null);
   const [renameShortcutName, setRenameShortcutName] = useState('');
   // Detail panel
@@ -160,23 +189,29 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     if (shortcuts.length === 0) return;
     const loadCounts = async () => {
       const counts: Record<string, number> = {};
+      const data: Record<string, { columns: Column[]; filteredEntries: Entry[] }> = {};
       await Promise.all(
         shortcuts.map(async (s) => {
           try {
             const full = await getRegister(s.registerId);
-            const count = getFilteredEntriesCount(
+            const filtered = getFilteredEntriesList(
               full.columns || [],
               full.entries || [],
               s.searchQuery || '',
               s.filters || []
             );
-            counts[s.id] = count;
+            data[s.id] = {
+              columns: full.columns || [],
+              filteredEntries: filtered
+            };
+            counts[s.id] = filtered.length;
           } catch (e) {
-            console.error(`Failed to load count for shortcut ${s.id}:`, e);
+            console.error(`Failed to load data for shortcut ${s.id}:`, e);
             counts[s.id] = 0;
           }
         })
       );
+      setShortcutData(prev => ({ ...prev, ...data }));
       setShortcutCounts(prev => ({ ...prev, ...counts }));
     };
     loadCounts();
@@ -493,7 +528,8 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   flexDirection: 'column',
                   justifyContent: 'space-between',
                   minHeight: '130px',
-                  padding: '16px'
+                  padding: '16px',
+                  overflow: 'visible'
                 }}
               >
                 {/* Top Row: Icon, Register Name, and Options Menu */}
@@ -506,9 +542,13 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                   </span>
                   
                   {/* Three-dot options menu */}
-                  <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}>
                     <button
-                      onClick={() => setActiveMenuId(activeMenuId === s.id ? null : s.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setActiveMenuId(activeMenuId === s.id ? null : s.id);
+                      }}
                       title="Options"
                       style={{
                         background: 'none',
@@ -527,25 +567,32 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                     >
                       <MoreVertical size={16} />
                     </button>
-
+ 
                     {/* Dropdown Menu */}
                     {activeMenuId === s.id && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '24px',
-                        right: '0',
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        boxShadow: 'var(--admin-card-shadow)',
-                        zIndex: 10,
-                        minWidth: '120px',
-                        padding: '4px 0',
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}>
+                      <div 
+                        onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+                        style={{
+                          position: 'absolute',
+                          top: '24px',
+                          right: '0',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          boxShadow: 'var(--admin-card-shadow)',
+                          zIndex: 10,
+                          minWidth: '160px',
+                          maxHeight: '260px',
+                          overflowY: 'auto',
+                          padding: '4px 0',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                             setRenamingShortcut(s);
                             setRenameShortcutName(s.name);
                             setActiveMenuId(null);
@@ -568,6 +615,8 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                         </button>
                         <button
                           onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                             handleDeleteShortcut(s.id, e);
                             setActiveMenuId(null);
                           }}
@@ -587,26 +636,352 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
                         >
                           Delete
                         </button>
+ 
+                        {/* Display Metric Section */}
+                        {(() => {
+                          const data = shortcutData[s.id];
+                          const numericCols = data?.columns.filter(isNumericColumn) || [];
+                          const currentMode = shortcutDisplayModes[s.id] || { mode: 'count' };
+
+                          return (
+                            <>
+                              <div style={{ borderTop: '1px solid var(--border-light)', margin: '4px 0' }} />
+                              <div style={{ padding: '4px 12px', fontSize: '9.5px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Display Metric
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: currentMode.columnId } };
+                                  setShortcutDisplayModes(nextModes);
+                                  localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                  setActiveMenuId(null);
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  padding: '8px 12px',
+                                  textAlign: 'left',
+                                  fontSize: '12px',
+                                  color: currentMode.mode === 'count' ? 'var(--brand-green)' : 'var(--foreground)',
+                                  cursor: 'pointer',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.15s',
+                                  width: '100%',
+                                  boxSizing: 'border-box'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                              >
+                                <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                  {currentMode.mode === 'count' ? '✓' : ''}
+                                </span>
+                                Count (Entries)
+                              </button>
+
+                              {/* Sum Section */}
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setExpandedSection(expandedSection === 'sum' ? null : 'sum');
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '8px 12px',
+                                    textAlign: 'left',
+                                    fontSize: '12px',
+                                    color: currentMode.mode === 'sum' ? 'var(--brand-green)' : 'var(--foreground)',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    transition: 'all 0.15s',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                >
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                      {currentMode.mode === 'sum' ? '✓' : ''}
+                                    </span>
+                                    Sum
+                                  </span>
+                                  <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'sum' ? '▼' : '▶'}</span>
+                                </button>
+
+                                {expandedSection === 'sum' && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                                    {!data ? (
+                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                        Loading columns...
+                                      </div>
+                                    ) : numericCols.length === 0 ? (
+                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                        No numeric columns
+                                      </div>
+                                    ) : (
+                                      numericCols.map(col => {
+                                        const isActive = currentMode.mode === 'sum' && currentMode.columnId === col.id;
+                                        return (
+                                          <button
+                                            key={`sum-${col.id}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: col.id } };
+                                              setShortcutDisplayModes(nextModes);
+                                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                              setActiveMenuId(null);
+                                            }}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              padding: '6px 12px 6px 16px',
+                                              textAlign: 'left',
+                                              fontSize: '11.5px',
+                                              color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                              cursor: 'pointer',
+                                              fontWeight: 600,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '6px',
+                                              transition: 'all 0.15s',
+                                              width: '100%',
+                                              boxSizing: 'border-box'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                          >
+                                            <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                              {isActive ? '✓' : ''}
+                                            </span>
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                              {col.name}
+                                            </span>
+                                          </button>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Average Section */}
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setExpandedSection(expandedSection === 'average' ? null : 'average');
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '8px 12px',
+                                    textAlign: 'left',
+                                    fontSize: '12px',
+                                    color: currentMode.mode === 'average' ? 'var(--brand-green)' : 'var(--foreground)',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    transition: 'all 0.15s',
+                                    width: '100%',
+                                    boxSizing: 'border-box'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                >
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                      {currentMode.mode === 'average' ? '✓' : ''}
+                                    </span>
+                                    Average
+                                  </span>
+                                  <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'average' ? '▼' : '▶'}</span>
+                                </button>
+
+                                {expandedSection === 'average' && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                                    {!data ? (
+                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                        Loading columns...
+                                      </div>
+                                    ) : numericCols.length === 0 ? (
+                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                        No numeric columns
+                                      </div>
+                                    ) : (
+                                      numericCols.map(col => {
+                                        const isActive = currentMode.mode === 'average' && currentMode.columnId === col.id;
+                                        return (
+                                          <button
+                                            key={`avg-${col.id}`}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: col.id } };
+                                              setShortcutDisplayModes(nextModes);
+                                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                              setActiveMenuId(null);
+                                            }}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              padding: '6px 12px 6px 16px',
+                                              textAlign: 'left',
+                                              fontSize: '11.5px',
+                                              color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                              cursor: 'pointer',
+                                              fontWeight: 600,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '6px',
+                                              transition: 'all 0.15s',
+                                              width: '100%',
+                                              boxSizing: 'border-box'
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                          >
+                                            <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                              {isActive ? '✓' : ''}
+                                            </span>
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                              {col.name}
+                                            </span>
+                                          </button>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Middle & Bottom Row: Big entry count & Shortcut Label */}
-                <div>
-                  <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                    {shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...'}
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>entries</span>
-                  </div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
-                    {s.name}
-                  </div>
-                  {s.filters && s.filters.length > 0 && (
-                    <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
-                      {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+                {/* Middle & Bottom Row: Big entry count / sum / average & Shortcut Label */}
+                {(() => {
+                  const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
+                  let displayVal: string | number = '...';
+                  let displayLabel = 'entries';
+
+                  if (modeSetting.mode === 'sum' && modeSetting.columnId !== undefined) {
+                    const data = shortcutData[s.id];
+                    if (data) {
+                      const col = data.columns.find(c => c.id === modeSetting.columnId);
+                      if (col) {
+                        const sum = calculateSumForColumn(data.filteredEntries, col.id);
+                        const isCurrency = col.type?.toLowerCase() === 'currency';
+                        displayVal = isCurrency ? formatCurrency(sum) : sum.toLocaleString();
+                        displayLabel = `sum of ${col.name}`;
+                      } else {
+                        displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+                        displayLabel = 'entries';
+                      }
+                    }
+                  } else if (modeSetting.mode === 'average' && modeSetting.columnId !== undefined) {
+                    const data = shortcutData[s.id];
+                    if (data) {
+                      const col = data.columns.find(c => c.id === modeSetting.columnId);
+                      if (col) {
+                        const avg = calculateAverageForColumn(data.filteredEntries, col.id);
+                        const isCurrency = col.type?.toLowerCase() === 'currency';
+                        const formattedAvg = Number(avg.toFixed(2));
+                        displayVal = isCurrency ? formatCurrency(formattedAvg) : formattedAvg.toLocaleString();
+                        displayLabel = `avg of ${col.name}`;
+                      } else {
+                        displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+                        displayLabel = 'entries';
+                      }
+                    }
+                  } else {
+                    displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+                    displayLabel = 'entries';
+                  }
+
+                  return (
+                    <div>
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const data = shortcutData[s.id];
+                          const numericCols = data?.columns.filter(isNumericColumn) || [];
+                          if (modeSetting.mode === 'count') {
+                            if (numericCols.length > 0) {
+                              const targetColId = modeSetting.columnId ?? numericCols[0].id;
+                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: targetColId } };
+                              setShortcutDisplayModes(nextModes);
+                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                            } else {
+                              toast.error("No numeric columns available in this register to sum.");
+                            }
+                          } else if (modeSetting.mode === 'sum') {
+                            const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: modeSetting.columnId } };
+                            setShortcutDisplayModes(nextModes);
+                            localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                          } else {
+                            const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: modeSetting.columnId } };
+                            setShortcutDisplayModes(nextModes);
+                            localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'baseline',
+                          gap: '4px',
+                          flexWrap: 'wrap',
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          padding: '2px 6px',
+                          marginLeft: '-6px',
+                          borderRadius: '6px',
+                          transition: 'all 0.15s'
+                        }}
+                        title="Click to toggle Count/Sum/Average"
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'var(--border-light)';
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'none';
+                          e.currentTarget.style.transform = 'none';
+                        }}
+                      >
+                        <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
+                          {displayVal}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>
+                          {displayLabel}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+                        {s.name}
+                      </div>
+                      {s.filters && s.filters.length > 0 && (
+                        <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                          {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -993,7 +1368,7 @@ function getFilteredEntriesCount(
   columns: Column[],
   entries: Entry[],
   searchQuery: string,
-  filters: Array<{ columnId: number; operator: string; value: string; values?: string[] }>
+  filters: Array<{ columnId: number; operator: string; value: string; value2?: string; values?: string[] }>
 ) {
   const s = searchQuery.toLowerCase().trim();
   const filterLen = filters.length;
@@ -1003,9 +1378,9 @@ function getFilteredEntriesCount(
     ...f,
     lFilter: (f.value || '').toLowerCase(),
     nValue: parseFloat(f.value),
-    nValue2: 0,
+    nValue2: parseFloat(f.value2 || '0'),
     dValue: f.value,
-    dValue2: '',
+    dValue2: f.value2 || '',
     values: f.values || [],
   }));
 
@@ -1065,6 +1440,126 @@ function getFilteredEntriesCount(
   }
   return matchCount;
 }
+
+/* Helper to get filtered entries list for saved shortcuts */
+function getFilteredEntriesList(
+  columns: Column[],
+  entries: Entry[],
+  searchQuery: string,
+  filters: Array<{ columnId: number; operator: string; value: string; value2?: string; values?: string[] }>
+): Entry[] {
+  const s = searchQuery.toLowerCase().trim();
+  const filterLen = filters.length;
+  if (!s && filterLen === 0) return entries;
+
+  const preparedFilters = filters.map(f => ({
+    ...f,
+    lFilter: (f.value || '').toLowerCase(),
+    nValue: parseFloat(f.value),
+    nValue2: parseFloat(f.value2 || '0'),
+    dValue: f.value,
+    dValue2: f.value2 || '',
+    values: f.values || [],
+  }));
+
+  const matches: Entry[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+
+    // Search
+    if (s) {
+      let match = false;
+      const cells = e.cells || {};
+      for (const key in cells) {
+        const val = cells[key];
+        if (val && typeof val === 'string' && val.toLowerCase().includes(s)) {
+          match = true;
+          break;
+        }
+      }
+      if (!match) continue;
+    }
+
+    // Filters
+    if (filterLen > 0) {
+      let pass = true;
+      for (let j = 0; j < filterLen; j++) {
+        const f = preparedFilters[j];
+        const val = (e.cells?.[f.columnId.toString()] || '').trim();
+        const lVal = val.toLowerCase();
+        let cond = true;
+        switch (f.operator) {
+          case 'contains': cond = lVal.includes(f.lFilter); break;
+          case 'not_contains': cond = !lVal.includes(f.lFilter); break;
+          case 'equals': cond = lVal === f.lFilter; break;
+          case 'not_equals': cond = lVal !== f.lFilter; break;
+          case 'starts_with': cond = lVal.startsWith(f.lFilter); break;
+          case 'ends_with': cond = lVal.endsWith(f.lFilter); break;
+          case 'eq': cond = parseFloat(val) === f.nValue; break;
+          case 'gt': cond = parseFloat(val) > f.nValue; break;
+          case 'gte': cond = parseFloat(val) >= f.nValue; break;
+          case 'lt': cond = parseFloat(val) < f.nValue; break;
+          case 'lte': cond = parseFloat(val) <= f.nValue; break;
+          case 'between': { const n = parseFloat(val); cond = n >= f.nValue && n <= f.nValue2; break; }
+          case 'date_is': cond = parseDateString(val) === f.dValue; break;
+          case 'date_before': cond = parseDateString(val) < f.dValue; break;
+          case 'date_after': cond = parseDateString(val) > f.dValue; break;
+          case 'date_between': { const dV = parseDateString(val); cond = dV >= f.dValue && dV <= f.dValue2; break; }
+          case 'empty': cond = !val; break;
+          case 'not_empty': cond = !!val; break;
+          case 'multi_select': cond = !val ? (f.values || []).includes('(Blanks)') : (f.values || []).includes(val); break;
+        }
+        if (!cond) { pass = false; break; }
+      }
+      if (!pass) continue;
+    }
+
+    matches.push(e);
+  }
+  return matches;
+}
+
+/* Helper to check if a column is numeric/summable */
+function isNumericColumn(col: Column) {
+  const t = col.type?.toLowerCase();
+  return t === 'number' || t === 'currency' || t === 'formula' || t === 'auto_increment' || t === 'rating';
+}
+
+/* Helper to calculate the sum of a numeric column for entries */
+function calculateSumForColumn(entries: Entry[], columnId: number) {
+  let sum = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const val = entries[i].cells?.[columnId.toString()];
+    if (val) {
+      // Strip all characters except digits, decimal points, and minus signs (e.g. removes currency symbols, commas, spaces)
+      const cleanVal = val.replace(/[^0-9.-]/g, '');
+      const parsed = parseFloat(cleanVal);
+      if (!isNaN(parsed)) {
+        sum += parsed;
+      }
+    }
+  }
+  return sum;
+}
+
+/* Helper to calculate the average of a numeric column for entries */
+function calculateAverageForColumn(entries: Entry[], columnId: number) {
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const val = entries[i].cells?.[columnId.toString()];
+    if (val) {
+      const cleanVal = val.replace(/[^0-9.-]/g, '');
+      const parsed = parseFloat(cleanVal);
+      if (!isNaN(parsed)) {
+        sum += parsed;
+        count++;
+      }
+    }
+  }
+  return count > 0 ? sum / count : 0;
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════════
    FILTER OPS — same as RegisterPage
@@ -1131,7 +1626,7 @@ function RegisterDetailPanel({
   detailEntries: Entry[];
   onClose: () => void;
   initialSearch?: string;
-  initialFilters?: Array<{ columnId: number; operator: string; value: string; values?: string[] }>;
+  initialFilters?: Array<{ columnId: number; operator: string; value: string; value2?: string; values?: string[] }>;
   onSaveShortcut: (name: string, searchQuery: string, filters: any[]) => void;
 }) {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -1142,11 +1637,8 @@ function RegisterDetailPanel({
 
   // Local states to avoid rendering parent component on every keystroke
   const [detailSearch, setDetailSearch] = useState(initialSearch);
-  const [detailFilters, setDetailFilters] = useState<Array<{ columnId: number; operator: string; value: string; values?: string[] }>>(initialFilters);
-  const [newFilterCol, setNewFilterCol] = useState<number | null>(null);
-  const [newFilterOp, setNewFilterOp] = useState('contains');
-  const [newFilterVal, setNewFilterVal] = useState('');
-  const [newFilterValues, setNewFilterValues] = useState<string[]>([]);
+  const [detailFilters, setDetailFilters] = useState<Array<{ columnId: number; operator: string; value: string; value2?: string; values?: string[] }>>(initialFilters);
+
 
   // Save shortcut modal states
   const [showSaveShortcutModal, setShowSaveShortcutModal] = useState(false);
@@ -1255,9 +1747,9 @@ function RegisterDetailPanel({
       ...f,
       lFilter: (f.value || '').toLowerCase(),
       nValue: parseFloat(f.value),
-      nValue2: 0,
+      nValue2: parseFloat(f.value2 || '0'),
       dValue: f.value,
-      dValue2: '',
+      dValue2: f.value2 || '',
       values: f.values || [],
     }));
 
@@ -1325,34 +1817,7 @@ function RegisterDetailPanel({
     return displayEntries.slice(start, start + itemsPerPage);
   }, [displayEntries, currentPage, itemsPerPage]);
 
-  // Unique values for multi-select per column
-  const uniqueValuesForCol = useMemo(() => {
-    if (!newFilterCol) return [];
-    const set = new Set<string>();
-    const colIdStr = newFilterCol.toString();
-    detailEntries.forEach(e => {
-      const val = (e.cells?.[colIdStr] || '').trim();
-      if (val) set.add(val);
-    });
-    return Array.from(set).sort();
-  }, [newFilterCol, detailEntries]);
 
-  const handleAddFilter = () => {
-    if (!newFilterCol) return;
-    if (newFilterOp === 'multi_select') {
-      if (newFilterValues.length === 0) return;
-      setDetailFilters([...detailFilters, { columnId: newFilterCol, operator: newFilterOp, value: '', values: newFilterValues }]);
-    } else if (newFilterOp !== 'empty' && newFilterOp !== 'not_empty' && !newFilterVal.trim()) {
-      return;
-    } else {
-      setDetailFilters([...detailFilters, { columnId: newFilterCol, operator: newFilterOp, value: newFilterVal }]);
-    }
-    // Reset for next filter but keep panel open for adding more
-    setNewFilterCol(null);
-    setNewFilterOp('contains');
-    setNewFilterVal('');
-    setNewFilterValues([]);
-  };
 
   const isFiltered = !!deferredSearch.trim() || detailFilters.length > 0;
 
@@ -1572,79 +2037,6 @@ function RegisterDetailPanel({
             </button>
           )}
 
-          {/* Inline Add Filter dropdown and selectors */}
-          {showFilterPanel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-              <select
-                value={newFilterCol ?? ''}
-                onChange={e => { setNewFilterCol(Number(e.target.value) || null); setNewFilterOp('contains'); setNewFilterVal(''); setNewFilterValues([]); }}
-                style={{
-                  padding: '6px 10px', borderRadius: '6px', border: '1.5px solid rgba(99,102,241,0.35)',
-                  background: 'var(--background)', color: 'var(--foreground)', fontSize: '12px', outline: 'none',
-                  width: '135px', fontWeight: 600, cursor: 'pointer'
-                }}
-              >
-                <option value="">+ Add Filter...</option>
-                {detailColumns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-
-              {newFilterCol && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--surface)', padding: '3px 6px', borderRadius: '6px', border: '1px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                  {/* Operator picker */}
-                  <select
-                    value={newFilterOp}
-                    onChange={e => { setNewFilterOp(e.target.value); setNewFilterVal(''); setNewFilterValues([]); }}
-                    style={{ padding: '4px 6px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '11px', outline: 'none' }}
-                  >
-                    {getOpsForType(detailColumns.find(c => c.id === newFilterCol)?.type || 'text').map(op => (
-                      <option key={op.key} value={op.key}>{op.label}</option>
-                    ))}
-                  </select>
-
-                  {/* Value input */}
-                  {newFilterOp === 'multi_select' ? (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '200px', maxHeight: '60px', overflowY: 'auto', padding: '3px', background: 'var(--background)', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                      {uniqueValuesForCol.length === 0 ? (
-                        <span style={{ fontSize: '10px', color: 'var(--muted)' }}>No values</span>
-                      ) : (
-                        <>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', padding: '1px 4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                            <input type="checkbox" checked={newFilterValues.includes('(Blanks)')} onChange={() => setNewFilterValues(newFilterValues.includes('(Blanks)') ? newFilterValues.filter(x => x !== '(Blanks)') : [...newFilterValues, '(Blanks)'])} style={{ width: '10px', height: '10px' }} />
-                            Blanks
-                          </label>
-                          {uniqueValuesForCol.map(v => (
-                            <label key={v} style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px', padding: '1px 4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                              <input type="checkbox" checked={newFilterValues.includes(v)} onChange={() => setNewFilterValues(newFilterValues.includes(v) ? newFilterValues.filter(x => x !== v) : [...newFilterValues, v])} style={{ width: '10px', height: '10px' }} />
-                              {v}
-                            </label>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  ) : newFilterOp !== 'empty' && newFilterOp !== 'not_empty' ? (
-                    <input
-                      type={newFilterOp.startsWith('date') ? 'date' : 'text'}
-                      placeholder="value..."
-                      value={newFilterVal}
-                      onChange={e => setNewFilterVal(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddFilter(); }}
-                      style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', fontSize: '11px', outline: 'none', width: '100px' }}
-                      autoFocus
-                    />
-                  ) : null}
-
-                  <button onClick={handleAddFilter} style={{ padding: '4px 10px', borderRadius: '4px', border: 'none', background: 'var(--accent)', color: 'white', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
-                    Apply
-                  </button>
-                  <button onClick={() => { setNewFilterCol(null); setNewFilterVal(''); setNewFilterValues([]); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '2px', display: 'flex' }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-
         </div>
 
         {/* Action buttons */}
@@ -1665,26 +2057,38 @@ function RegisterDetailPanel({
             <Bookmark size={15} color="var(--accent)" />
           </button>
 
-          {/* Filter toggle */}
-          <button
-            onClick={() => setShowFilterPanel(v => !v)}
-            title="Filters"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '34px', height: '34px', borderRadius: '8px',
-              border: showFilterPanel ? '1.5px solid rgba(99,102,241,0.4)' : '1.5px solid var(--border)',
-              background: showFilterPanel ? 'rgba(99,102,241,0.06)' : 'var(--background)',
-              color: showFilterPanel ? '#6366f1' : 'var(--foreground)',
-              cursor: 'pointer', transition: 'all 0.15s', position: 'relative', flexShrink: 0
-            }}
-          >
-            <Filter size={15} />
-            {detailFilters.length > 0 && (
-              <span style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%', background: '#6366f1', color: 'white', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {detailFilters.length}
-              </span>
-            )}
-          </button>
+          {/* Filter toggle and dropdown */}
+          <div className="pab-filter-wrapper" style={{ position: 'relative' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowFilterPanel(v => !v); }}
+              title="Filters"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '34px', height: '34px', borderRadius: '8px',
+                border: showFilterPanel ? '1.5px solid rgba(99,102,241,0.4)' : '1.5px solid var(--border)',
+                background: showFilterPanel ? 'rgba(99,102,241,0.06)' : 'var(--background)',
+                color: showFilterPanel ? '#6366f1' : 'var(--foreground)',
+                cursor: 'pointer', transition: 'all 0.15s', position: 'relative', flexShrink: 0
+              }}
+            >
+              <Filter size={15} />
+              {detailFilters.length > 0 && (
+                <span style={{ position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%', background: '#6366f1', color: 'white', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {detailFilters.length}
+                </span>
+              )}
+            </button>
+
+            <FilterModal
+              filterModal={showFilterPanel}
+              setFilterModal={setShowFilterPanel}
+              filters={detailFilters}
+              setFilters={setDetailFilters}
+              setActiveFilters={setDetailFilters}
+              columns={detailColumns}
+              entries={detailEntries}
+            />
+          </div>
 
           {/* Export Menu Dropdown */}
           <div style={{ position: 'relative' }}>
@@ -1844,9 +2248,14 @@ function RegisterDetailPanel({
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
               {detailFilters.map((f, idx) => {
                 const col = detailColumns.find(c => c.id === f.columnId);
-                const valText = f.operator === 'multi_select'
-                  ? `(${(f.values || []).length} selected)`
-                  : f.operator === 'empty' || f.operator === 'not_empty' ? '' : f.value;
+                let valText = '';
+                if (f.operator === 'multi_select') {
+                  valText = `(${(f.values || []).length} selected)`;
+                } else if (f.operator === 'between' || f.operator === 'date_between') {
+                  valText = `"${f.value}" to "${f.value2 || ''}"`;
+                } else if (f.operator !== 'empty' && f.operator !== 'not_empty') {
+                  valText = `"${f.value}"`;
+                }
                 return (
                   <div key={idx} style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px',
@@ -1856,7 +2265,7 @@ function RegisterDetailPanel({
                     <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: 600 }}>{idx === 0 ? 'WHERE' : 'AND'}</span>
                     <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--navy)' }}>{col?.name || 'Unknown'}</span>
                     <span style={{ fontSize: '10px', color: '#6366f1', fontWeight: 600 }}>{opLabel(f.operator)}</span>
-                    {valText && <span style={{ fontSize: '11px', color: 'var(--foreground)', fontWeight: 600 }}>"{valText}"</span>}
+                    {valText && <span style={{ fontSize: '11px', color: 'var(--foreground)', fontWeight: 600 }}>{valText}</span>}
                     <button
                       onClick={() => setDetailFilters(detailFilters.filter((_, i) => i !== idx))}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', padding: '2px', marginLeft: '2px', borderRadius: '4px', transition: 'all 0.15s' }}

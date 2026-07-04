@@ -1195,8 +1195,13 @@ export default async function handler(req, res) {
             register_name TEXT NOT NULL,
             search_query TEXT,
             filters TEXT NOT NULL,
+            summary_column_id BIGINT,
             created_at TIMESTAMP DEFAULT NOW()
           )
+        `);
+        // Ensure the column exists on existing installations
+        await query(`
+          ALTER TABLE saved_register_shortcuts ADD COLUMN IF NOT EXISTS summary_column_id BIGINT;
         `);
         globalThis._savedShortcutsTableCreated = true;
       } catch (e) {
