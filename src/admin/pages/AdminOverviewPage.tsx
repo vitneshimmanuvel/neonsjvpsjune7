@@ -341,6 +341,488 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     );
   }
 
+  const countShortcuts = shortcuts.filter(s => {
+    const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
+    return modeSetting.mode === 'count';
+  });
+
+  const sumShortcuts = shortcuts.filter(s => {
+    const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
+    return modeSetting.mode === 'sum' || modeSetting.mode === 'average';
+  });
+
+  const renderShortcutCard = (s: SavedRegisterShortcut) => {
+    return (
+      <div
+        key={s.id}
+        onClick={() => openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters)}
+        className="admin-stat-card-premium"
+        style={{
+          cursor: 'pointer',
+          border: '1px solid var(--border)',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          minHeight: '130px',
+          padding: '16px',
+          overflow: 'visible'
+        }}
+      >
+        {/* Top Row: Icon, Register Name, and Options Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', position: 'relative' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-green)', flexShrink: 0 }}>
+            <FileSpreadsheet size={16} />
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
+            {s.registerName}
+          </span>
+          
+          {/* Three-dot options menu */}
+          <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setActiveMenuId(activeMenuId === s.id ? null : s.id);
+              }}
+              title="Options"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--muted)',
+                padding: '4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--border-light)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {activeMenuId === s.id && (
+              <div 
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+                style={{
+                  position: 'absolute',
+                  top: '24px',
+                  right: '0',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--admin-card-shadow)',
+                  zIndex: 10,
+                  minWidth: '160px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  padding: '4px 0',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setRenamingShortcut(s);
+                    setRenameShortcutName(s.name);
+                    setActiveMenuId(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--foreground)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Change Name
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDeleteShortcut(s.id, e);
+                    setActiveMenuId(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 12px',
+                    textAlign: 'left',
+                    fontSize: '12px',
+                    color: 'var(--danger)',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Delete
+                </button>
+
+                {/* Display Metric Section */}
+                {(() => {
+                  const data = shortcutData[s.id];
+                  const numericCols = data?.columns.filter(isNumericColumn) || [];
+                  const currentMode = shortcutDisplayModes[s.id] || { mode: 'count' };
+
+                  return (
+                    <>
+                      <div style={{ borderTop: '1px solid var(--border-light)', margin: '4px 0' }} />
+                      <div style={{ padding: '4px 12px', fontSize: '9.5px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Display Metric
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: currentMode.columnId } };
+                          setShortcutDisplayModes(nextModes);
+                          localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                          setActiveMenuId(null);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          color: currentMode.mode === 'count' ? 'var(--brand-green)' : 'var(--foreground)',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                          {currentMode.mode === 'count' ? '✓' : ''}
+                        </span>
+                        Count (Entries)
+                      </button>
+
+                      {/* Sum Section */}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setExpandedSection(expandedSection === 'sum' ? null : 'sum');
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            color: currentMode.mode === 'sum' ? 'var(--brand-green)' : 'var(--foreground)',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            transition: 'all 0.15s',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                              {currentMode.mode === 'sum' ? '✓' : ''}
+                            </span>
+                            Sum
+                          </span>
+                          <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'sum' ? '▼' : '▶'}</span>
+                        </button>
+
+                        {expandedSection === 'sum' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                            {!data ? (
+                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                Loading columns...
+                              </div>
+                            ) : numericCols.length === 0 ? (
+                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                No numeric columns
+                              </div>
+                            ) : (
+                              numericCols.map(col => {
+                                const isActive = currentMode.mode === 'sum' && currentMode.columnId === col.id;
+                                return (
+                                  <button
+                                    key={`sum-${col.id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: col.id } };
+                                      setShortcutDisplayModes(nextModes);
+                                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                      setActiveMenuId(null);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: '6px 12px 6px 16px',
+                                      textAlign: 'left',
+                                      fontSize: '11.5px',
+                                      color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                      cursor: 'pointer',
+                                      fontWeight: 600,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      transition: 'all 0.15s',
+                                      width: '100%',
+                                      boxSizing: 'border-box'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                  >
+                                    <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                      {isActive ? '✓' : ''}
+                                    </span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                      {col.name}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Average Section */}
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setExpandedSection(expandedSection === 'average' ? null : 'average');
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            color: currentMode.mode === 'average' ? 'var(--brand-green)' : 'var(--foreground)',
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            transition: 'all 0.15s',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                              {currentMode.mode === 'average' ? '✓' : ''}
+                            </span>
+                            Average
+                          </span>
+                          <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'average' ? '▼' : '▶'}</span>
+                        </button>
+
+                        {expandedSection === 'average' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
+                            {!data ? (
+                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                Loading columns...
+                              </div>
+                            ) : numericCols.length === 0 ? (
+                              <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
+                                No numeric columns
+                              </div>
+                            ) : (
+                              numericCols.map(col => {
+                                const isActive = currentMode.mode === 'average' && currentMode.columnId === col.id;
+                                return (
+                                  <button
+                                    key={`avg-${col.id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: col.id } };
+                                      setShortcutDisplayModes(nextModes);
+                                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                                      setActiveMenuId(null);
+                                    }}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: '6px 12px 6px 16px',
+                                      textAlign: 'left',
+                                      fontSize: '11.5px',
+                                      color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
+                                      cursor: 'pointer',
+                                      fontWeight: 600,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      transition: 'all 0.15s',
+                                      width: '100%',
+                                      boxSizing: 'border-box'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                                  >
+                                    <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
+                                      {isActive ? '✓' : ''}
+                                    </span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
+                                      {col.name}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Middle & Bottom Row: Big entry count / sum / average & Shortcut Label */}
+        {(() => {
+          const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
+          let displayVal: string | number = '...';
+          let displayLabel = 'entries';
+
+          if (modeSetting.mode === 'sum' && modeSetting.columnId !== undefined) {
+            const data = shortcutData[s.id];
+            if (data) {
+              const col = data.columns.find(c => c.id === modeSetting.columnId);
+              if (col) {
+                const sum = calculateSumForColumn(data.filteredEntries, col.id);
+                const isCurrency = col.type?.toLowerCase() === 'currency';
+                displayVal = isCurrency ? formatCurrency(sum) : sum.toLocaleString();
+                displayLabel = `sum of ${col.name}`;
+              } else {
+                displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+                displayLabel = 'entries';
+              }
+            }
+          } else if (modeSetting.mode === 'average' && modeSetting.columnId !== undefined) {
+            const data = shortcutData[s.id];
+            if (data) {
+              const col = data.columns.find(c => c.id === modeSetting.columnId);
+              if (col) {
+                const avg = calculateAverageForColumn(data.filteredEntries, col.id);
+                const isCurrency = col.type?.toLowerCase() === 'currency';
+                const formattedAvg = Number(avg.toFixed(2));
+                displayVal = isCurrency ? formatCurrency(formattedAvg) : formattedAvg.toLocaleString();
+                displayLabel = `avg of ${col.name}`;
+              } else {
+                displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+                displayLabel = 'entries';
+              }
+            }
+          } else {
+            displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
+            displayLabel = 'entries';
+          }
+
+          return (
+            <div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const data = shortcutData[s.id];
+                  const numericCols = data?.columns.filter(isNumericColumn) || [];
+                  if (modeSetting.mode === 'count') {
+                    if (numericCols.length > 0) {
+                      const targetColId = modeSetting.columnId ?? numericCols[0].id;
+                      const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: targetColId } };
+                      setShortcutDisplayModes(nextModes);
+                      localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                    } else {
+                      toast.error("No numeric columns available in this register to sum.");
+                    }
+                  } else if (modeSetting.mode === 'sum') {
+                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: modeSetting.columnId } };
+                    setShortcutDisplayModes(nextModes);
+                    localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                  } else {
+                    const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: modeSetting.columnId } };
+                    setShortcutDisplayModes(nextModes);
+                    localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
+                  }
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'baseline',
+                  gap: '4px',
+                  flexWrap: 'wrap',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  padding: '2px 6px',
+                  marginLeft: '-6px',
+                  borderRadius: '6px',
+                  transition: 'all 0.15s'
+                }}
+                title="Click to toggle Count/Sum/Average"
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'var(--border-light)';
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'none';
+                  e.currentTarget.style.transform = 'none';
+                }}
+              >
+                <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
+                  {displayVal}
+                </span>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>
+                  {displayLabel}
+                </span>
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
+                {s.name}
+              </div>
+              {s.filters && s.filters.length > 0 && (
+                <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                  {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
   return (
     <div className="admin-animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
@@ -515,475 +997,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             </div>
 
             {/* Saved Shortcuts */}
-            {shortcuts.map(s => (
-              <div
-                key={s.id}
-                onClick={() => openRegisterDetail({ id: s.registerId, name: s.registerName }, s.searchQuery, s.filters)}
-                className="admin-stat-card-premium"
-                style={{
-                  cursor: 'pointer',
-                  border: '1px solid var(--border)',
-                  boxSizing: 'border-box',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: '130px',
-                  padding: '16px',
-                  overflow: 'visible'
-                }}
-              >
-                {/* Top Row: Icon, Register Name, and Options Menu */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', position: 'relative' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--brand-green)', flexShrink: 0 }}>
-                    <FileSpreadsheet size={16} />
-                  </div>
-                  <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>
-                    {s.registerName}
-                  </span>
-                  
-                  {/* Three-dot options menu */}
-                  <div style={{ marginLeft: 'auto', position: 'relative' }} onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setActiveMenuId(activeMenuId === s.id ? null : s.id);
-                      }}
-                      title="Options"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--muted)',
-                        padding: '4px',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--border-light)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; e.currentTarget.style.background = 'none'; }}
-                    >
-                      <MoreVertical size={16} />
-                    </button>
- 
-                    {/* Dropdown Menu */}
-                    {activeMenuId === s.id && (
-                      <div 
-                        onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
-                        style={{
-                          position: 'absolute',
-                          top: '24px',
-                          right: '0',
-                          background: 'var(--surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '8px',
-                          boxShadow: 'var(--admin-card-shadow)',
-                          zIndex: 10,
-                          minWidth: '160px',
-                          maxHeight: '260px',
-                          overflowY: 'auto',
-                          padding: '4px 0',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            setRenamingShortcut(s);
-                            setRenameShortcutName(s.name);
-                            setActiveMenuId(null);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            color: 'var(--foreground)',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        >
-                          Change Name
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleDeleteShortcut(s.id, e);
-                            setActiveMenuId(null);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            color: 'var(--danger)',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                            transition: 'all 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        >
-                          Delete
-                        </button>
- 
-                        {/* Display Metric Section */}
-                        {(() => {
-                          const data = shortcutData[s.id];
-                          const numericCols = data?.columns.filter(isNumericColumn) || [];
-                          const currentMode = shortcutDisplayModes[s.id] || { mode: 'count' };
-
-                          return (
-                            <>
-                              <div style={{ borderTop: '1px solid var(--border-light)', margin: '4px 0' }} />
-                              <div style={{ padding: '4px 12px', fontSize: '9.5px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                Display Metric
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: currentMode.columnId } };
-                                  setShortcutDisplayModes(nextModes);
-                                  localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                  setActiveMenuId(null);
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  padding: '8px 12px',
-                                  textAlign: 'left',
-                                  fontSize: '12px',
-                                  color: currentMode.mode === 'count' ? 'var(--brand-green)' : 'var(--foreground)',
-                                  cursor: 'pointer',
-                                  fontWeight: 600,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  transition: 'all 0.15s',
-                                  width: '100%',
-                                  boxSizing: 'border-box'
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                              >
-                                <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                  {currentMode.mode === 'count' ? '✓' : ''}
-                                </span>
-                                Count (Entries)
-                              </button>
-
-                              {/* Sum Section */}
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    setExpandedSection(expandedSection === 'sum' ? null : 'sum');
-                                  }}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: '8px 12px',
-                                    textAlign: 'left',
-                                    fontSize: '12px',
-                                    color: currentMode.mode === 'sum' ? 'var(--brand-green)' : 'var(--foreground)',
-                                    cursor: 'pointer',
-                                    fontWeight: 700,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    transition: 'all 0.15s',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                  }}
-                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                >
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                      {currentMode.mode === 'sum' ? '✓' : ''}
-                                    </span>
-                                    Sum
-                                  </span>
-                                  <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'sum' ? '▼' : '▶'}</span>
-                                </button>
-
-                                {expandedSection === 'sum' && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
-                                    {!data ? (
-                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                        Loading columns...
-                                      </div>
-                                    ) : numericCols.length === 0 ? (
-                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                        No numeric columns
-                                      </div>
-                                    ) : (
-                                      numericCols.map(col => {
-                                        const isActive = currentMode.mode === 'sum' && currentMode.columnId === col.id;
-                                        return (
-                                          <button
-                                            key={`sum-${col.id}`}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: col.id } };
-                                              setShortcutDisplayModes(nextModes);
-                                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                              setActiveMenuId(null);
-                                            }}
-                                            style={{
-                                              background: 'none',
-                                              border: 'none',
-                                              padding: '6px 12px 6px 16px',
-                                              textAlign: 'left',
-                                              fontSize: '11.5px',
-                                              color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
-                                              cursor: 'pointer',
-                                              fontWeight: 600,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '6px',
-                                              transition: 'all 0.15s',
-                                              width: '100%',
-                                              boxSizing: 'border-box'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                          >
-                                            <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                              {isActive ? '✓' : ''}
-                                            </span>
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
-                                              {col.name}
-                                            </span>
-                                          </button>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Average Section */}
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    setExpandedSection(expandedSection === 'average' ? null : 'average');
-                                  }}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    padding: '8px 12px',
-                                    textAlign: 'left',
-                                    fontSize: '12px',
-                                    color: currentMode.mode === 'average' ? 'var(--brand-green)' : 'var(--foreground)',
-                                    cursor: 'pointer',
-                                    fontWeight: 700,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    transition: 'all 0.15s',
-                                    width: '100%',
-                                    boxSizing: 'border-box'
-                                  }}
-                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                >
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ width: '12px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                      {currentMode.mode === 'average' ? '✓' : ''}
-                                    </span>
-                                    Average
-                                  </span>
-                                  <span style={{ fontSize: '9px', color: 'var(--muted)' }}>{expandedSection === 'average' ? '▼' : '▶'}</span>
-                                </button>
-
-                                {expandedSection === 'average' && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--background)', paddingLeft: '8px' }}>
-                                    {!data ? (
-                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                        Loading columns...
-                                      </div>
-                                    ) : numericCols.length === 0 ? (
-                                      <div style={{ padding: '6px 16px', fontSize: '11px', color: 'var(--muted)', fontStyle: 'italic' }}>
-                                        No numeric columns
-                                      </div>
-                                    ) : (
-                                      numericCols.map(col => {
-                                        const isActive = currentMode.mode === 'average' && currentMode.columnId === col.id;
-                                        return (
-                                          <button
-                                            key={`avg-${col.id}`}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: col.id } };
-                                              setShortcutDisplayModes(nextModes);
-                                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                                              setActiveMenuId(null);
-                                            }}
-                                            style={{
-                                              background: 'none',
-                                              border: 'none',
-                                              padding: '6px 12px 6px 16px',
-                                              textAlign: 'left',
-                                              fontSize: '11.5px',
-                                              color: isActive ? 'var(--brand-green)' : 'var(--foreground)',
-                                              cursor: 'pointer',
-                                              fontWeight: 600,
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              gap: '6px',
-                                              transition: 'all 0.15s',
-                                              width: '100%',
-                                              boxSizing: 'border-box'
-                                            }}
-                                            onMouseEnter={e => e.currentTarget.style.background = 'var(--border-light)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                                          >
-                                            <span style={{ width: '10px', display: 'inline-block', textAlign: 'center', fontWeight: 'bold' }}>
-                                              {isActive ? '✓' : ''}
-                                            </span>
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={col.name}>
-                                              {col.name}
-                                            </span>
-                                          </button>
-                                        );
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Middle & Bottom Row: Big entry count / sum / average & Shortcut Label */}
-                {(() => {
-                  const modeSetting = shortcutDisplayModes[s.id] || { mode: 'count' };
-                  let displayVal: string | number = '...';
-                  let displayLabel = 'entries';
-
-                  if (modeSetting.mode === 'sum' && modeSetting.columnId !== undefined) {
-                    const data = shortcutData[s.id];
-                    if (data) {
-                      const col = data.columns.find(c => c.id === modeSetting.columnId);
-                      if (col) {
-                        const sum = calculateSumForColumn(data.filteredEntries, col.id);
-                        const isCurrency = col.type?.toLowerCase() === 'currency';
-                        displayVal = isCurrency ? formatCurrency(sum) : sum.toLocaleString();
-                        displayLabel = `sum of ${col.name}`;
-                      } else {
-                        displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-                        displayLabel = 'entries';
-                      }
-                    }
-                  } else if (modeSetting.mode === 'average' && modeSetting.columnId !== undefined) {
-                    const data = shortcutData[s.id];
-                    if (data) {
-                      const col = data.columns.find(c => c.id === modeSetting.columnId);
-                      if (col) {
-                        const avg = calculateAverageForColumn(data.filteredEntries, col.id);
-                        const isCurrency = col.type?.toLowerCase() === 'currency';
-                        const formattedAvg = Number(avg.toFixed(2));
-                        displayVal = isCurrency ? formatCurrency(formattedAvg) : formattedAvg.toLocaleString();
-                        displayLabel = `avg of ${col.name}`;
-                      } else {
-                        displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-                        displayLabel = 'entries';
-                      }
-                    }
-                  } else {
-                    displayVal = shortcutCounts[s.id] !== undefined ? shortcutCounts[s.id] : '...';
-                    displayLabel = 'entries';
-                  }
-
-                  return (
-                    <div>
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const data = shortcutData[s.id];
-                          const numericCols = data?.columns.filter(isNumericColumn) || [];
-                          if (modeSetting.mode === 'count') {
-                            if (numericCols.length > 0) {
-                              const targetColId = modeSetting.columnId ?? numericCols[0].id;
-                              const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'sum' as const, columnId: targetColId } };
-                              setShortcutDisplayModes(nextModes);
-                              localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                            } else {
-                              toast.error("No numeric columns available in this register to sum.");
-                            }
-                          } else if (modeSetting.mode === 'sum') {
-                            const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'average' as const, columnId: modeSetting.columnId } };
-                            setShortcutDisplayModes(nextModes);
-                            localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                          } else {
-                            const nextModes = { ...shortcutDisplayModes, [s.id]: { mode: 'count' as const, columnId: modeSetting.columnId } };
-                            setShortcutDisplayModes(nextModes);
-                            localStorage.setItem('dashboard_shortcut_display_modes', JSON.stringify(nextModes));
-                          }
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'baseline',
-                          gap: '4px',
-                          flexWrap: 'wrap',
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          padding: '2px 6px',
-                          marginLeft: '-6px',
-                          borderRadius: '6px',
-                          transition: 'all 0.15s'
-                        }}
-                        title="Click to toggle Count/Sum/Average"
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = 'var(--border-light)';
-                          e.currentTarget.style.transform = 'scale(1.02)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = 'none';
-                          e.currentTarget.style.transform = 'none';
-                        }}
-                      >
-                        <span style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>
-                          {displayVal}
-                        </span>
-                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--muted)' }}>
-                          {displayLabel}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.name}>
-                        {s.name}
-                      </div>
-                      {s.filters && s.filters.length > 0 && (
-                        <div style={{ fontSize: '10px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
-                          {s.filters.length} active filter{s.filters.length > 1 ? 's' : ''} {s.searchQuery ? `• "${s.searchQuery}"` : ''}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            ))}
+            {countShortcuts.map(s => renderShortcutCard(s))}
           </div>
 
           {/* All Registers list - toggled by the plus box */}
@@ -997,6 +1011,46 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
               />
             </div>
           )}
+
+          {/* Register Shortcut Sums Section */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+            <h3 style={{ margin: 0, fontSize: '12px', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Register Shortcut Sums
+            </h3>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '16px'
+          }}>
+            {sumShortcuts.length === 0 ? (
+              <div 
+                className="admin-card-glass"
+                style={{
+                  gridColumn: '1 / -1',
+                  border: '1.5px dashed var(--border)',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  textAlign: 'center',
+                  color: 'var(--muted)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--navy)' }}>No shortcut sums configured</div>
+                <div style={{ maxWidth: '400px', margin: '0 auto', fontSize: '12px' }}>
+                  Use the 3-dot options menu on any shortcut above to change its display metric to Sum or Average.
+                </div>
+              </div>
+            ) : (
+              sumShortcuts.map(s => renderShortcutCard(s))
+            )}
+          </div>
         </div>
       )}
 
