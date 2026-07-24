@@ -20,6 +20,7 @@ import {
 import toast from 'react-hot-toast';
 import { formatCurrency } from '../../lib/formatters';
 import { FilterModal } from '../../components/register/modals/FilterModal';
+import { AdminNotificationBell } from '../components/AdminNotificationBell';
 
 interface ServerUser {
   id: string; name: string; email: string; role: string; status: string;
@@ -1489,15 +1490,18 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             Real-time control center metrics, pending approvals and audit overview.
           </p>
         </div>
-        <button
-          onClick={() => loadData(true)}
-          disabled={refreshing}
-          className="admin-btn-secondary-flat"
-          style={{ padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
-          {refreshing ? 'Refreshing...' : 'Sync Dashboard'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <AdminNotificationBell />
+          <button
+            onClick={() => loadData(true)}
+            disabled={refreshing}
+            className="admin-btn-secondary-flat"
+            style={{ padding: '10px 16px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Refreshing...' : 'Sync Dashboard'}
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards Row */}

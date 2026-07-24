@@ -1,5 +1,66 @@
 import { query } from '../db-lib/db.js';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+
+// Helper to send login notification email to user
+async function sendLoginNotificationEmail(userEmail, userName, role) {
+  try {
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    const loginTime = new Date().toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || `"AG Admin Alert" <no-reply@sjvps.com>`,
+      to: userEmail,
+      subject: `🔒 Security Alert: Account Login Detected (${userName})`,
+      text: `Hello ${userName},\n\nWe detected a new login to your AG Account (${userEmail}) at ${loginTime}.\nRole: ${role}\n\nIf this was you, no action is required. If you did not recognize this activity, please contact your administrator immediately.`,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+            <div style="background: #1a73e8; color: white; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 16px;">AG</div>
+            <h2 style="margin: 0; color: #0f172a; font-size: 20px; font-weight: 700;">Account Login Notification</h2>
+          </div>
+          <p style="color: #334155; font-size: 15px; line-height: 1.5;">Hello <strong>${userName}</strong>,</p>
+          <p style="color: #334155; font-size: 14.5px; line-height: 1.5;">A successful login to your AG account was registered with the following details:</p>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+              <tr><td style="padding: 4px 0; color: #64748b;">User:</td><td style="padding: 4px 0; font-weight: 600;">${userName} (${userEmail})</td></tr>
+              <tr><td style="padding: 4px 0; color: #64748b;">Role:</td><td style="padding: 4px 0; font-weight: 600; text-transform: capitalize;">${role}</td></tr>
+              <tr><td style="padding: 4px 0; color: #64748b;">Time:</td><td style="padding: 4px 0; font-weight: 600;">${loginTime} (IST)</td></tr>
+            </table>
+          </div>
+
+          <p style="color: #64748b; font-size: 13px; line-height: 1.5;">If this was you, you can safely ignore this email. If you did not initiate this login, please notify your administrator right away.</p>
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px;" />
+          <p style="color: #94a3b8; font-size: 11.5px; margin: 0;">AG Trust Workspace Security Team • Automatic System Notification</p>
+        </div>
+      `
+    };
+
+    if (smtpUser && smtpPass) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass }
+      });
+      await transporter.sendMail(mailOptions);
+      console.log(`[Email Alert Sent] Login notification sent to ${userEmail}`);
+    } else {
+      console.log(`[Email Alert Prepared] Login email notification ready for ${userEmail}:`, mailOptions.subject);
+    }
+  } catch (err) {
+    console.error('[Email Notification Error]', err.message);
+  }
+}
 
 // Helper to hash password matching the client-side SHA-256 algorithm
 function hashPassword(password) {
@@ -124,6 +185,32 @@ export default async function handler(req, res) {
         VALUES ($1, $2, $3, 'login', $4, NOW())
       `, [logId, user.id, user.name, `User logged in: ${user.email}`]);
 
+      // 1. Notify Admin Panel: Add in-app notification for all admin / superadmin users
+      try {
+        const adminUsers = await query("SELECT id FROM users WHERE role = 'admin' OR role = 'superadmin'");
+        for (const adminRow of adminUsers.rows) {
+          const notifId = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+          await query(`
+            INSERT INTO notifications (id, user_id, title, message, type, meta, is_read, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
+          `, [
+            notifId,
+            adminRow.id,
+            'User Login Alert',
+            `User ${user.name} (${user.email}) logged into the system`,
+            'info',
+            JSON.stringify({ userId: user.id, userName: user.name, userEmail: user.email, role: user.role, event: 'login' })
+          ]);
+        }
+      } catch (notifErr) {
+        console.error('Failed to create admin login notifications:', notifErr);
+      }
+
+      // 2. Send email notification to user's email address
+      sendLoginNotificationEmail(user.email, user.name, user.role).catch(err => {
+        console.error('Email dispatch error on login:', err);
+      });
+
       // Generate stateless token
       const token = Buffer.from(JSON.stringify({
         id: user.id,
@@ -184,6 +271,7 @@ export default async function handler(req, res) {
         const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
         const resUser = await query('SELECT * FROM users WHERE id = $1', [decoded.id]);
         if (resUser.rowCount === 0) return sendError(res, 401, 'User not found');
+        await query('UPDATE users SET last_login = NOW() WHERE id = $1', [decoded.id]).catch(() => {});
         return sendJson(res, 200, { user: formatUser(resUser.rows[0]) });
       } catch (e) {
         return sendError(res, 401, 'Invalid token');
@@ -279,7 +367,7 @@ export default async function handler(req, res) {
 
     // GET /api/businesses
     if (pathname === '/api/businesses' && method === 'GET') {
-      const result = await query('SELECT * FROM businesses ORDER BY name ASC');
+      const result = await query('SELECT * FROM businesses ORDER BY name ASC, id ASC');
       return sendJson(res, 200, result.rows.map(r => ({
         id: Number(r.id),
         name: r.name,

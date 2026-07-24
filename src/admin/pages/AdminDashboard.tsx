@@ -10,6 +10,7 @@ import AdminAnalyticsPage from './AdminAnalyticsPage';
 import AdminActiveReportPage from './AdminActiveReportPage';
 import RecycleBinPage from '../../pages/RecycleBinPage';
 import AdminOverviewPage from './AdminOverviewPage';
+import { AdminNotificationBell } from '../components/AdminNotificationBell';
 
 export default function AdminDashboard() {
   const { user, logout, token } = useAuth();
@@ -60,7 +61,7 @@ export default function AdminDashboard() {
         <h1 style={{margin:0,fontSize:'16px',fontWeight:800,color:'white',display:'flex',alignItems:'center',gap:'8px'}}>
           <img src="/logo-transparent.png" alt="AG Trust" style={{ width: '18px', height: '18px', objectFit: 'contain' }} /> AG Admin
         </h1>
-        <div style={{width:'30px'}}/>
+        <AdminNotificationBell />
       </div>
 
       {/* Backdrop for mobile */}

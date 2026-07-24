@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -127,12 +127,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.9.6') !== 'true';
+      return localStorage.getItem('seen_version_1.9.7') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.9.6');
+  const [versionTab, setVersionTab] = useState<'1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.9.7');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
   
   // Slideshow state
@@ -142,15 +142,16 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.9.6', 'true');
+      localStorage.setItem('seen_version_1.9.7', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
 
   useEffect(() => {
-    if (versionTab !== '1.9.6' && versionTab !== '1.9.5' && versionTab !== '1.8.8' && versionTab !== '1.7.7' || !showVersionModal || !isPlaying) return;
-    const slideCount = versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5));
+    const isSlideshowVersion = versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
+    if (!isSlideshowVersion || !showVersionModal || !isPlaying) return;
+    const slideCount = versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5)));
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % slideCount);
     }, 4500);
@@ -905,9 +906,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v1.9.6"
+                  title="View what's new in v1.9.7"
                 >
-                  v1.9.6
+                  v1.9.7
                 </span>
               </div>
             </div>
@@ -1781,11 +1782,11 @@ export const Sidebar = memo(function Sidebar({
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '850px' : '500px',
+              maxWidth: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '850px' : '500px',
               width: '100%',
               borderRadius: '20px',
-              padding: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '24px',
-              background: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
+              padding: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '24px',
+              background: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               overflow: 'hidden',
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1798,10 +1799,10 @@ export const Sidebar = memo(function Sidebar({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '16px',
+              marginBottom: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '16px',
               borderBottom: '1px solid #f1f5f9',
-              padding: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '16px 24px' : '0 0 12px 0',
-              background: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '#f8fafc' : 'transparent'
+              padding: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '16px 24px' : '0 0 12px 0',
+              background: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '#f8fafc' : 'transparent'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1827,8 +1828,8 @@ export const Sidebar = memo(function Sidebar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '20px',
-              padding: (versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '12px 24px' : '12px 0',
+              marginBottom: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '20px',
+              padding: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '12px 24px' : '12px 0',
               background: versionTab === '1.7.7' ? '#f8fafc' : 'transparent',
               borderBottom: versionTab === '1.7.7' ? '1px solid #e2e8f0' : 'none',
               position: 'relative'
@@ -1857,7 +1858,7 @@ export const Sidebar = memo(function Sidebar({
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
                 >
-                  {versionTab === '1.8.5' ? 'v1.8.5 (Current)' : `v${versionTab}`}
+                  {versionTab === '1.9.7' ? 'v1.9.7 (Current)' : `v${versionTab}`}
                   <ChevronDown size={14} style={{ color: '#64748b', transition: 'transform 0.2s', transform: showOlderVersionsDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
                 </button>
                 
@@ -1883,7 +1884,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1905,7 +1906,7 @@ export const Sidebar = memo(function Sidebar({
                             background: versionTab === v ? '#f1f5f9' : 'transparent',
                             color: versionTab === v ? '#0f172a' : '#475569',
                             cursor: 'pointer',
-                            transition: 'all 0.1s'
+                            transition: 'all 0.15s'
                           }}
                           onMouseEnter={e => {
                             if (versionTab !== v) e.currentTarget.style.background = '#f8fafc';
@@ -1914,7 +1915,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '1.9.6' ? 'v1.9.6 (Current)' : `v${v}`}
+                          {v === '1.9.7' ? 'v1.9.7 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1923,7 +1924,183 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '1.9.6' ? (
+            {versionTab === '1.9.7' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v1.9.7 • Change 1 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          User Active Status Tracking
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Live presence indicators added to the Users & Roles table. Easily view who is Online, Away, Recent, or Offline with pulse dots and relative timestamps.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <UserCheck size={20} color="#10b981" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Live Online Presence</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Real-time user status monitoring</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v1.9.7 • Change 2 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Real-time Admin Notifications
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Admin Panel receives instant in-app alerts whenever users log in, complete with unread notification badge count and dropdown panel.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Bell size={20} color="#2563eb" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Admin Alert System</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Instant login alerts</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v1.9.7 • Change 3 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Automated User Email Alerts
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Automated security alert emails are dispatched to registered user email accounts upon every login to verify account access.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <ShieldAlert size={20} color="#f59e0b" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Security Mailer</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Automatic email notice</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v1.9.7 • Change 4 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          User Status Quick Filters
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Filter user management views with one click by All Users, Online, Away, and Offline status chips.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <Filter size={20} color="#8b5cf6" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Quick Status Chips</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Dynamic user filtering</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer / Controls */}
+                <div style={{ padding: '12px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff' }}>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: '#64748b',
+                      fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    {isPlaying ? (
+                      <><Pause size={12} /> Pause Auto-play</>
+                    ) : (
+                      <><Play size={12} /> Play Slideshow</>
+                    )}
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { setActiveSlide(idx); setIsPlaying(false); }}
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          background: activeSlide === idx ? 'var(--brand-blue)' : '#cbd5e1',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleCloseVersionModal}
+                    style={{
+                      padding: '8px 20px', background: 'var(--navy)', color: 'white',
+                      border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                      cursor: 'pointer', transition: 'all 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.15)'}
+                    onMouseLeave={e => e.currentTarget.style.filter = 'none'}
+                  >
+                    Get Started
+                  </button>
+                </div>
+              </div>
+            ) : versionTab === '1.9.6' ? (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes slideInUp {
