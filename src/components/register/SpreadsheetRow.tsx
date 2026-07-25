@@ -1,7 +1,7 @@
-import { evaluateFormula, type Entry, type Column } from '../../lib/api';
+import { evaluateFormula, getOptionBadgeStyle, type Entry, type Column } from '../../lib/api';
 import { ImageCompressionModule } from '../../lib/imageCompressionModule';
 import { formatCurrency } from '../../lib/formatters';
-import { Calendar, ChevronDown, Image as ImageIcon, Mail, Phone, Globe, ListOrdered, IndianRupee, Maximize2, Bell } from 'lucide-react';
+import { Calendar, ChevronDown, Image as ImageIcon, Mail, Phone, Globe, ListOrdered, IndianRupee, Maximize2, Bell, PenTool } from 'lucide-react';
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNotifications } from '../../lib/NotificationContext';
@@ -21,6 +21,34 @@ const HighlightedText = React.memo(function HighlightedText({ text, searchTerm }
     </>
   );
 });
+
+export function OptionBadge({ col, value, searchTerm }: { col: Column | any; value: string; searchTerm?: string }) {
+  const style = getOptionBadgeStyle(col, value);
+  return (
+    <span 
+      className="option-badge-pill" 
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        fontSize: '11px',
+        fontWeight: 700,
+        border: '1px solid',
+        lineHeight: '1.3',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        ...style
+      }}
+    >
+      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: style.color, flexShrink: 0 }} />
+      <HighlightedText text={value} searchTerm={searchTerm} />
+    </span>
+  );
+}
 
 
 
@@ -1112,6 +1140,7 @@ interface SpreadsheetRowProps {
   registerColumns: Column[];
   onRowDetail?: (entry: Entry) => void;
   onImagePreview?: (data: { url: string; entryId: number; colId: string }) => void;
+  onOpenSignaturePad?: (entryId: number, colId: number, currentSignature: string, columnName: string) => void;
   frozenColumns?: Set<number>;
   frozenLeftOffsets?: Record<number, number>;
   colWidths?: Record<number, number>;
@@ -1396,21 +1425,37 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
                 </button>
               )}
             </div>
-          ) : col.type === 'dropdown' ? (
+          ) : (col.type === 'dropdown' || col.type === 'yes_no' || col.type === 'status') ? (
             <div 
               data-cell={`cell-${idx}-${col.id}`} 
               tabIndex={isEditable ? 0 : -1} 
               className={`cell-dropdown ${!isEditable ? 'cell-readonly' : ''}`} 
-              onClick={isEditable ? (e) => openDropdown(entry.id, col.id, col.dropdownOptions || [], e.currentTarget.getBoundingClientRect()) : undefined} 
+              onClick={isEditable ? (e) => {
+                let opts = col.dropdownOptions || [];
+                if (col.type === 'yes_no' && opts.length === 0) opts = ['Yes', 'No'];
+                if (col.type === 'status' && opts.length === 0) opts = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+                openDropdown(entry.id, col.id, opts, e.currentTarget.getBoundingClientRect());
+              } : undefined} 
               onKeyDown={(e) => { 
                 if (!isEditable) return;
                 if (e.key === ' ' || e.key === 'Enter' && e.ctrlKey) { 
                   e.preventDefault(); 
-                  openDropdown(entry.id, col.id, col.dropdownOptions || [], e.currentTarget.getBoundingClientRect()); 
+                  let opts = col.dropdownOptions || [];
+                  if (col.type === 'yes_no' && opts.length === 0) opts = ['Yes', 'No'];
+                  if (col.type === 'status' && opts.length === 0) opts = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+                  openDropdown(entry.id, col.id, opts, e.currentTarget.getBoundingClientRect()); 
                 } else handleCellKeyDown(e, col.id, colIdx); 
               }}
             >
-              {entry.cells?.[col.id.toString()] ? <HighlightedText text={entry.cells[col.id.toString()]} searchTerm={searchTerm} /> : <span className="cell-placeholder"><ChevronDown size={12} /> {isEditable ? 'Select' : '—'}</span>}
+              {entry.cells?.[col.id.toString()] ? (
+                (col.type === 'yes_no' || col.type === 'status' || (col.optionColors && Object.keys(col.optionColors).length > 0)) ? (
+                  <OptionBadge col={col} value={entry.cells[col.id.toString()]} searchTerm={searchTerm} />
+                ) : (
+                  <HighlightedText text={entry.cells[col.id.toString()]} searchTerm={searchTerm} />
+                )
+              ) : (
+                <span className="cell-placeholder"><ChevronDown size={12} /> {isEditable ? 'Select' : '—'}</span>
+              )}
             </div>
           ) : col.type === 'checkbox' ? (
             <div className={`cell-checkbox-wrap ${!isEditable ? 'cell-readonly' : ''}`}>
@@ -1526,6 +1571,39 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
                       e.target.value = '';
                     }} />
                   </label>
+                ) : (
+                  <span className="cell-placeholder" style={{ fontSize: '10px', opacity: 0.5 }}>—</span>
+                )
+              )}
+            </div>
+          ) : col.type === 'signature' ? (
+            <div 
+              data-cell={`cell-${idx}-${col.id}`} 
+              tabIndex={0} 
+              className="cell-image-wrap" 
+              onKeyDown={(e) => handleCellKeyDown(e, col.id, colIdx)}
+              onClick={() => {
+                if (isEditable && props.onOpenSignaturePad) {
+                  props.onOpenSignaturePad(entry.id, col.id, entry.cells?.[col.id.toString()] || '', col.name);
+                }
+              }}
+              style={{ cursor: isEditable ? 'pointer' : 'default', padding: '2px 6px', display: 'flex', alignItems: 'center', height: '100%' }}
+              title={entry.cells?.[col.id.toString()] ? "Click to view or re-sign signature" : (isEditable ? "Click to draw signature" : "")}
+            >
+              {entry.cells?.[col.id.toString()] ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '2px 8px', background: 'rgba(29, 78, 216, 0.05)', borderRadius: '6px', border: '1px solid rgba(29, 78, 216, 0.15)', maxWidth: '100%', overflow: 'hidden' }}>
+                  <img 
+                    src={entry.cells[col.id.toString()]} 
+                    alt="Signature" 
+                    style={{ height: '22px', maxWidth: '90px', objectFit: 'contain' }} 
+                  />
+                  <PenTool size={10} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                </div>
+              ) : (
+                isEditable ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', padding: '4px 8px', borderRadius: '6px', background: 'rgba(29, 78, 216, 0.08)', border: '1px dashed rgba(29, 78, 216, 0.3)' }}>
+                    <PenTool size={13} />
+                  </span>
                 ) : (
                   <span className="cell-placeholder" style={{ fontSize: '10px', opacity: 0.5 }}>—</span>
                 )

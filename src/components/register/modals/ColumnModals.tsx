@@ -1019,8 +1019,45 @@ const presetBtnStyle = (active: boolean) => ({
   cursor: 'pointer', transition: 'all 0.2s'
 });
 
-function OptionsEditor({ value, onChange, columnData = [], businessId }: { value: string, onChange: (v: string) => void, columnData?: string[], businessId?: number }) {
+const PRESET_OPTION_COLORS = [
+  { name: 'Emerald', hex: '#10b981' },
+  { name: 'Rose', hex: '#ef4444' },
+  { name: 'Amber', hex: '#f59e0b' },
+  { name: 'Blue', hex: '#3b82f6' },
+  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Indigo', hex: '#6366f1' },
+  { name: 'Teal', hex: '#14b8a6' },
+  { name: 'Slate', hex: '#64748b' },
+];
+
+function getDefaultOptionColor(val: string): string {
+  const valLower = (val || '').trim().toLowerCase();
+  if (valLower === 'yes') return '#10b981';
+  if (valLower === 'no') return '#ef4444';
+  if (valLower === 'pending') return '#f59e0b';
+  if (valLower === 'in progress') return '#3b82f6';
+  if (valLower === 'completed' || valLower === 'done') return '#10b981';
+  if (valLower === 'cancelled' || valLower === 'failed') return '#ef4444';
+  return '#64748b';
+}
+
+function OptionsEditor({ 
+  value, 
+  onChange, 
+  optionColors = {},
+  onOptionColorsChange,
+  columnData = [], 
+  businessId 
+}: { 
+  value: string, 
+  onChange: (v: string) => void, 
+  optionColors?: Record<string, string>,
+  onOptionColorsChange?: (colors: Record<string, string>) => void,
+  columnData?: string[], 
+  businessId?: number 
+}) {
   const [opts, setOpts] = useState<string[]>(() => value ? value.split(',') : []);
+  const [openColorIndex, setOpenColorIndex] = useState<number | null>(null);
   const lastSentValue = useRef(value);
 
   // ── Saved Dropdowns State ──
@@ -1200,49 +1237,129 @@ function OptionsEditor({ value, onChange, columnData = [], businessId }: { value
         </button>
       </div>
 
-      <div className="options-list-scroll" style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '12px', paddingRight: '4px' }}>
+      <div className="options-list-scroll" style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '12px', paddingRight: '4px' }}>
         {opts.length === 0 ? (
           <div style={{ padding: '20px', textAlign: 'center', border: '1px dashed var(--border)', borderRadius: '8px', color: 'var(--muted)', fontSize: '12px', background: 'var(--bg-light)' }}>
             No predefined options yet. Add some below or pick from existing data.
           </div>
         ) : (
-          opts.map((opt, i) => (
-            <div key={i} className="options-editor-row" style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg-light)', color: 'var(--muted)', fontSize: '10px', fontWeight: 700 }}>
-                {i + 1}
+          opts.map((opt, i) => {
+            const curColor = optionColors[opt] || getDefaultOptionColor(opt);
+            return (
+              <div key={i} className="options-editor-row" style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'var(--bg-light)', color: 'var(--muted)', fontSize: '10px', fontWeight: 700 }}>
+                  {i + 1}
+                </div>
+                <input 
+                  className="modal-input" 
+                  style={{ marginBottom: 0, flex: 1, height: '36px', fontSize: '13px' }} 
+                  value={opt} 
+                  onChange={(e) => {
+                    const newOpts = [...opts];
+                    const oldOpt = newOpts[i];
+                    newOpts[i] = e.target.value;
+                    if (onOptionColorsChange && optionColors[oldOpt]) {
+                      const newColors = { ...optionColors };
+                      newColors[e.target.value] = newColors[oldOpt];
+                      delete newColors[oldOpt];
+                      onOptionColorsChange(newColors);
+                    }
+                    updateOpts(newOpts);
+                  }} 
+                  placeholder="Option name" 
+                />
+
+                {/* Color swatch picker */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenColorIndex(openColorIndex === i ? null : i)}
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      border: '2px solid white',
+                      boxShadow: '0 0 0 1px var(--border), 0 1px 3px rgba(0,0,0,0.1)',
+                      backgroundColor: curColor,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                    title={`Color for "${opt}"`}
+                  />
+
+                  {openColorIndex === i && (
+                    <div style={{
+                      position: 'absolute', right: 0, top: '100%', marginTop: '6px',
+                      zIndex: 100, background: 'white', border: '1px solid var(--border)',
+                      borderRadius: '10px', padding: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                      width: '180px'
+                    }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>Assign Color</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
+                        {PRESET_OPTION_COLORS.map(p => (
+                          <button
+                            key={p.hex}
+                            type="button"
+                            onClick={() => {
+                              if (onOptionColorsChange) {
+                                onOptionColorsChange({ ...optionColors, [opt]: p.hex });
+                              }
+                              setOpenColorIndex(null);
+                            }}
+                            style={{
+                              width: '28px', height: '28px', borderRadius: '50%', background: p.hex,
+                              border: curColor === p.hex ? '2px solid #0f172a' : '1px solid rgba(0,0,0,0.1)',
+                              cursor: 'pointer'
+                            }}
+                            title={p.name}
+                          />
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '6px', borderTop: '1px solid var(--bg-light)' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>Custom:</span>
+                        <input
+                          type="color"
+                          value={curColor}
+                          onChange={(e) => {
+                            if (onOptionColorsChange) {
+                              onOptionColorsChange({ ...optionColors, [opt]: e.target.value });
+                            }
+                          }}
+                          style={{ width: '32px', height: '24px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    const newOpts = [...opts];
+                    newOpts.splice(i, 1);
+                    updateOpts(newOpts);
+                  }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '6px', opacity: 0.6, transition: 'opacity 0.2s' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <input 
-                className="modal-input" 
-                style={{ marginBottom: 0, flex: 1, height: '36px', fontSize: '13px' }} 
-                value={opt} 
-                onChange={(e) => {
-                  const newOpts = [...opts];
-                  newOpts[i] = e.target.value;
-                  updateOpts(newOpts);
-                }} 
-                placeholder="Option name" 
-              />
-              <button 
-                type="button" 
-                onClick={() => {
-                  const newOpts = [...opts];
-                  newOpts.splice(i, 1);
-                  updateOpts(newOpts);
-                }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '6px', opacity: 0.6, transition: 'opacity 0.2s' }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
       <button 
         type="button" 
-        onClick={() => updateOpts([...opts, `Option ${opts.length + 1}`])}
+        onClick={() => {
+          const newOptName = `Option ${opts.length + 1}`;
+          updateOpts([...opts, newOptName]);
+        }}
         style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-light)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', color: 'var(--navy)', width: '100%', justifyContent: 'center', fontSize: '13px', fontWeight: 600, marginBottom: '20px', transition: 'all 0.2s' }}
         onMouseEnter={(e) => e.currentTarget.style.background = 'white'}
         onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-light)'}
@@ -1381,6 +1498,8 @@ interface ColumnModalsProps {
   setNewColType: (v: string) => void;
   newColDropdownOpts: string;
   setNewColDropdownOpts: (v: string) => void;
+  newColOptionColors?: Record<string, string>;
+  setNewColOptionColors?: (colors: Record<string, string>) => void;
   newColFormula: string;
   setNewColFormula: (v: string) => void;
   addColumnMutation: any;
@@ -1402,6 +1521,8 @@ interface ColumnModalsProps {
   setDropdownConfigModal: (v: boolean) => void;
   dropdownConfigOptions: string;
   setDropdownConfigOptions: (v: string) => void;
+  dropdownConfigOptionColors?: Record<string, string>;
+  setDropdownConfigOptionColors?: (colors: Record<string, string>) => void;
   updateDropdownMutation: any;
 
   // Change Type
@@ -1430,11 +1551,13 @@ export function ColumnModals(props: ColumnModalsProps) {
   const {
     newColumnModal, setNewColumnModal, insertColModal, setInsertColModal,
     newColName, setNewColName, newColType, setNewColType,
-    newColDropdownOpts, setNewColDropdownOpts, newColFormula, setNewColFormula,
+    newColDropdownOpts, setNewColDropdownOpts, newColOptionColors = {}, setNewColOptionColors,
+    newColFormula, setNewColFormula,
     newColMinVal, setNewColMinVal, newColMaxVal, setNewColMaxVal,
     addColumnMutation, insertColumnMutation,
     renameColModal, setRenameColModal, renameColValue, setRenameColValue, renameColumnMutation,
-    dropdownConfigModal, setDropdownConfigModal, dropdownConfigOptions, setDropdownConfigOptions, updateDropdownMutation,
+    dropdownConfigModal, setDropdownConfigModal, dropdownConfigOptions, setDropdownConfigOptions,
+    dropdownConfigOptionColors = {}, setDropdownConfigOptionColors, updateDropdownMutation,
     changeTypeModal, setChangeTypeModal, changeTypeValue, setChangeTypeValue, changeColumnTypeMutation,
     linkColumnModal, setLinkColumnModal,
     activeModalColId,
@@ -1455,17 +1578,32 @@ export function ColumnModals(props: ColumnModalsProps) {
             <label className="modal-label">Column Type</label>
             <div className="type-chips">
               {COL_TYPES.map((t) => (
-                <button key={t.id} className={`type-chip ${newColType === t.id ? 'active' : ''}`} onClick={() => setNewColType(t.id)}>
+                <button 
+                  key={t.id} 
+                  className={`type-chip ${newColType === t.id ? 'active' : ''}`} 
+                  onClick={() => {
+                    setNewColType(t.id);
+                    if (t.id === 'yes_no' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Yes,No');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Yes': '#10b981', 'No': '#ef4444' });
+                    } else if (t.id === 'status' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Pending,In Progress,Completed,Cancelled');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Pending': '#f59e0b', 'In Progress': '#3b82f6', 'Completed': '#10b981', 'Cancelled': '#ef4444' });
+                    }
+                  }}
+                >
                   {t.icon} {t.label}
                 </button>
               ))}
             </div>
-            {newColType === 'dropdown' && (
+            {(newColType === 'dropdown' || newColType === 'yes_no' || newColType === 'status') && (
               <>
                 <label className="modal-label" style={{ marginTop: '12px', display: 'block', marginBottom: '8px' }}>Options</label>
                 <OptionsEditor 
                   value={newColDropdownOpts} 
                   onChange={setNewColDropdownOpts} 
+                  optionColors={newColOptionColors}
+                  onOptionColorsChange={setNewColOptionColors}
                   columnData={[]} // No column data for new column
                   businessId={businessId}
                 />
@@ -1541,6 +1679,8 @@ export function ColumnModals(props: ColumnModalsProps) {
             <OptionsEditor 
               value={dropdownConfigOptions} 
               onChange={setDropdownConfigOptions} 
+              optionColors={dropdownConfigOptionColors}
+              onOptionColorsChange={setDropdownConfigOptionColors}
               columnData={(() => {
                 if (activeModalColId == null || !entries) return [];
                 const colIdStr = activeModalColId.toString();
@@ -1573,11 +1713,38 @@ export function ColumnModals(props: ColumnModalsProps) {
             <p className="modal-p-text">Changing the type may affect existing data in this column.</p>
             <div className="type-chips">
               {COL_TYPES.map((t) => (
-                <button key={t.id} className={`type-chip ${changeTypeValue === t.id ? 'active' : ''}`} onClick={() => setChangeTypeValue(t.id)}>
+                <button 
+                  key={t.id} 
+                  className={`type-chip ${changeTypeValue === t.id ? 'active' : ''}`} 
+                  onClick={() => {
+                    setChangeTypeValue(t.id);
+                    if (t.id === 'yes_no' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Yes,No');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Yes': '#10b981', 'No': '#ef4444' });
+                    } else if (t.id === 'status' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Pending,In Progress,Completed,Cancelled');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Pending': '#f59e0b', 'In Progress': '#3b82f6', 'Completed': '#10b981', 'Cancelled': '#ef4444' });
+                    }
+                  }}
+                >
                   {t.icon} {t.label}
                 </button>
               ))}
             </div>
+
+            {(changeTypeValue === 'dropdown' || changeTypeValue === 'yes_no' || changeTypeValue === 'status') && (
+              <>
+                <label className="modal-label" style={{ marginTop: '12px', display: 'block', marginBottom: '8px' }}>Options</label>
+                <OptionsEditor 
+                  value={newColDropdownOpts} 
+                  onChange={setNewColDropdownOpts} 
+                  optionColors={newColOptionColors}
+                  onOptionColorsChange={setNewColOptionColors}
+                  columnData={[]}
+                  businessId={businessId}
+                />
+              </>
+            )}
 
             {changeTypeValue === 'formula' && (
               <FormulaBuilder 
@@ -1638,17 +1805,32 @@ export function ColumnModals(props: ColumnModalsProps) {
             <label className="modal-label">Column Type</label>
             <div className="type-chips">
               {COL_TYPES.map((t) => (
-                <button key={t.id} className={`type-chip ${newColType === t.id ? 'active' : ''}`} onClick={() => setNewColType(t.id)}>
+                <button 
+                  key={t.id} 
+                  className={`type-chip ${newColType === t.id ? 'active' : ''}`} 
+                  onClick={() => {
+                    setNewColType(t.id);
+                    if (t.id === 'yes_no' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Yes,No');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Yes': '#10b981', 'No': '#ef4444' });
+                    } else if (t.id === 'status' && !newColDropdownOpts) {
+                      setNewColDropdownOpts('Pending,In Progress,Completed,Cancelled');
+                      if (setNewColOptionColors) setNewColOptionColors({ 'Pending': '#f59e0b', 'In Progress': '#3b82f6', 'Completed': '#10b981', 'Cancelled': '#ef4444' });
+                    }
+                  }}
+                >
                   {t.icon} {t.label}
                 </button>
               ))}
             </div>
-            {newColType === 'dropdown' && (
+            {(newColType === 'dropdown' || newColType === 'yes_no' || newColType === 'status') && (
               <>
                 <label className="modal-label" style={{ marginTop: '12px', display: 'block', marginBottom: '8px' }}>Options</label>
                 <OptionsEditor 
                   value={newColDropdownOpts} 
                   onChange={setNewColDropdownOpts} 
+                  optionColors={newColOptionColors}
+                  onOptionColorsChange={setNewColOptionColors}
                   columnData={(() => {
                     if (activeModalColId == null || !entries) return [];
                     const colIdStr = activeModalColId.toString();

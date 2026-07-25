@@ -134,6 +134,41 @@ export interface Column {
   bgColor?: string;
   minVal?: number;
   maxVal?: number;
+  optionColors?: Record<string, string>;
+}
+
+export function getOptionBadgeStyle(col: Column | any, val: string) {
+  if (!val) return { background: 'transparent', color: 'inherit', borderColor: 'transparent' };
+  const customColor = col?.optionColors?.[val] || col?.optionColors?.[val.toLowerCase()] || col?.optionColors?.[val.trim()];
+  if (customColor) {
+    return {
+      background: customColor + '1e',
+      color: customColor,
+      borderColor: customColor + '50',
+    };
+  }
+
+  const valLower = (val || '').trim().toLowerCase();
+  if (valLower === 'yes') {
+    return { background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' };
+  }
+  if (valLower === 'no') {
+    return { background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' };
+  }
+  if (valLower === 'pending') {
+    return { background: '#fffbebf', color: '#b45309', borderColor: '#fde68a' };
+  }
+  if (valLower === 'in progress') {
+    return { background: '#eff6ff', color: '#1d4ed8', borderColor: '#bfdbfe' };
+  }
+  if (valLower === 'completed' || valLower === 'done') {
+    return { background: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' };
+  }
+  if (valLower === 'cancelled' || valLower === 'failed') {
+    return { background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' };
+  }
+
+  return { background: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' };
 }
 
 export interface CellStyle {
@@ -1255,7 +1290,7 @@ export function evaluateFormula(formula: string, entry: Entry, columns: Column[]
 
 // ─── Column Operations ──────────────────────────────────────────────────────
 
-export async function addColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number }): Promise<RegisterDetail> {
+export async function addColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number; optionColors?: Record<string, string> }): Promise<RegisterDetail> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     reg.columns.sort((a, b) => a.position - b.position); // ensure canonical order
@@ -1263,7 +1298,7 @@ export async function addColumn(registerId: number, data: { name: string; type: 
     const col: Column = {
       id: colId, registerId, name: data.name, type: data.type,
       position: reg.columns.length, dropdownOptions: data.dropdownOptions, formula: data.formula,
-      minVal: data.minVal, maxVal: data.maxVal
+      minVal: data.minVal, maxVal: data.maxVal, optionColors: data.optionColors
     };
     reg.columns.push(col);
     reg.columns.forEach((c, i) => c.position = i); // re-normalise
@@ -1423,6 +1458,7 @@ export async function updateColumnDropdownOptions(
   registerId: number,
   columnId: number,
   options: string[],
+  optionColors?: Record<string, string>,
   preventSync?: boolean
 ): Promise<RegisterDetail> {
   const result = await runQueuedMutation(registerId, async () => {
@@ -1430,6 +1466,9 @@ export async function updateColumnDropdownOptions(
     const col = reg.columns.find((c) => c.id.toString() === columnId.toString());
     if (!col) throw new Error('Column not found');
     col.dropdownOptions = options;
+    if (optionColors !== undefined) {
+      col.optionColors = optionColors;
+    }
     await saveRegDocImmediate(reg);
     return { reg, col };
   });
@@ -1437,7 +1476,7 @@ export async function updateColumnDropdownOptions(
   const { reg, col } = result;
 
   if (!preventSync && col.linkedTo) {
-    await updateColumnDropdownOptions(col.linkedTo.registerId, col.linkedTo.columnId, options, true)
+    await updateColumnDropdownOptions(col.linkedTo.registerId, col.linkedTo.columnId, options, optionColors, true)
       .catch(e => console.error("Failed to sync column dropdown options change:", e));
   }
 
@@ -1553,7 +1592,7 @@ export async function changeColumnType(
   registerId: number,
   columnId: number,
   newType: string,
-  options?: { formula?: string; dropdownOptions?: string[]; minVal?: number; maxVal?: number },
+  options?: { formula?: string; dropdownOptions?: string[]; minVal?: number; maxVal?: number; optionColors?: Record<string, string> },
   preventSync?: boolean
 ): Promise<RegisterDetail> {
   const result = await runQueuedMutation(registerId, async () => {
@@ -1572,10 +1611,12 @@ export async function changeColumnType(
       col.formula = undefined;
     }
 
-    if (newType === 'dropdown') {
+    if (['dropdown', 'yes_no', 'status'].includes(newType)) {
       col.dropdownOptions = options?.dropdownOptions;
+      col.optionColors = options?.optionColors;
     } else {
       col.dropdownOptions = undefined;
+      col.optionColors = undefined;
     }
 
     if (newType === 'currency' || newType === 'number') {
@@ -1680,7 +1721,7 @@ export async function clearColumnData(registerId: number, columnId: number): Pro
   });
 }
 
-export async function insertColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number }, position: number): Promise<RegisterDetail> {
+export async function insertColumn(registerId: number, data: { name: string; type: string; dropdownOptions?: string[]; formula?: string; minVal?: number; maxVal?: number; optionColors?: Record<string, string> }, position: number): Promise<RegisterDetail> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const colId = generateId();

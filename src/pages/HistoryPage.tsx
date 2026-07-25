@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ArrowLeft, ArrowRight, Calendar, FileText, Link as LinkIcon, Pencil, Plus, RotateCcw, Settings, Trash2, User } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, Calendar, Download, FileText, Link as LinkIcon, Loader2, Pencil, Plus, RotateCcw, Settings, Trash2, User } from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { listBusinesses, listHistory, type HistoryEntry } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { cleanActivityLogs } from '../lib/activityHelper';
@@ -12,12 +13,17 @@ export default function HistoryPage() {
   const { data: businesses } = useQuery({ queryKey: ['businesses'], queryFn: listBusinesses });
   const businessId = businesses?.[0]?.id;
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isAdmin = (user as any)?.permissions?.isAdmin === true || 
+                  (user as any)?.permissions?.fullSheetAccess === true || 
+                  user?.role === 'admin' || 
+                  user?.role === 'superadmin' || 
+                  user?.role === 'sheet_admin';
 
   const [history, setHistory] = React.useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isError, setIsError] = React.useState(false);
   const [error, setError] = React.useState<any>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
   
   const [hasMore, setHasMore] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
@@ -77,20 +83,86 @@ export default function HistoryPage() {
     // No-op effect for infinite pagination checks
   }, [filteredHistory.length, isLoading, loadingMore, hasActiveFilters, hasMore, history.length]);
 
+  const handleExportExcel = async () => {
+    if (!isAdmin) {
+      toast.error('Only Admin users are allowed to download history');
+      return;
+    }
+    if (!filteredHistory || filteredHistory.length === 0) {
+      toast.error('No history records available to download');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const XLSX = await import('xlsx');
+      const rows = filteredHistory.map((entry, idx) => ({
+        'S.No.': idx + 1,
+        'User Name': entry.userName || 'System / Unknown',
+        'User Email': entry.userEmail || '—',
+        'Register Name': entry.registerName || 'System',
+        'Action': entry.action || '—',
+        'Details & Content': entry.details || '—',
+        'Date': new Date(entry.timestamp).toLocaleDateString('en-IN'),
+        'Time': new Date(entry.timestamp).toLocaleTimeString('en-IN'),
+        'Timestamp ISO': entry.timestamp
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 8 },  // S.No
+        { wch: 22 }, // User Name
+        { wch: 26 }, // User Email
+        { wch: 24 }, // Register Name
+        { wch: 18 }, // Action
+        { wch: 55 }, // Details
+        { wch: 14 }, // Date
+        { wch: 14 }, // Time
+        { wch: 24 }, // ISO Timestamp
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'History Log');
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Activity_History_Log_${dateStr}.xlsx`);
+      toast.success('History log downloaded successfully');
+    } catch (err: any) {
+      console.error('Failed to export history log:', err);
+      toast.error('Failed to export history log');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="history-page" ref={containerRef} onScroll={handleScroll}>
       <div className="history-header">
-        <button className="back-button" onClick={() => navigate('/')}>
-          <ArrowLeft size={20} />
-        </button>
-        <div className="header-title-group">
-          <h1 className="header-title">History</h1>
-          <p className="header-subtitle">
-            {isAdmin 
-              ? 'All changes and actions made across registers by all users' 
-              : 'Your personal changes and actions made across registers'}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <button className="back-button" onClick={() => navigate('/')}>
+            <ArrowLeft size={20} />
+          </button>
+          <div className="header-title-group">
+            <h1 className="header-title">History</h1>
+            <p className="header-subtitle">
+              {isAdmin 
+                ? 'All changes and actions made across registers by all users' 
+                : 'Your personal changes and actions made across registers'}
+            </p>
+          </div>
         </div>
+
+        {isAdmin && (
+          <button
+            className="history-download-btn"
+            onClick={handleExportExcel}
+            disabled={isExporting || isLoading || filteredHistory.length === 0}
+            title="Download activity history report (Admin only)"
+          >
+            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            <span>{isExporting ? 'Exporting...' : 'Download History'}</span>
+          </button>
+        )}
       </div>
 
       <div className="history-content">
@@ -163,10 +235,41 @@ export default function HistoryPage() {
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 20px;
         position: sticky;
         top: 0;
         z-index: 10;
+      }
+
+      .history-download-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 18px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--navy) 0%, #1e3a8a 100%);
+        color: white;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
+        flex-shrink: 0;
+      }
+
+      .history-download-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(30, 58, 138, 0.3);
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e293b 100%);
+      }
+
+      .history-download-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
       }
 
       .back-button {

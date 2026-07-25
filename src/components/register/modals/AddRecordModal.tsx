@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, AlertTriangle, CloudUpload, X, Loader2, Link as LinkIcon, Lock as LockIcon } from 'lucide-react';
+import { Plus, AlertTriangle, CloudUpload, X, Loader2, Link as LinkIcon, Lock as LockIcon, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateToDDMMYYYY } from '../../../lib/api';
 import { ImageCompressionModule } from '../../../lib/imageCompressionModule';
+import { SignatureModal } from './SignatureModal';
 
 interface Column {
   id: number;
@@ -39,6 +40,7 @@ export function AddRecordModal({
   const [values, setValues] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Set<string>>(new Set());
   const [uploadingImageCol, setUploadingImageCol] = useState<string | null>(null);
+  const [activeSignatureCol, setActiveSignatureCol] = useState<{ id: string; name: string } | null>(null);
   const [submitType, setSubmitType] = useState<'save' | 'save_and_add' | null>(null);
   const firstInputRef = useRef<HTMLElement | null>(null);
   // Track which (colId:value) combinations we've already toasted — prevents spam
@@ -166,6 +168,24 @@ export function AddRecordModal({
         toast.error(`Cannot save. ${col.name} must be unique, and "${val}" already exists.`);
         setSubmitType(null);
         return;
+      }
+
+      if (col.type === 'date' && val && val.trim() !== '') {
+        const formatted = formatDateToDDMMYYYY(val.trim());
+        const parts = formatted.split('-');
+        if (parts.length === 3) {
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          const y = parseInt(parts[2], 10);
+          const inputDate = new Date(y, m - 1, d);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          if (inputDate < today) {
+            toast.error(`${col.name}: Backdated entries are not allowed (cannot select past dates).`);
+            setSubmitType(null);
+            return;
+          }
+        }
       }
     }
 
@@ -462,6 +482,66 @@ export function AddRecordModal({
                             </label>
                           )}
                         </div>
+                      ) : col.type === 'signature' ? (
+                        <div style={{ position: 'relative', width: '100%' }}>
+                          {val ? (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border)',
+                              background: '#f8fafc',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <img src={val} alt={col.name} style={{ height: '36px', maxWidth: '140px', objectFit: 'contain' }} />
+                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)' }}>Signature Saved</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="modal-cancel-btn"
+                                  style={{ padding: '4px 10px', fontSize: '11px' }}
+                                  onClick={() => setActiveSignatureCol({ id: colIdStr, name: col.name })}
+                                >
+                                  Re-sign
+                                </button>
+                                <button
+                                  type="button"
+                                  className="modal-cancel-btn"
+                                  style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--danger)' }}
+                                  onClick={() => setValues(prev => ({ ...prev, [colIdStr]: '' }))}
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setActiveSignatureCol({ id: colIdStr, name: col.name })}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                width: '100%',
+                                padding: '12px',
+                                border: '2px dashed #cbd5e1',
+                                borderRadius: '8px',
+                                background: '#f8fafc',
+                                color: 'var(--primary)',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <PenTool size={16} /> Click to Draw Signature
+                            </button>
+                          )}
+                        </div>
                       ) : col.type === 'date' ? (
                         <input type="text" id={`ar-col-${col.id}`} className={inputCls}
                           value={val} onChange={onChange} placeholder="DD-MM-YYYY"
@@ -552,6 +632,17 @@ export function AddRecordModal({
           </div>
         </form>
       </div>
+      {activeSignatureCol && (
+        <SignatureModal
+          isOpen={!!activeSignatureCol}
+          onClose={() => setActiveSignatureCol(null)}
+          onSave={(dataUrl) => {
+            setValues(prev => ({ ...prev, [activeSignatureCol.id]: dataUrl }));
+          }}
+          initialSignature={values[activeSignatureCol.id] || ''}
+          columnName={activeSignatureCol.name}
+        />
+      )}
     </div>,
     document.body
   );

@@ -3,10 +3,11 @@ import {
   Clock, FileText, Download, X, Plus, AlertCircle, 
   Image as ImageIcon, FlaskConical, ChevronDown, Maximize2, 
   ListOrdered, Globe, Phone, Mail,
-  Link as LinkIcon, Lock as LockIcon
+  Link as LinkIcon, Lock as LockIcon, PenTool
 } from 'lucide-react';
 import { type Entry, listRowHistory, updateEntry } from '../../../lib/api';
 import { ImageCompressionModule } from '../../../lib/imageCompressionModule';
+import { SignatureModal } from './SignatureModal';
 import toast from 'react-hot-toast';
 
 interface RowDetailModalProps {
@@ -118,6 +119,7 @@ export const RowDetailModal = React.memo(function RowDetailModal({
   detailInputRefs
 }: RowDetailModalProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [activeSignatureCol, setActiveSignatureCol] = useState<{ id: string; name: string; value: string } | null>(null);
 
   const isRowEditable = !_canEditAny ? false : (!_rowEditRange ? true : (() => {
     const num = detailViewEntry.rowNumber;
@@ -498,6 +500,52 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                         )
                       )}
                     </div>
+                  ) : col.type === 'signature' ? (
+                    <div className="row-detail-image-field">
+                      {val ? (
+                        <div className="row-detail-image-container">
+                          <div 
+                            className="row-detail-img-wrapper" 
+                            onClick={() => isFieldEditable && setActiveSignatureCol({ id: colKey, name: col.name, value: val })}
+                            style={{ background: '#ffffff', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <img src={val} alt="Signature" style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain' }} />
+                          </div>
+                          <div className="row-detail-image-actions">
+                            {isFieldEditable && (
+                              <button 
+                                className="row-detail-img-btn" 
+                                onClick={() => setActiveSignatureCol({ id: colKey, name: col.name, value: val })}
+                              >
+                                Re-sign Signature
+                              </button>
+                            )}
+                            <button className="row-detail-img-btn" onClick={() => handleImageDownload(val)}>Download PNG</button>
+                            {isFieldEditable && (
+                              <button className="row-detail-img-btn danger" onClick={() => handleCellChange(detailViewEntry.id, colKey, '')}>
+                                Clear Signature
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        isFieldEditable ? (
+                          <button 
+                            className="row-detail-add-btn" 
+                            style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', cursor: 'pointer' }}
+                            onClick={() => setActiveSignatureCol({ id: colKey, name: col.name, value: '' })}
+                          >
+                            <PenTool size={16} />
+                            <span>Draw Signature</span>
+                          </button>
+                        ) : (
+                          <div className="row-detail-input auto-increment-readonly" style={{ opacity: 0.5 }}>
+                            <PenTool size={16} style={{ marginRight: 6 }} />
+                            <span>No signature</span>
+                          </div>
+                        )
+                      )}
+                    </div>
                   ) : col.type === 'formula' ? (
                     <div 
                       className="row-detail-formula-result"
@@ -685,6 +733,19 @@ export const RowDetailModal = React.memo(function RowDetailModal({
           )}
         </div>
       </div>
+
+      {activeSignatureCol && (
+        <SignatureModal
+          isOpen={!!activeSignatureCol}
+          onClose={() => setActiveSignatureCol(null)}
+          onSave={(dataUrl) => {
+            handleCellChange(detailViewEntry.id, activeSignatureCol.id, dataUrl);
+            setActiveSignatureCol(null);
+          }}
+          initialSignature={activeSignatureCol.value}
+          columnName={activeSignatureCol.name}
+        />
+      )}
 
       {showRowAuditTrail && (
         <div className="row-history-modal-overlay" onClick={() => setShowRowAuditTrail(false)}>

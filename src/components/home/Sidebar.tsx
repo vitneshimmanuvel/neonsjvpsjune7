@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -46,7 +46,7 @@ export const Sidebar = memo(function Sidebar({
   onClearImport,
   clipboard,
   setClipboard,
-  sidebarWidth,
+  sidebarWidth = 260,
   isCollapsed,
   toggleCollapse,
   unreadCount,
@@ -127,12 +127,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_1.9.7') !== 'true';
+      return localStorage.getItem('seen_version_2.0') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('1.9.7');
+  const [versionTab, setVersionTab] = useState<'2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.0');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
   
   // Slideshow state
@@ -142,16 +142,16 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_1.9.7', 'true');
+      localStorage.setItem('seen_version_2.0', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
 
   useEffect(() => {
-    const isSlideshowVersion = versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
+    const isSlideshowVersion = versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
     if (!isSlideshowVersion || !showVersionModal || !isPlaying) return;
-    const slideCount = versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5)));
+    const slideCount = versionTab === '2.0' ? 6 : (versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5))));
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % slideCount);
     }, 4500);
@@ -896,7 +896,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('1.9.5');
+                    setVersionTab('2.0');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -906,9 +906,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v1.9.7"
+                  title="View what's new in v2.0"
                 >
-                  v1.9.7
+                  v2.0
                 </span>
               </div>
             </div>
@@ -1858,7 +1858,7 @@ export const Sidebar = memo(function Sidebar({
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
                 >
-                  {versionTab === '1.9.7' ? 'v1.9.7 (Current)' : `v${versionTab}`}
+                  {versionTab === '2.0' ? 'v2.0 (Current)' : `v${versionTab}`}
                   <ChevronDown size={14} style={{ color: '#64748b', transition: 'transform 0.2s', transform: showOlderVersionsDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
                 </button>
                 
@@ -1884,7 +1884,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1915,7 +1915,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '1.9.7' ? 'v1.9.7 (Current)' : `v${v}`}
+                          {v === '2.0' ? 'v2.0 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1924,7 +1924,233 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '1.9.7' ? (
+            {versionTab === '2.0' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 1 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Digital Signature Column Type
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Draw, re-sign, and save signatures directly into spreadsheet cells using an interactive canvas pad with ink colors, stroke width controls, and touch support.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <PenTool size={24} color="#1d4ed8" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Digital Canvas Signature Pad</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Ink colors, line thickness & mobile touch drawing</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 2 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Configurable Status & Yes/No Badges
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Custom option color swatches for Status and Yes/No column types. Display selectable options as dynamic colored badge pills across spreadsheet cells and dropdown popovers.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Tag size={24} color="#10b981" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Color-Coded Status & Yes/No</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Custom swatches & pill badge dropdowns</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef2f2', color: '#dc2626', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 3 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Admin Activity History Downloads
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Restricted History page downloads accessible exclusively to Admin users. Export complete audit trail logs into structured Excel spreadsheets.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Download size={24} color="#1e3a8a" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Admin Activity Export</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Download history logs to Excel (Admin restricted)</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fffbeb', color: '#b45309', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 4 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Phone Number (+91) Validation
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Updated phone number column validation allowing standard 10-digit mobile numbers or numbers prefixed with the +91 country code.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Phone size={24} color="#b45309" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>10-Digit & +91 Support</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Flexible phone number formatting & validation</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 4 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f3e8ff', color: '#7e22ce', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 5 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Date Backdate Restrictions & Filters
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Restricted backdated date entries preventing past date selection, with new 'From Date & To Date Range' filter options for date columns.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Calendar size={24} color="#7e22ce" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Date Protection & Range Filter</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>No backdated entries & From/To date filtering</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 5 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0 • Feature 6 of 6</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Performance & Core Refinements
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Optimized virtual grid performance, image compression module enhancements, and real-time database synchronization.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <CheckCircle2 size={24} color="#15803d" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>v2.0 Major Engine Upgrade</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>High speed, smooth rendering & rock solid stability</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer / Controls */}
+                <div style={{ padding: '12px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff' }}>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: '#64748b',
+                      fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    {isPlaying ? (
+                      <><Pause size={12} /> Pause Auto-play</>
+                    ) : (
+                      <><Play size={12} /> Play Slideshow</>
+                    )}
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {Array.from({ length: 6 }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { setActiveSlide(idx); setIsPlaying(false); }}
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          background: activeSlide === idx ? 'var(--brand-blue)' : '#cbd5e1',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleCloseVersionModal}
+                    style={{
+                      padding: '8px 20px', background: 'var(--navy)', color: 'white',
+                      border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                      cursor: 'pointer', transition: 'all 0.15s'
+                    }}
+                  >
+                    Got It
+                  </button>
+                </div>
+              </div>
+            ) : versionTab === '1.9.7' ? (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes slideInUp {

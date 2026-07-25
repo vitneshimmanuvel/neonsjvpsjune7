@@ -16,12 +16,14 @@ interface RegisterContextMenusProps {
   setChangeTypeValue: (v: string) => void;
   setChangeTypeModal: (v: boolean) => void;
   setDropdownConfigOptions: (v: string) => void;
+  setDropdownConfigOptionColors?: (colors: Record<string, string>) => void;
   setDropdownConfigModal: (v: boolean) => void;
   setLinkColumnModal: (v: boolean) => void;
   duplicateColumnMutation: any;
   setNewColName: (v: string) => void;
   setNewColType: (v: string) => void;
   setNewColDropdownOpts: (v: string) => void;
+  setNewColOptionColors?: (colors: Record<string, string>) => void;
   setNewColFormula: (v: string) => void;
   setNewColMinVal: (v: string) => void;
   setNewColMaxVal: (v: string) => void;
@@ -68,9 +70,8 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
   const {
     colMenuId, colMenuRect, setColMenuId, setActiveModalColId, columns, handleSort,
     setRenameColValue, setRenameColModal, setChangeTypeValue, setChangeTypeModal,
-    setDropdownConfigOptions, setDropdownConfigModal, setLinkColumnModal, duplicateColumnMutation,
-    setNewColName, setNewColType, setNewColDropdownOpts, setNewColFormula, setInsertColModal,
-    setNewColMinVal, setNewColMaxVal,
+    setDropdownConfigOptions, setDropdownConfigOptionColors, setDropdownConfigModal, setLinkColumnModal, duplicateColumnMutation,
+    setNewColName, setNewColType, setNewColDropdownOpts, setNewColOptionColors, setNewColFormula, setNewColMinVal, setNewColMaxVal, setInsertColModal,
     moveColumnMutation, frozenColumns, setFrozenColumns, freezeColumn, registerId,
     hiddenColumns, setHiddenColumns, hideColumn, clearColumnDataMutation, deleteColumnMutation,
     setColumnMandatoryMutation, setColumnUniqueMutation,
@@ -126,6 +127,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setNewColName(col?.name || '');
                   setNewColFormula(col?.formula || '');
                   setNewColDropdownOpts(col?.dropdownOptions?.join(', ') || '');
+                  if (setNewColOptionColors) setNewColOptionColors(col?.optionColors || {});
                   setNewColMinVal(col?.minVal != null ? col.minVal.toString() : '');
                   setNewColMaxVal(col?.maxVal != null ? col.maxVal.toString() : '');
                   setActiveModalColId(colMenuId);
@@ -168,14 +170,15 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                     )}
                   </span>
                 </button>
-                {columns.find((c) => c.id === colMenuId)?.type === 'dropdown' && (
+                {['dropdown', 'yes_no', 'status'].includes(columns.find((c) => c.id === colMenuId)?.type || '') && (
                   <button className="context-item" onClick={() => {
                     const col = columns.find((c) => c.id === colMenuId);
                     setDropdownConfigOptions(col?.dropdownOptions?.join(', ') || '');
+                    if (setDropdownConfigOptionColors) setDropdownConfigOptionColors(col?.optionColors || {});
                     setActiveModalColId(colMenuId);
                     setDropdownConfigModal(true); setColMenuId(null);
                   }}>
-                    <ChevronDown size={16} /> Edit Dropdown Options
+                    <ChevronDown size={16} /> Edit Options
                   </button>
                 )}
               </>

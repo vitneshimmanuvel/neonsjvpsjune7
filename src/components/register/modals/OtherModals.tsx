@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Plus, Search, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import { type Entry } from '../../../lib/api';
+import { type Entry, getOptionBadgeStyle } from '../../../lib/api';
 
 interface OtherModalsProps {
   // Rename Page
@@ -282,14 +282,22 @@ export function OtherModals(props: OtherModalsProps) {
                   {Array.from({ length: daysInMonth(viewMonth, viewYear) }).map((_, i) => {
                     const d = i + 1;
                     const isSelected = d.toString() === dateDay && viewMonth.toString() === dateMonth && viewYear.toString() === dateYear;
-                    const isToday = d === new Date().getDate() && viewMonth === (new Date().getMonth() + 1) && viewYear === new Date().getFullYear();
+                    const todayDate = new Date();
+                    todayDate.setHours(0, 0, 0, 0);
+                    const isToday = d === todayDate.getDate() && viewMonth === (todayDate.getMonth() + 1) && viewYear === todayDate.getFullYear();
+                    const cellDate = new Date(viewYear, viewMonth - 1, d);
+                    const isPast = cellDate < todayDate;
                     
                     return (
                       <button 
                         key={d} 
-                        className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                        className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isPast ? 'disabled' : ''}`}
+                        disabled={isPast}
+                        style={isPast ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                         onClick={() => {
-                          handleDateSelect(d.toString(), viewMonth.toString(), viewYear.toString());
+                          if (!isPast) {
+                            handleDateSelect(d.toString(), viewMonth.toString(), viewYear.toString());
+                          }
                         }}
                       >
                         {d}
@@ -392,6 +400,10 @@ export function OtherModals(props: OtherModalsProps) {
                   const currentVal = dropdownEntryId ? localEntries.find((e) => e.id === dropdownEntryId)?.cells?.[dropdownColumnId?.toString() || ''] : '';
                   // Strict single choice: compare directly with currentVal
                   const isSelected = currentVal === opt;
+                  const col = columns?.find(c => c.id === dropdownColumnId);
+                  const badgeStyle = (col && (col.type === 'yes_no' || col.type === 'status' || (col.optionColors && Object.keys(col.optionColors).length > 0)))
+                    ? getOptionBadgeStyle(col, opt)
+                    : null;
                   
                   return (
                     <button
@@ -407,7 +419,14 @@ export function OtherModals(props: OtherModalsProps) {
                         }
                       }}
                     >
-                      <span>{opt}</span>
+                      {badgeStyle ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: badgeStyle.color, flexShrink: 0 }} />
+                          <span>{opt}</span>
+                        </div>
+                      ) : (
+                        <span>{opt}</span>
+                      )}
                       {isSelected && <Check size={14} className="check-icon" />}
                     </button>
                   );

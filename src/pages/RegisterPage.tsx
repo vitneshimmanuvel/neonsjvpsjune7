@@ -40,6 +40,7 @@ import { ExportModal } from '../components/register/modals/ExportModal';
 import { ShareModal } from '../components/register/modals/ShareModal';
 import { ColumnModals } from '../components/register/modals/ColumnModals';
 import { OtherModals } from '../components/register/modals/OtherModals';
+import { SignatureModal } from '../components/register/modals/SignatureModal';
 import { RegisterToolbar } from '../components/register/RegisterToolbar';
 import { RegisterContextMenus } from '../components/register/menus/RegisterContextMenus';
 import { RegisterSummaryRow } from '../components/register/RegisterSummaryRow';
@@ -68,11 +69,17 @@ function parseDateString(dStr: string) {
   if (dStr.includes('/') || dStr.includes('-')) {
     const parts = dStr.split(/[/-]/);
     if (parts.length === 3) {
-      // Ensure DD and MM are padded if they come in as 1 or 2 digits
-      const d = parts[0].padStart(2, '0');
-      const m = parts[1].padStart(2, '0');
-      const y = parts[2];
-      return `${y}-${m}-${d}`;
+      if (parts[0].length === 4) {
+        const y = parts[0];
+        const m = parts[1].padStart(2, '0');
+        const d = parts[2].padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      } else {
+        const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        const y = parts[2];
+        return `${y}-${m}-${d}`;
+      }
     }
   }
   return dStr;
@@ -313,12 +320,13 @@ export default function RegisterPage() {
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showFolderDropdown]);
 
   // ── State ──
   const _uid = (user as any)?.id || 'guest';
   const [search, setSearch] = useState(() => localStorage.getItem(`rb_search_${_uid}_${registerId}`) || '');
+  const [signatureModalState, setSignatureModalState] = useState<{ entryId: number; colId: number; currentSignature: string; columnName: string } | null>(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(() => {
     const saved = localStorage.getItem(`rb_page_${_uid}_${registerId}`);
     return saved ? parseInt(saved, 10) : 0;
@@ -470,6 +478,7 @@ export default function RegisterPage() {
   const [newColName, setNewColName] = useState('');
   const [newColType, setNewColType] = useState('text');
   const [newColDropdownOpts, setNewColDropdownOpts] = useState('');
+  const [newColOptionColors, setNewColOptionColors] = useState<Record<string, string>>({});
   const [newColFormula, setNewColFormula] = useState('');
   const [newColMinVal, setNewColMinVal] = useState('');
   const [newColMaxVal, setNewColMaxVal] = useState('');
@@ -482,6 +491,7 @@ export default function RegisterPage() {
 
   // Dropdown config
   const [dropdownConfigOptions, setDropdownConfigOptions] = useState('');
+  const [dropdownConfigOptionColors, setDropdownConfigOptionColors] = useState<Record<string, string>>({});
 
   // Filter
   const [filters, setFilters] = useState<Array<{ columnId: number; operator: string; value: string; value2?: string; values?: string[] }>>(() => {
@@ -1235,13 +1245,19 @@ export default function RegisterPage() {
 
   // ── Mutations ──
   const addColumnMutation = useMutation({
-    mutationFn: () => addColumn(registerId, {
-      name: newColName, type: newColType,
-      dropdownOptions: newColType === 'dropdown' ? cleanOptions(newColDropdownOpts.split(',')) : undefined,
-      formula: newColType === 'formula' ? newColFormula : undefined,
-      minVal: (newColType === 'currency' || newColType === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
-      maxVal: (newColType === 'currency' || newColType === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
-    }),
+    mutationFn: () => {
+      let opts = ['dropdown', 'yes_no', 'status'].includes(newColType) ? cleanOptions(newColDropdownOpts.split(',')) : undefined;
+      if (newColType === 'yes_no' && (!opts || opts.length === 0)) opts = ['Yes', 'No'];
+      if (newColType === 'status' && (!opts || opts.length === 0)) opts = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+      return addColumn(registerId, {
+        name: newColName, type: newColType,
+        dropdownOptions: opts,
+        formula: newColType === 'formula' ? newColFormula : undefined,
+        minVal: (newColType === 'currency' || newColType === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
+        maxVal: (newColType === 'currency' || newColType === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
+        optionColors: ['dropdown', 'yes_no', 'status'].includes(newColType) ? newColOptionColors : undefined,
+      });
+    },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ['register', registerId] });
       const prev = queryClient.getQueryData(['register', registerId]) as any;
@@ -1406,7 +1422,7 @@ export default function RegisterPage() {
   });
 
   const updateDropdownMutation = useMutation({
-    mutationFn: () => updateColumnDropdownOptions(registerId, activeModalColId!, cleanOptions(dropdownConfigOptions.split(','))),
+    mutationFn: () => updateColumnDropdownOptions(registerId, activeModalColId!, cleanOptions(dropdownConfigOptions.split(',')), dropdownConfigOptionColors),
     onSuccess: (updatedReg) => {
       queryClient.setQueryData(['register', registerId], updatedReg);
       queryClient.invalidateQueries({ queryKey: ['register', registerId] });
@@ -1852,11 +1868,15 @@ export default function RegisterPage() {
   const changeColumnTypeMutation = useMutation({
     mutationFn: () => {
       if (activeModalColId === null) throw new Error('No column selected');
+      let opts = ['dropdown', 'yes_no', 'status'].includes(changeTypeValue) ? cleanOptions(newColDropdownOpts.split(',')) : undefined;
+      if (changeTypeValue === 'yes_no' && (!opts || opts.length === 0)) opts = ['Yes', 'No'];
+      if (changeTypeValue === 'status' && (!opts || opts.length === 0)) opts = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
       return changeColumnType(registerId, activeModalColId, changeTypeValue, {
         formula: changeTypeValue === 'formula' ? newColFormula : undefined,
-        dropdownOptions: changeTypeValue === 'dropdown' ? cleanOptions(newColDropdownOpts.split(',')) : undefined,
+        dropdownOptions: opts,
         minVal: (changeTypeValue === 'currency' || changeTypeValue === 'number') && newColMinVal ? parseFloat(newColMinVal) : undefined,
         maxVal: (changeTypeValue === 'currency' || changeTypeValue === 'number') && newColMaxVal ? parseFloat(newColMaxVal) : undefined,
+        optionColors: ['dropdown', 'yes_no', 'status'].includes(changeTypeValue) ? newColOptionColors : undefined,
       });
     },
     onSuccess: (updatedReg) => {
@@ -2035,12 +2055,16 @@ export default function RegisterPage() {
       minVal?: string,
       maxVal?: string
     }) => {
+      let opts = ['dropdown', 'yes_no', 'status'].includes(vars.type) ? cleanOptions(vars.dropdownOpts.split(',')) : undefined;
+      if (vars.type === 'yes_no' && (!opts || opts.length === 0)) opts = ['Yes', 'No'];
+      if (vars.type === 'status' && (!opts || opts.length === 0)) opts = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
       return insertColumn(registerId, {
         name: vars.name, type: vars.type,
-        dropdownOptions: vars.type === 'dropdown' ? cleanOptions(vars.dropdownOpts.split(',')) : undefined,
+        dropdownOptions: opts,
         formula: vars.type === 'formula' ? vars.formula : undefined,
         minVal: (vars.type === 'currency' || vars.type === 'number') && vars.minVal ? parseFloat(vars.minVal) : undefined,
         maxVal: (vars.type === 'currency' || vars.type === 'number') && vars.maxVal ? parseFloat(vars.maxVal) : undefined,
+        optionColors: ['dropdown', 'yes_no', 'status'].includes(vars.type) ? newColOptionColors : undefined,
       }, vars.pos);
     },
     onMutate: async (vars) => {
@@ -2401,20 +2425,28 @@ export default function RegisterPage() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(valStr)) return { isValid: false, error: 'Invalid email format' };
       } else if (col.type === 'phone') {
-        const phoneRegex = /^[\d\s+()-]{7,20}$/;
-        if (!phoneRegex.test(valStr)) return { isValid: false, error: 'Invalid phone format (e.g. +91 1234567890)' };
+        const cleanedPhone = valStr.trim().replace(/[\s()-]/g, '');
+        const phoneRegex = /^(\+91)?\d{10}$/;
+        if (!phoneRegex.test(cleanedPhone)) return { isValid: false, error: 'Invalid phone format (must be 10 digits or +91 followed by 10 digits)' };
       } else if (col.type === 'date') {
         const dateRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
         if (!dateRegex.test(valStr)) return { isValid: false, error: 'Use DD-MM-YYYY format' };
         
         const parts = valStr.split('-');
-        const d = parseInt(parts[0]);
-        const m = parseInt(parts[1]);
-        const y = parseInt(parts[2]);
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[2], 10);
         if (m < 1 || m > 12) return { isValid: false, error: 'Invalid month (1-12)' };
         const daysInMonth = new Date(y, m, 0).getDate();
         if (d < 1 || d > daysInMonth) return { isValid: false, error: `Invalid day for this month (max ${daysInMonth})` };
         if (y < 1900 || y > 2100) return { isValid: false, error: 'Year must be between 1900-2100' };
+
+        const inputDate = new Date(y, m - 1, d);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (inputDate < today) {
+          return { isValid: false, error: 'Backdated entries are not allowed (cannot select past dates)' };
+        }
       } else if (col.type === 'number' || col.type === 'currency') {
         const numericValue = valStr.replace(/[^0-9.-]/g, '');
         if (numericValue === '' || isNaN(parseFloat(numericValue))) return { isValid: false, error: 'Must be a valid number' };
@@ -2475,11 +2507,11 @@ export default function RegisterPage() {
     const validation = validateCellValue(col, value);
     if (!validation.isValid) {
       if (value.trim() !== '') {
-        // For grid editing, we show a warning but allow the change (save as is)
-        if (col.type === 'date' && value.length >= 10) {
-        toast(validation.error, { icon: <AlertTriangle size={16} color="var(--warning)" /> });
+        if (col.type === 'date') {
+          toast.error(validation.error || 'Backdated entries are not allowed');
+          return false;
         } else if (col.type === 'dropdown' || col.type === 'email' || col.type === 'phone' || col.type === 'number' || col.type === 'currency') {
-        toast(validation.error, { icon: <AlertTriangle size={16} color="var(--warning)" /> });
+          toast(validation.error, { icon: <AlertTriangle size={16} color="var(--warning)" /> });
         }
       }
     }
@@ -3991,6 +4023,7 @@ export default function RegisterPage() {
                   registerColumns={columns}
                   onRowDetail={setDetailViewEntry}
                   onImagePreview={setPreviewImage}
+                  onOpenSignaturePad={(entryId, colId, currentSignature, columnName) => setSignatureModalState({ entryId, colId, currentSignature, columnName })}
                   frozenColumns={frozenColumns}
                   frozenLeftOffsets={frozenLeftOffsets}
                   colWidths={colWidths}
@@ -4095,9 +4128,9 @@ export default function RegisterPage() {
         handleSort={handleSort}
         setRenameColValue={setRenameColValue} setRenameColModal={setRenameColModal}
         setChangeTypeValue={setChangeTypeValue} setChangeTypeModal={setChangeTypeModal}
-        setDropdownConfigOptions={setDropdownConfigOptions} setDropdownConfigModal={setDropdownConfigModal} setLinkColumnModal={setLinkColumnModal}
+        setDropdownConfigOptions={setDropdownConfigOptions} setDropdownConfigOptionColors={setDropdownConfigOptionColors} setDropdownConfigModal={setDropdownConfigModal} setLinkColumnModal={setLinkColumnModal}
         duplicateColumnMutation={duplicateColumnMutation}
-        setNewColName={setNewColName} setNewColType={setNewColType} setNewColDropdownOpts={setNewColDropdownOpts} setNewColFormula={setNewColFormula}
+        setNewColName={setNewColName} setNewColType={setNewColType} setNewColDropdownOpts={setNewColDropdownOpts} setNewColOptionColors={setNewColOptionColors} setNewColFormula={setNewColFormula}
         setNewColMinVal={setNewColMinVal} setNewColMaxVal={setNewColMaxVal}
         setInsertColModal={setInsertColModal} moveColumnMutation={moveColumnMutation}
         frozenColumns={frozenColumns} setFrozenColumns={setFrozenColumns} freezeColumn={freezeColumn} registerId={registerId}
@@ -4131,6 +4164,7 @@ export default function RegisterPage() {
         newColName={newColName} setNewColName={setNewColName}
         newColType={newColType} setNewColType={setNewColType}
         newColDropdownOpts={newColDropdownOpts} setNewColDropdownOpts={setNewColDropdownOpts}
+        newColOptionColors={newColOptionColors} setNewColOptionColors={setNewColOptionColors}
         newColFormula={newColFormula} setNewColFormula={setNewColFormula}
         newColMinVal={newColMinVal} setNewColMinVal={setNewColMinVal}
         newColMaxVal={newColMaxVal} setNewColMaxVal={setNewColMaxVal}
@@ -4138,7 +4172,9 @@ export default function RegisterPage() {
         renameColModal={renameColModal} setRenameColModal={setRenameColModal}
         renameColValue={renameColValue} setRenameColValue={setRenameColValue} renameColumnMutation={renameColumnMutation}
         dropdownConfigModal={dropdownConfigModal} setDropdownConfigModal={setDropdownConfigModal}
-        dropdownConfigOptions={dropdownConfigOptions} setDropdownConfigOptions={setDropdownConfigOptions} updateDropdownMutation={updateDropdownMutation}
+        dropdownConfigOptions={dropdownConfigOptions} setDropdownConfigOptions={setDropdownConfigOptions}
+        dropdownConfigOptionColors={dropdownConfigOptionColors} setDropdownConfigOptionColors={setDropdownConfigOptionColors}
+        updateDropdownMutation={updateDropdownMutation}
         changeTypeModal={changeTypeModal} setChangeTypeModal={setChangeTypeModal}
         changeTypeValue={changeTypeValue} setChangeTypeValue={setChangeTypeValue} changeColumnTypeMutation={changeColumnTypeMutation}
         linkColumnModal={linkColumnModal} setLinkColumnModal={setLinkColumnModal}
@@ -4505,6 +4541,19 @@ export default function RegisterPage() {
         registerId={registerId}
         handleCellChange={handleCellChange}
       />
+
+      {signatureModalState && (
+        <SignatureModal
+          isOpen={!!signatureModalState}
+          onClose={() => setSignatureModalState(null)}
+          onSave={(dataUrl) => {
+            handleCellChange(signatureModalState.entryId, signatureModalState.colId.toString(), dataUrl);
+            setSignatureModalState(null);
+          }}
+          initialSignature={signatureModalState.currentSignature}
+          columnName={signatureModalState.columnName}
+        />
+      )}
     </div>
   );
 }

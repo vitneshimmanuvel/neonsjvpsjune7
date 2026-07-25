@@ -174,6 +174,8 @@ export function useExport({
               v: `View Photo 1 (+${cleanUrls.length - 1} more)`
             };
           }
+        } else if (c.type === 'signature' && val) {
+          val = '[Signed Signature]';
         }
 
         if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {

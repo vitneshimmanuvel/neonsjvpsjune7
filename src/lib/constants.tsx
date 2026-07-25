@@ -1,4 +1,4 @@
-import { Type, Hash, Calendar, ChevronDown, FlaskConical, Phone, Mail, Globe, Star, CheckSquare, Image, ListOrdered, IndianRupee } from 'lucide-react';
+import { Type, Hash, Calendar, ChevronDown, FlaskConical, Phone, Mail, Globe, Star, CheckSquare, Image, ListOrdered, IndianRupee, CheckCircle2, Tag, PenTool } from 'lucide-react';
 import React from 'react';
 
 export const COL_TYPES = [
@@ -8,6 +8,9 @@ export const COL_TYPES = [
   { id: 'currency',       label: 'Currency (₹)',   icon: React.createElement(IndianRupee, { size: 12 }) },
   { id: 'date',           label: 'Date',           icon: React.createElement(Calendar, { size: 12 }) },
   { id: 'dropdown',       label: 'Dropdown',       icon: React.createElement(ChevronDown, { size: 12 }) },
+  { id: 'yes_no',         label: 'Yes/No',         icon: React.createElement(CheckCircle2, { size: 12 }) },
+  { id: 'status',         label: 'Status',         icon: React.createElement(Tag, { size: 12 }) },
+  { id: 'signature',      label: 'Signature',      icon: React.createElement(PenTool, { size: 12 }) },
   { id: 'formula',        label: 'Formula',        icon: React.createElement(FlaskConical, { size: 12 }) },
   { id: 'phone',          label: 'Phone',          icon: React.createElement(Phone, { size: 12 }) },
   { id: 'email',          label: 'Email',          icon: React.createElement(Mail, { size: 12 }) },

@@ -3,7 +3,7 @@ import {
   Type, Hash, Calendar, ChevronDown, FlaskConical, 
   IndianRupee, Mail, Phone, Globe, Star, 
   CheckSquare, Image as ImageIcon, ListOrdered,
-  Link as LinkIcon
+  Link as LinkIcon, CheckCircle2, Tag, PenTool
 } from 'lucide-react';
 
 interface ColumnIconProps {
@@ -23,6 +23,12 @@ export const ColumnIcon: React.FC<ColumnIconProps> = ({ type, size = 16, classNa
       return <Calendar size={size} className={className} style={style} />;
     case 'dropdown':
       return <ChevronDown size={size} className={className} style={style} />;
+    case 'yes_no':
+      return <CheckCircle2 size={size} className={className} style={style} />;
+    case 'status':
+      return <Tag size={size} className={className} style={style} />;
+    case 'signature':
+      return <PenTool size={size} className={className} style={style} />;
     case 'formula':
       return <FlaskConical size={size} className={className} style={style} />;
     case 'checkbox':
