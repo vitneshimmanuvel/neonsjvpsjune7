@@ -17,7 +17,7 @@ import {
   subscribeToMutationStatus, updateEntriesOrder, flushAllPendingWrites,
   getPendingMutationsCount,
   updateEntryCellStyles, unlinkColumn,
-  formatDateToDDMMYYYY,
+  formatDateToDDMMYYYY, canUserSelectBackDates,
   listFolders,
   type Entry, type CellStyle, type HistoryEntry, type Folder,
 } from '../lib/api';
@@ -87,6 +87,7 @@ function parseDateString(dStr: string) {
 
 export default function RegisterPage() {
   const { user } = useAuth();
+  const canSelectBackDates = canUserSelectBackDates(user);
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -2444,8 +2445,8 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         const inputDate = new Date(y, m - 1, d);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        if (inputDate < today) {
-          return { isValid: false, error: 'Backdated entries are not allowed (cannot select past dates)' };
+        if (inputDate < today && !canSelectBackDates) {
+          return { isValid: false, error: 'Backdated entries are not allowed (requires admin permission)' };
         }
       } else if (col.type === 'number' || col.type === 'currency') {
         const numericValue = valStr.replace(/[^0-9.-]/g, '');
@@ -4345,6 +4346,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         dateModal={dateModal} setDateModal={setDateModal}
         dateDay={dateDay} setDateDay={setDateDay} dateMonth={dateMonth} setDateMonth={setDateMonth} dateYear={dateYear} setDateYear={setDateYear}
         handleDateSelect={handleDateSelect} dateRect={dateRect}
+        canSelectBackDates={canSelectBackDates}
         dropdownModal={dropdownModal} setDropdownModal={setDropdownModal}
         dropdownOptions={dropdownOptions} dropdownEntryId={dropdownEntryId} dropdownColumnId={dropdownColumnId}
         dropdownRect={dropdownRect}
@@ -4367,6 +4369,8 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         onClose={() => setShowAddRecordModal(false)}
         columns={columns}
         isSubmitting={addEntryMutation.isPending}
+        canSelectBackDates={canSelectBackDates}
+        openDatePicker={openDatePicker}
         onSubmit={(cells, onSuccessCallback) => {
           addEntryMutation.mutate(cells, {
             onSuccess: () => {
@@ -4417,6 +4421,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
           setNewColMaxVal={setNewColMaxVal}
           openDropdown={openDropdown}
           openDatePicker={openDatePicker}
+          canSelectBackDates={canSelectBackDates}
           queryClient={queryClient}
           pendingTempRowEdits={pendingTempRowEdits}
           debounceTimers={debounceTimers}

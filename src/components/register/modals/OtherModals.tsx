@@ -26,6 +26,7 @@ interface OtherModalsProps {
   dateYear: string;
   setDateYear: (v: string) => void;
   handleDateSelect: (d?: string, m?: string, y?: string) => void;
+  canSelectBackDates?: boolean;
 
   // Dropdown Cell
   dropdownModal: boolean;
@@ -287,15 +288,16 @@ export function OtherModals(props: OtherModalsProps) {
                     const isToday = d === todayDate.getDate() && viewMonth === (todayDate.getMonth() + 1) && viewYear === todayDate.getFullYear();
                     const cellDate = new Date(viewYear, viewMonth - 1, d);
                     const isPast = cellDate < todayDate;
+                    const isPastDisabled = isPast && !props.canSelectBackDates;
                     
                     return (
                       <button 
                         key={d} 
-                        className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isPast ? 'disabled' : ''}`}
-                        disabled={isPast}
-                        style={isPast ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+                        className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isPastDisabled ? 'disabled' : ''}`}
+                        disabled={isPastDisabled}
+                        style={isPastDisabled ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
                         onClick={() => {
-                          if (!isPast) {
+                          if (!isPastDisabled) {
                             handleDateSelect(d.toString(), viewMonth.toString(), viewYear.toString());
                           }
                         }}

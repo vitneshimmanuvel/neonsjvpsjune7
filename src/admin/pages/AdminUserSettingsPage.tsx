@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { firebaseGetUsers, firebaseUpdatePermissions, firebaseAdminChangePassword, firebaseUpdateUser } from '../../lib/firebaseAuth';
 import { listBusinesses, listRegisters, getRegisterColumnsOnly, listFolders, type RegisterDetail, type Folder, setColumnMandatory, setColumnUnique } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { ArrowLeft, FileText, Shield, Eye, Edit3, Download, EyeOff, Lock, ChevronDown, ChevronRight, X, Play, Check, Search, FolderOpen, Users } from 'lucide-react';
+import { ArrowLeft, FileText, Shield, Eye, Edit3, Download, EyeOff, Lock, ChevronDown, ChevronRight, X, Play, Check, Search, FolderOpen, Users, Calendar } from 'lucide-react';
 import { useNotifications } from '../../lib/NotificationContext';
 
 export default function AdminUserSettingsPage() {
@@ -34,7 +34,7 @@ export default function AdminUserSettingsPage() {
   const [userRole, setUserRole] = useState<string>('user');
   const [expandedRegId, setExpandedRegId] = useState<number | null>(null);
 
-  const [globalPerms, setGlobalPerms] = useState({ canView: true, canEdit: false, canDownload: false, isAdmin: false, fullSheetAccess: false, canCreateSheets: false });
+  const [globalPerms, setGlobalPerms] = useState({ canView: true, canEdit: false, canDownload: false, isAdmin: false, fullSheetAccess: false, canCreateSheets: false, canSelectBackDates: false });
 
   useEffect(() => {
     async function loadData() {
@@ -67,7 +67,8 @@ export default function AdminUserSettingsPage() {
           canDownload: p.canDownload ?? false,
           isAdmin: p.isAdmin ?? false,
           fullSheetAccess: p.fullSheetAccess ?? false,
-          canCreateSheets: p.canCreateSheets ?? false
+          canCreateSheets: p.canCreateSheets ?? false,
+          canSelectBackDates: p.canSelectBackDates ?? false
         });
 
         if (Array.isArray(p.allowedRegisters)) {
@@ -298,6 +299,7 @@ export default function AdminUserSettingsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {[
                   { k: 'canCreateSheets', l: 'Can Create Folders & Sheets', icon: <FileText size={16} color="var(--accent)" />, desc: 'Can add new folders and sheets' },
+                  { k: 'canSelectBackDates', l: 'Can Select Past / Back Dates', icon: <Calendar size={16} color="var(--accent)" />, desc: 'Allows selecting back/past dates in date columns' },
                   { k: 'isAdmin', l: 'Admin Access', icon: <Shield size={16} color="var(--accent)" />, desc: 'Full administrative access' }
                 ].map(({ k, l, icon, desc }) => (
                   <label key={k} className="admin-global-permission-label" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', transition: 'background-color 0.2s' }}>
@@ -323,7 +325,7 @@ export default function AdminUserSettingsPage() {
                     if (userRole === r.value) return;
                     try {
                       const newPerms = r.value === 'admin'
-                        ? { ...globalPerms, canView: true, canEdit: true, canDownload: true, isAdmin: true, fullSheetAccess: true, canCreateSheets: true }
+                        ? { ...globalPerms, canView: true, canEdit: true, canDownload: true, isAdmin: true, fullSheetAccess: true, canCreateSheets: true, canSelectBackDates: true }
                         : { ...globalPerms, fullSheetAccess: false, isAdmin: false };
                       await firebaseUpdateUser(user.id, { role: r.value });
                       await firebaseUpdatePermissions(user.id, { ...user.permissions, ...newPerms });

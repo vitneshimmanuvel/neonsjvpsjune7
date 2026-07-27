@@ -29,13 +29,15 @@ interface AddRecordModalProps {
   columns: Column[];
   isSubmitting?: boolean;
   existingEntries?: Entry[];
+  canSelectBackDates?: boolean;
+  openDatePicker?: (entryId: number, colId: number, currentVal: string, rect?: DOMRect) => void;
 }
 
 // Only these types get duplicate-checked (not text/name/date/dropdown/checkbox etc.)
 const DUPLICATE_CHECK_TYPES = new Set(['phone', 'email', 'number', 'currency', 'url']);
 
 export function AddRecordModal({
-  open, onClose, onSubmit, columns, isSubmitting, existingEntries = []
+  open, onClose, onSubmit, columns, isSubmitting, existingEntries = [], canSelectBackDates, openDatePicker
 }: AddRecordModalProps) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [duplicates, setDuplicates] = useState<Set<string>>(new Set());
@@ -180,8 +182,8 @@ export function AddRecordModal({
           const inputDate = new Date(y, m - 1, d);
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          if (inputDate < today) {
-            toast.error(`${col.name}: Backdated entries are not allowed (cannot select past dates).`);
+          if (inputDate < today && !canSelectBackDates) {
+            toast.error(`${col.name}: Backdated entries are not allowed (requires admin authorization).`);
             setSubmitType(null);
             return;
           }
@@ -543,12 +545,22 @@ export function AddRecordModal({
                           )}
                         </div>
                       ) : col.type === 'date' ? (
-                        <input type="text" id={`ar-col-${col.id}`} className={inputCls}
+                        <input type="text" id={`ar-col-${col.id}`} className={`${inputCls} cell-date`}
                           value={val} onChange={onChange} placeholder="DD-MM-YYYY"
+                          readOnly={true}
                           ref={isFirst ? (el) => { firstInputRef.current = el; } : undefined}
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => {
+                            if (openDatePicker) {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              openDatePicker(-1, col.id, val, rect as DOMRect);
+                            }
+                          }}
                           onKeyDown={(e) => {
-                            if (e.key === 'Backspace' || e.key === 'Delete') {
-                              e.preventDefault();
+                            e.preventDefault();
+                            if ((e.key === 'Enter' || e.key === ' ') && openDatePicker) {
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              openDatePicker(-1, col.id, val, rect as DOMRect);
                             }
                           }}
                         />

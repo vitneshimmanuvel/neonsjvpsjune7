@@ -44,6 +44,7 @@ interface RowDetailModalProps {
   setNewColMaxVal: (v: string) => void;
   openDropdown: (entryId: number, columnId: number, options: string[], rect: DOMRect) => void;
   openDatePicker: (entryId: number, columnId: number, value: string, rect: DOMRect) => void;
+  canSelectBackDates?: boolean;
   queryClient: any;
   pendingTempRowEdits: React.MutableRefObject<Record<number, Record<string, string>>>;
   debounceTimers: React.MutableRefObject<Record<string, any>>;
@@ -343,7 +344,8 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                         value={val}
                         placeholder={isFieldEditable ? "DD-MM-YYYY" : "—"}
                         autoComplete="off"
-                        readOnly={!isFieldEditable}
+                        readOnly={true}
+                        style={{ cursor: isFieldEditable ? 'pointer' : 'default' }}
                         onChange={(e) => {
                           if (!isFieldEditable) return;
                           setDetailEdits(prev => ({ ...prev, [colKey]: e.target.value }));
@@ -354,15 +356,10 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                           openDatePicker(detailViewEntry.id, col.id, val, rect as DOMRect);
                         } : undefined}
                         onKeyDown={(e) => {
-                          if (e.key === 'Backspace' || e.key === 'Delete') {
-                            e.preventDefault();
-                            return;
-                          }
-                          if (e.key === 'Enter' && isFieldEditable) {
+                          e.preventDefault();
+                          if ((e.key === 'Enter' || e.key === ' ') && isFieldEditable) {
                             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                             openDatePicker(detailViewEntry.id, col.id, val, rect as DOMRect);
-                          } else {
-                            handleDetailKeyDown(e, col.id);
                           }
                         }}
                         ref={(el) => {

@@ -20,6 +20,7 @@ export interface User {
     canDownload?: boolean;
     isAdmin?: boolean;
     canCreateSheets?: boolean;
+    canSelectBackDates?: boolean;
     viewRestrictions?: Record<string, number[]> | null;
     editRestrictions?: Record<string, number[]> | null;
     downloadRestrictions?: Record<string, number[]> | null;
@@ -31,6 +32,12 @@ export interface User {
     allowedRegisters?: string[];
     allowedFolders?: string[];
   };
+}
+
+export function canUserSelectBackDates(user?: User | null): boolean {
+  if (!user) return false;
+  if (user.role === 'superadmin' || user.role === 'admin' || user.permissions?.isAdmin) return true;
+  return !!user.permissions?.canSelectBackDates;
 }
 
 export interface SendOtpResponse { message: string; devOtp?: string; }

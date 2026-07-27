@@ -798,7 +798,7 @@ const CurrencyCell = React.memo(({ idx, col, entry, colIdx, totalRows, visibleCo
   );
 });
 
-const SpreadsheetTextInput = React.memo(({ idx, col, entry, visibleColumns, colIdx, totalRows, handleCellChange, type = 'text', placeholder, searchTerm, readOnly, suggestions, scrollToColumn }: SpreadsheetTextInputProps) => {
+const SpreadsheetTextInput = React.memo(({ idx, col, entry, visibleColumns, colIdx, totalRows, handleCellChange, type = 'text', placeholder, searchTerm, readOnly, suggestions, scrollToColumn, onOpenDatePicker }: SpreadsheetTextInputProps & { onOpenDatePicker?: (rect?: DOMRect) => void }) => {
   let initialValue = entry.cells?.[col.id.toString()] || '';
   if (col.type === 'date' && initialValue.includes('/')) {
     initialValue = initialValue.replace(/\//g, '-');
@@ -881,9 +881,23 @@ const SpreadsheetTextInput = React.memo(({ idx, col, entry, visibleColumns, colI
   }, [val, entry, col.id, handleCellChange, readOnly]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<any>) => {
-    if (col.type === 'date' && (e.key === 'Backspace' || e.key === 'Delete')) {
-      e.preventDefault();
-      return;
+    if (col.type === 'date') {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (onOpenDatePicker) {
+          const rect = inputRef.current?.getBoundingClientRect() || (e.currentTarget as HTMLElement).getBoundingClientRect();
+          onOpenDatePicker(rect);
+        }
+        return;
+      }
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        return;
+      }
     }
 
     if (e.key === 'Escape') {
@@ -1028,13 +1042,28 @@ const SpreadsheetTextInput = React.memo(({ idx, col, entry, visibleColumns, colI
         onFocus={handleFocus}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
-        onDoubleClick={() => !readOnly && setIsEditing(true)}
+        onClick={(e) => {
+          if (col.type === 'date' && onOpenDatePicker) {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            onOpenDatePicker(rect);
+          }
+        }}
+        onDoubleClick={(e) => {
+          if (col.type === 'date') {
+            if (onOpenDatePicker) {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              onOpenDatePicker(rect);
+            }
+            return;
+          }
+          if (!readOnly) setIsEditing(true);
+        }}
         style={{
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
-          cursor: readOnly ? 'default' : 'cell',
+          cursor: col.type === 'date' ? (readOnly ? 'default' : 'pointer') : (readOnly ? 'default' : 'cell'),
           userSelect: 'none',
           outline: 'none',
         }}
@@ -1400,7 +1429,13 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
           {col.type === 'formula' ? (
             <FormulaCell idx={idx} col={col} entry={entry} registerColumns={registerColumns} onKeyDown={(e) => handleCellKeyDown(e, col.id, colIdx)} />
           ) : col.type === 'date' ? (
-            <div className="cell-url-wrap cell-date-wrap">
+            <div 
+              className="cell-url-wrap cell-date-wrap"
+              style={{ cursor: isEditable ? 'pointer' : 'default' }}
+              onClick={isEditable ? (e) => {
+                openDatePicker(entry.id, col.id, entry.cells?.[col.id.toString()] || '', e.currentTarget.getBoundingClientRect());
+              } : undefined}
+            >
               {typeof entry.cells?.[col.id.toString()] === 'string' && entry.cells[col.id.toString()].includes(' ||| ') ? (
                 <SplitTextInput
                   idx={idx} col={col} entry={entry} visibleColumns={visibleColumns} colIdx={colIdx} totalRows={totalRows} handleCellChange={handleCellChange}
@@ -1412,13 +1447,17 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
                   placeholder="DD-MM-YYYY" searchTerm={searchTerm}
                   readOnly={!isEditable}
                   scrollToColumn={scrollToColumn}
+                  onOpenDatePicker={isEditable ? (rect: any) => openDatePicker(entry.id, col.id, entry.cells?.[col.id.toString()] || '', rect) : undefined}
                 />
               )}
               {isEditable && (
                 <button 
                   className="cell-url-link cell-date-picker-btn" 
                   style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                  onClick={(e) => openDatePicker(entry.id, col.id, entry.cells?.[col.id.toString()] || '', e.currentTarget.getBoundingClientRect())}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDatePicker(entry.id, col.id, entry.cells?.[col.id.toString()] || '', e.currentTarget.getBoundingClientRect());
+                  }}
                   tabIndex={-1}
                 >
                   <Calendar size={12} />

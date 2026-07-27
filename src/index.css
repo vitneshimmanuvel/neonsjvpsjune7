@@ -10768,5 +10768,19 @@ tr:hover .admin-table-sticky-col {
   }
 }
 
+/* ── Date Column Cursor Styling ── */
+.cell-date-wrap,
+.cell-date-wrap input,
+.cell-date {
+  cursor: pointer !important;
+}
+
+.cell-date-wrap.cell-readonly,
+.cell-date-wrap input:disabled,
+.cell-date.cell-readonly {
+  cursor: default !important;
+}
+
+
 
 
