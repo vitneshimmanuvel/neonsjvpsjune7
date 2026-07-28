@@ -114,7 +114,7 @@ export default function BackupPage() {
               : (entry.cells?.[c.id.toString()] || '');
             
             if (c.type === 'checkbox') {
-              rowData.push(val === 'true' || val === true ? 'YES' : '');
+              rowData.push(String(val) === 'true' ? 'YES' : '');
             } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
                 const cleaned = val.toString().replace(/[^\d.-]/g, '');
                 const n = parseFloat(cleaned);

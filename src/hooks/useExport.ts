@@ -192,7 +192,7 @@ export function useExport({
         }
 
         if (c.type === 'checkbox') {
-          rowData.push((val === 'true' || val === true) ? 'YES' : '');
+          rowData.push(String(val) === 'true' ? 'YES' : '');
         } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
           const original = val.toString();
           if (c.type === 'currency') {
@@ -383,7 +383,7 @@ export function useExport({
             : (entry.cells?.[c.id.toString()] || '');
           
           if (c.type === 'checkbox') {
-            return (cellValue === 'true' || cellValue === true) ? 'YES' : '';
+            return String(cellValue) === 'true' ? 'YES' : '';
           }
           if (c.type === 'image') {
             if (!cellValue) return '';
@@ -546,7 +546,7 @@ export function useExport({
           
           let displayVal = val;
           if (c.type === 'checkbox') {
-            displayVal = (val === 'true' || val === true) ? 'YES' : '';
+            displayVal = String(val) === 'true' ? 'YES' : '';
           } else if (c.type === 'image') {
             if (!val) {
               displayVal = '';
@@ -643,7 +643,7 @@ export function useExport({
         }
 
         if (c.type === 'checkbox') {
-          return (val === 'true' || val === true) ? 'YES' : '';
+          return String(val) === 'true' ? 'YES' : '';
         } else if (c.type === 'number' || c.type === 'currency') {
           const original = val.toString();
           if (c.type === 'currency') {
@@ -720,7 +720,7 @@ export function useExport({
         : (entry.cells?.[c.id.toString()] || '');
       
       const displayVal = c.type === 'checkbox'
-        ? ((val === 'true' || val === true) ? 'YES' : '')
+        ? (String(val) === 'true' ? 'YES' : '')
         : c.type === 'currency'
           ? formatCurrency(val).replace('₹', '')
           : val;
