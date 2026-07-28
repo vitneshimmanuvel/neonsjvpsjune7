@@ -113,8 +113,9 @@ export default function BackupPage() {
               ? evaluateFormula(c.formula || '', entry, cols)
               : (entry.cells?.[c.id.toString()] || '');
             
-            // Clean numeric values for Excel
-            if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
+            if (c.type === 'checkbox') {
+              rowData.push(val === 'true' || val === true ? 'YES' : '');
+            } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
                 const cleaned = val.toString().replace(/[^\d.-]/g, '');
                 const n = parseFloat(cleaned);
                 rowData.push(isNaN(n) ? val : n);

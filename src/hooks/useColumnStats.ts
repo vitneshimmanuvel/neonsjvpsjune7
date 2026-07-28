@@ -82,15 +82,27 @@ export function useColumnStats({
         const trimmed = val.trim();
 
         if (s.type === 'empty') {
-          if (trimmed === '') s.count++;
+          if (col.type === 'checkbox') {
+            if (trimmed !== 'true') s.count++;
+          } else if (trimmed === '') {
+            s.count++;
+          }
           continue;
         }
         if (s.type === 'filled') {
-          if (trimmed !== '') s.count++;
+          if (col.type === 'checkbox') {
+            if (trimmed === 'true') s.count++;
+          } else if (trimmed !== '') {
+            s.count++;
+          }
           continue;
         }
         if (s.type === 'count') {
-          if (trimmed !== '') {
+          if (col.type === 'checkbox') {
+            if (trimmed === 'true') {
+              s.count++;
+            }
+          } else if (trimmed !== '') {
             // Only skip values that are numbers with x/int suffix (e.g. "100x", "3000INT")
             if (/^\d[\d,.]*\s*(x|int)$/i.test(trimmed)) {
               continue;

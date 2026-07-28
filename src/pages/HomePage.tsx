@@ -542,6 +542,8 @@ export default function HomePage() {
               excelMutation={excelMutation}
               handleFileUpload={handleFileUpload}
               onInputFolder={handleFolderUpload}
+              search={search}
+              setSearch={setSearch}
             />
           } />
           <Route path="register/:id" element={<RegisterPageWrapper />} />

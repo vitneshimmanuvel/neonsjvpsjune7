@@ -533,6 +533,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
   const [dateYear, setDateYear] = useState('');
   const dateEntryIdRef = useRef<number | null>(null);
   const dateColumnIdRef = useRef<number | null>(null);
+  const dateOnSelectRef = useRef<((dateStr: string) => void) | null>(null);
   const dateRectRef = useRef<{ top: number, bottom: number, left: number, width: number } | null>(null);
   // Expose as stable getters for OtherModals
   const dateEntryId = dateEntryIdRef.current;
@@ -3125,12 +3126,13 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
     });
   }, [registerId, queryClient]);
 
-  const openDatePicker = useCallback((entryId: number, colId: number, currentVal: string, rect?: DOMRect) => {
+  const openDatePicker = useCallback((entryId: number, colId: number, currentVal: string, rect?: DOMRect, onSelect?: (dateStr: string) => void) => {
     // Support various separators like /, . or - for parsing
     const parts = (currentVal || '').split(/[./-]/);
     setDateDay(parts[0] || ''); setDateMonth(parts[1] || ''); setDateYear(parts[2] || '');
     dateEntryIdRef.current = entryId;
     dateColumnIdRef.current = colId;
+    dateOnSelectRef.current = onSelect || null;
     dateRectRef.current = rect ? { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width } : null;
     setDateModal(true);
   }, []);
@@ -3140,7 +3142,9 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       setDateDay('');
       setDateMonth('');
       setDateYear('');
-      if (dateEntryId != null && dateColumnId != null) {
+      if (dateOnSelectRef.current) {
+        dateOnSelectRef.current('');
+      } else if (dateEntryId != null && dateColumnId != null && dateEntryId > 0) {
         handleCellChange(dateEntryId, dateColumnId.toString(), '');
       }
       setDateModal(false);
@@ -3159,7 +3163,9 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
 
     const dateStr = `${finalD.padStart(2, '0')}-${finalM.padStart(2, '0')}-${finalY}`;
     
-    if (dateEntryId != null && dateColumnId != null) {
+    if (dateOnSelectRef.current) {
+      dateOnSelectRef.current(dateStr);
+    } else if (dateEntryId != null && dateColumnId != null && dateEntryId > 0) {
       const col = columns.find(c => c.id === dateColumnId);
       const validation = validateCellValue(col, dateStr);
       

@@ -9,6 +9,7 @@ import { getRegister, getRegisterColumnsOnly, addEntry, formatDateToDDMMYYYY, li
 import toast from 'react-hot-toast';
 import { ImageCompressionModule } from '../../lib/imageCompressionModule';
 import { firebaseLogWorkspaceAction } from '../../lib/firebaseAuth';
+import { DatePickerModal } from '../register/modals/DatePickerModal';
 interface SidebarProps {
   businesses?: Business[];
   filtered?: RegisterSummary[];
@@ -98,6 +99,7 @@ export const Sidebar = memo(function Sidebar({
   const [entrySavedCount, setEntrySavedCount] = useState(0);
   const entryFirstInputRef = useRef<HTMLElement | null>(null);
   const [entryUploadingImageCol, setEntryUploadingImageCol] = useState<string | null>(null);
+  const [quickEntryDateCol, setQuickEntryDateCol] = useState<{ colId: string; val: string; rect?: DOMRect } | null>(null);
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   useEffect(() => {
@@ -127,12 +129,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_2.0') !== 'true';
+      return localStorage.getItem('seen_version_2.0.1') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.0');
+  const [versionTab, setVersionTab] = useState<'2.0.1' | '2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.0.1');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
   
   // Slideshow state
@@ -142,16 +144,16 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_2.0', 'true');
+      localStorage.setItem('seen_version_2.0.1', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
 
   useEffect(() => {
-    const isSlideshowVersion = versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
+    const isSlideshowVersion = versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
     if (!isSlideshowVersion || !showVersionModal || !isPlaying) return;
-    const slideCount = versionTab === '2.0' ? 6 : (versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5))));
+    const slideCount = versionTab === '2.0.1' ? 3 : (versionTab === '2.0' ? 6 : (versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5)))));
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % slideCount);
     }, 4500);
@@ -906,9 +908,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v2.0"
+                  title="View what's new in v2.0.1"
                 >
-                  v2.0
+                  v2.0.1
                 </span>
               </div>
             </div>
@@ -1478,12 +1480,42 @@ export const Sidebar = memo(function Sidebar({
                                           </label>
                                         )}
                                       </div>
+                                    ) : col.type === 'date' ? (
+                                      <input
+                                        type="text"
+                                        readOnly={true}
+                                        value={val}
+                                        onClick={(e) => {
+                                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                          setQuickEntryDateCol({ colId: colIdStr, val, rect });
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                            setQuickEntryDateCol({ colId: colIdStr, val, rect });
+                                          }
+                                        }}
+                                        placeholder="DD-MM-YYYY"
+                                        ref={idx === 0 ? (el: any) => { entryFirstInputRef.current = el; } : undefined}
+                                        style={{
+                                          width: '100%', padding: '10px 14px', fontSize: '13px',
+                                          borderRadius: '8px', border: '1px solid var(--border)',
+                                          background: 'var(--surface)', color: 'var(--foreground)',
+                                          outline: 'none', transition: 'border-color 0.15s',
+                                          font: 'inherit',
+                                          boxSizing: 'border-box',
+                                          cursor: 'pointer',
+                                        }}
+                                        onFocus={e => { e.currentTarget.style.borderColor = '#86efac'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,163,74,0.08)'; }}
+                                        onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                      />
                                     ) : (
                                       <input
-                                        type={col.type === 'number' || col.type === 'currency' || col.type === 'rating' ? 'number' : col.type === 'email' ? 'email' : col.type === 'phone' ? 'tel' : col.type === 'url' ? 'url' : col.type === 'date' ? 'text' : 'text'}
+                                        type={col.type === 'number' || col.type === 'currency' || col.type === 'rating' ? 'number' : col.type === 'email' ? 'email' : col.type === 'phone' ? 'tel' : col.type === 'url' ? 'url' : 'text'}
                                         value={val}
                                         onChange={e => setEntryValues(prev => ({ ...prev, [colIdStr]: e.target.value }))}
-                                        placeholder={isAutoIncr ? 'Auto-generated if blank' : col.type === 'date' ? 'DD-MM-YYYY' : col.type === 'email' ? 'email@example.com' : col.type === 'phone' ? '+91 XXXXX XXXXX' : col.type === 'url' ? 'https://' : `Enter ${col.name}…`}
+                                        placeholder={isAutoIncr ? 'Auto-generated if blank' : col.type === 'email' ? 'email@example.com' : col.type === 'phone' ? '+91 XXXXX XXXXX' : col.type === 'url' ? 'https://' : `Enter ${col.name}…`}
                                         ref={idx === 0 ? (el: any) => { entryFirstInputRef.current = el; } : undefined}
                                         min={col.type === 'rating' ? 1 : undefined}
                                         max={col.type === 'rating' ? 5 : undefined}
@@ -1672,6 +1704,18 @@ export const Sidebar = memo(function Sidebar({
           </div>,
           document.body
         )}
+        {quickEntryDateCol && (
+          <DatePickerModal
+            open={!!quickEntryDateCol}
+            onClose={() => setQuickEntryDateCol(null)}
+            currentValue={quickEntryDateCol.val}
+            dateRect={quickEntryDateCol.rect}
+            onSelectDate={(dateStr) => {
+              setEntryValues(prev => ({ ...prev, [quickEntryDateCol.colId]: dateStr }));
+              setQuickEntryDateCol(null);
+            }}
+          />
+        )}
       </div>
 
 
@@ -1782,11 +1826,11 @@ export const Sidebar = memo(function Sidebar({
             className="modal-content"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '850px' : '500px',
+              maxWidth: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '850px' : '500px',
               width: '100%',
               borderRadius: '20px',
-              padding: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '24px',
-              background: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
+              padding: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '24px',
+              background: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' : '#ffffff',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               overflow: 'hidden',
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -1799,10 +1843,10 @@ export const Sidebar = memo(function Sidebar({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '16px',
+              marginBottom: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '0' : '16px',
               borderBottom: '1px solid #f1f5f9',
-              padding: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '16px 24px' : '0 0 12px 0',
-              background: (versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '#f8fafc' : 'transparent'
+              padding: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '16px 24px' : '0 0 12px 0',
+              background: (versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7') ? '#f8fafc' : 'transparent'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '8px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1858,7 +1902,7 @@ export const Sidebar = memo(function Sidebar({
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
                 >
-                  {versionTab === '2.0' ? 'v2.0 (Current)' : `v${versionTab}`}
+                  {versionTab === '2.0.1' ? 'v2.0.1 (Current)' : `v${versionTab}`}
                   <ChevronDown size={14} style={{ color: '#64748b', transition: 'transform 0.2s', transform: showOlderVersionsDropdown ? 'rotate(180deg)' : 'rotate(0)' }} />
                 </button>
                 
@@ -1884,7 +1928,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '2.0.1', '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1915,7 +1959,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '2.0' ? 'v2.0 (Current)' : `v${v}`}
+                          {v === '2.0.1' ? 'v2.0.1 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1924,7 +1968,155 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '2.0' ? (
+            {versionTab === '2.0.1' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0.1 • Feature 1 of 3</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Date Picker Error Fix (Add Record & Quick Entry)
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Resolved date selection issue when adding new records or using Quick Entry pane. Selecting dates now populates form fields smoothly without connection error popups.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Calendar size={24} color="#2563eb" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Seamless Date Selection</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Error-free date popovers for Add Record & Quick Entry</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0.1 • Feature 2 of 3</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Accurate Checkbox COUNT Summary
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Footer COUNT summary for Checkbox columns now specifically counts selected/checked items instead of displaying the total number of rows.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <CheckCircle2 size={24} color="#10b981" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Checked Box Counter</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>N COUNT accurately tallies checked boxes</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.0.1 • Feature 3 of 3</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Formatted Checkbox Exports (YES / Blank)
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Excel (.xlsx) and PDF exports now represent checked rows as clean 'YES' labels and leave unchecked rows blank instead of printing 'true' and 'false'.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <FileSpreadsheet size={24} color="#1d4ed8" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Clean Excel & PDF Export</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Checked rows as YES and unchecked as empty</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer / Controls */}
+                <div style={{ padding: '12px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff' }}>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', color: '#64748b',
+                      fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px'
+                    }}
+                  >
+                    {isPlaying ? (
+                      <><Pause size={12} /> Pause Auto-play</>
+                    ) : (
+                      <><Play size={12} /> Play Slideshow</>
+                    )}
+                  </button>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => { setActiveSlide(idx); setIsPlaying(false); }}
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          border: 'none',
+                          background: activeSlide === idx ? 'var(--brand-blue)' : '#cbd5e1',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleCloseVersionModal}
+                    style={{
+                      padding: '8px 20px', background: 'var(--navy)', color: 'white',
+                      border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                      cursor: 'pointer', transition: 'all 0.15s'
+                    }}
+                  >
+                    Got It
+                  </button>
+                </div>
+              </div>
+            ) : versionTab === '2.0' ? (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes slideInUp {

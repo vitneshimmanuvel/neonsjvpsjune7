@@ -32,21 +32,34 @@ interface UseExportParams {
 function computeCalcValue(
   calcType: string,
   values: string[],
+  colType?: string
 ): string | number {
   let calcValue: string | number = 0;
   if (calcType === 'empty') {
-    calcValue = values.filter(v => v.trim() === '').length;
+    if (colType === 'checkbox') {
+      calcValue = values.filter(v => v.trim() !== 'true').length;
+    } else {
+      calcValue = values.filter(v => v.trim() === '').length;
+    }
   } else if (calcType === 'filled') {
-    calcValue = values.filter(v => v.trim() !== '').length;
+    if (colType === 'checkbox') {
+      calcValue = values.filter(v => v.trim() === 'true').length;
+    } else {
+      calcValue = values.filter(v => v.trim() !== '').length;
+    }
   } else if (calcType === 'count') {
-    calcValue = values.filter(v => {
-      const trimmed = v.trim();
-      if (trimmed === '') return false;
-      // Only skip values that are numbers with x/int suffix (e.g. "100x", "3000INT")
-      if (/^\d[\d,.]*\s*(x|int)$/i.test(trimmed)) return false;
-      // Count all other non-empty entries
-      return true;
-    }).length;
+    if (colType === 'checkbox') {
+      calcValue = values.filter(v => v.trim() === 'true').length;
+    } else {
+      calcValue = values.filter(v => {
+        const trimmed = v.trim();
+        if (trimmed === '') return false;
+        // Only skip values that are numbers with x/int suffix (e.g. "100x", "3000INT")
+        if (/^\d[\d,.]*\s*(x|int)$/i.test(trimmed)) return false;
+        // Count all other non-empty entries
+        return true;
+      }).length;
+    }
   } else if (calcType === 'distinct') {
     calcValue = new Set(values.filter(v => v.trim() !== '')).size;
   } else if (calcType === 'sum' || calcType === 'average' || calcType === 'min' || calcType === 'max') {
@@ -178,7 +191,9 @@ export function useExport({
           val = '[Signed Signature]';
         }
 
-        if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
+        if (c.type === 'checkbox') {
+          rowData.push((val === 'true' || val === true) ? 'YES' : '');
+        } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
           const original = val.toString();
           if (c.type === 'currency') {
             rowData.push(formatCurrency(original).replace('₹', ''));
@@ -212,7 +227,7 @@ export function useExport({
         return entry.cells?.[c.id.toString()] || '';
       });
 
-      const calcValue = computeCalcValue(calcType, values);
+      const calcValue = computeCalcValue(calcType, values, c.type);
       const prefix = CALC_PREFIX[calcType] || '';
       let displayValue = calcValue;
       if (c.type === 'currency' && (calcType === 'sum' || calcType === 'average' || calcType === 'min' || calcType === 'max')) {
@@ -367,6 +382,9 @@ export function useExport({
             ? evaluateFormula(c.formula || '', entry, columns)
             : (entry.cells?.[c.id.toString()] || '');
           
+          if (c.type === 'checkbox') {
+            return (cellValue === 'true' || cellValue === true) ? 'YES' : '';
+          }
           if (c.type === 'image') {
             if (!cellValue) return '';
             const urls = cellValue.includes('|||') ? cellValue.split('|||') : [cellValue];
@@ -395,7 +413,7 @@ export function useExport({
         return entry.cells?.[c.id.toString()] || '';
       });
 
-      const calcValue = computeCalcValue(calcType, values);
+      const calcValue = computeCalcValue(calcType, values, c.type);
       const prefix = CALC_PREFIX[calcType] || '';
       let displayValue = calcValue;
       if (c.type === 'currency' && (calcType === 'sum' || calcType === 'average' || calcType === 'min' || calcType === 'max')) {
@@ -527,7 +545,9 @@ export function useExport({
             : (entry.cells?.[c.id.toString()] || '');
           
           let displayVal = val;
-          if (c.type === 'image') {
+          if (c.type === 'checkbox') {
+            displayVal = (val === 'true' || val === true) ? 'YES' : '';
+          } else if (c.type === 'image') {
             if (!val) {
               displayVal = '';
             } else {
@@ -622,7 +642,9 @@ export function useExport({
           }
         }
 
-        if (c.type === 'number' || c.type === 'currency') {
+        if (c.type === 'checkbox') {
+          return (val === 'true' || val === true) ? 'YES' : '';
+        } else if (c.type === 'number' || c.type === 'currency') {
           const original = val.toString();
           if (c.type === 'currency') {
             return formatCurrency(original).replace('₹', '');
@@ -695,9 +717,13 @@ export function useExport({
     const lines = visibleCols.map(c => {
       const val = c.type === 'formula'
         ? evaluateFormula(c.formula || '', entry, columns)
-        : (entry.cells?.[c.id.toString()] || '—');
+        : (entry.cells?.[c.id.toString()] || '');
       
-      const displayVal = c.type === 'currency' ? formatCurrency(val).replace('₹', '') : val;
+      const displayVal = c.type === 'checkbox'
+        ? ((val === 'true' || val === true) ? 'YES' : '')
+        : c.type === 'currency'
+          ? formatCurrency(val).replace('₹', '')
+          : val;
       return `${c.name}: ${displayVal}`;
     });
 

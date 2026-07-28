@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { DatePickerModal } from './DatePickerModal';
 import { createPortal } from 'react-dom';
 import { Check, Plus, Search, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { type Entry, getOptionBadgeStyle } from '../../../lib/api';
@@ -169,177 +170,23 @@ export function OtherModals(props: OtherModalsProps) {
 
 
       {/* ── Date Picker ── */}
-      {dateModal && (
-        <div className={props.dateRect ? "popover-overlay" : "modal-overlay"} onClick={() => setDateModal(false)}>
-          <div 
-            className="popover-content date-popover modern-date-picker" 
-            onClick={(e) => e.stopPropagation()}
-            style={props.dateRect ? (() => {
-              const rect = props.dateRect;
-              const modalWidth = 280;
-              const estHeight = 320; 
-              const spaceBelow = window.innerHeight - rect.bottom - 12;
-              const spaceAbove = rect.top - 12;
-              const showAbove = spaceBelow < estHeight && spaceAbove > spaceBelow;
-              const maxHeight = showAbove ? spaceAbove : spaceBelow;
-
-              let left = rect.left + (rect.width / 2) - (modalWidth / 2);
-              left = Math.max(8, Math.min(left, window.innerWidth - modalWidth - 8));
-
-              return {
-                position: 'fixed',
-                left: left,
-                ...(showAbove 
-                  ? { bottom: (window.innerHeight - rect.top) + 6 } 
-                  : { top: rect.bottom + 6 }
-                ),
-                width: `${modalWidth}px`,
-                maxHeight: `${maxHeight}px`,
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                zIndex: 10005,
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                padding: '12px'
-              } as React.CSSProperties;
-            })() : {}}
-          >
-            <div className="calendar-header">
-              <button className="calendar-nav-btn" onClick={() => {
-                if (viewMonth === 1) {
-                  setViewMonth(12);
-                  setViewYear(viewYear - 1);
-                } else {
-                  setViewMonth(viewMonth - 1);
-                }
-              }}><ChevronLeft size={16} /></button>
-              
-              <div className="calendar-title">
-                <span className="calendar-month">{monthNames[viewMonth - 1]}</span>
-                <span 
-                  className="calendar-year calendar-year-clickable" 
-                  onClick={() => { setShowYearPicker(!showYearPicker); setYearPageOffset(0); }}
-                  title="Click to select year"
-                >
-                  {viewYear} ▾
-                </span>
-              </div>
-
-              <button className="calendar-nav-btn" onClick={() => {
-                if (viewMonth === 12) {
-                  setViewMonth(1);
-                  setViewYear(viewYear + 1);
-                } else {
-                  setViewMonth(viewMonth + 1);
-                }
-              }}><ChevronRight size={16} /></button>
-            </div>
-
-            {showYearPicker ? (
-              <div className="year-picker-container">
-                <div className="year-picker-nav">
-                  <button className="calendar-nav-btn" onClick={() => setYearPageOffset(yearPageOffset - 1)}>
-                    <ChevronLeft size={14} />
-                  </button>
-                  <span className="year-picker-range">
-                    {viewYear - 6 + yearPageOffset * 12} – {viewYear + 5 + yearPageOffset * 12}
-                  </span>
-                  <button className="calendar-nav-btn" onClick={() => setYearPageOffset(yearPageOffset + 1)}>
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-                <div className="year-picker-grid">
-                  {Array.from({ length: 12 }).map((_, i) => {
-                    const yr = viewYear - 6 + i + yearPageOffset * 12;
-                    const isCurrent = yr === viewYear;
-                    const isThisYear = yr === new Date().getFullYear();
-                    return (
-                      <button
-                        key={yr}
-                        className={`year-picker-item ${isCurrent ? 'selected' : ''} ${isThisYear ? 'current-year' : ''}`}
-                        onClick={() => {
-                          setViewYear(yr);
-                          setShowYearPicker(false);
-                        }}
-                      >
-                        {yr}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="calendar-weekdays">
-                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                    <div key={d} className="calendar-weekday">{d}</div>
-                  ))}
-                </div>
-
-                <div className="calendar-grid">
-                  {Array.from({ length: firstDayOfMonth(viewMonth, viewYear) }).map((_, i) => (
-                    <div key={`empty-${i}`} className="calendar-day empty" />
-                  ))}
-                  {Array.from({ length: daysInMonth(viewMonth, viewYear) }).map((_, i) => {
-                    const d = i + 1;
-                    const isSelected = d.toString() === dateDay && viewMonth.toString() === dateMonth && viewYear.toString() === dateYear;
-                    const todayDate = new Date();
-                    todayDate.setHours(0, 0, 0, 0);
-                    const isToday = d === todayDate.getDate() && viewMonth === (todayDate.getMonth() + 1) && viewYear === todayDate.getFullYear();
-                    const cellDate = new Date(viewYear, viewMonth - 1, d);
-                    const isPast = cellDate < todayDate;
-                    const isPastDisabled = isPast && !props.canSelectBackDates;
-                    
-                    return (
-                      <button 
-                        key={d} 
-                        className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${isPastDisabled ? 'disabled' : ''}`}
-                        disabled={isPastDisabled}
-                        style={isPastDisabled ? { opacity: 0.35, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
-                        onClick={() => {
-                          if (!isPastDisabled) {
-                            handleDateSelect(d.toString(), viewMonth.toString(), viewYear.toString());
-                          }
-                        }}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            <div className="calendar-footer">
-              <button 
-                className="calendar-today-btn" 
-                onClick={() => {
-                  const today = new Date();
-                  handleDateSelect(
-                    today.getDate().toString(), 
-                    (today.getMonth() + 1).toString(), 
-                    today.getFullYear().toString()
-                  );
-                }}
-              >
-                <CalendarIcon size={12} style={{ marginRight: 6 }} />
-                Today
-              </button>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button 
-                  className="calendar-clear-btn" 
-                  onClick={() => {
-                    handleDateSelect('', '', '');
-                  }}
-                >
-                  Clear
-                </button>
-                <button className="calendar-cancel-btn" onClick={() => setDateModal(false)}>Cancel</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DatePickerModal
+        open={dateModal}
+        onClose={() => setDateModal(false)}
+        dateDay={dateDay}
+        dateMonth={dateMonth}
+        dateYear={dateYear}
+        onSelectDate={(dateStr) => {
+          if (!dateStr) {
+            handleDateSelect('', '', '');
+          } else {
+            const [d, m, y] = dateStr.split('-');
+            handleDateSelect(d, m, y);
+          }
+        }}
+        canSelectBackDates={props.canSelectBackDates}
+        dateRect={props.dateRect}
+      />
 
       {/* ── Dropdown Cell ── */}
       {dropdownModal && (

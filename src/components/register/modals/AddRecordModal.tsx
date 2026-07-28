@@ -30,7 +30,7 @@ interface AddRecordModalProps {
   isSubmitting?: boolean;
   existingEntries?: Entry[];
   canSelectBackDates?: boolean;
-  openDatePicker?: (entryId: number, colId: number, currentVal: string, rect?: DOMRect) => void;
+  openDatePicker?: (entryId: number, colId: number, currentVal: string, rect?: DOMRect, onSelect?: (dateStr: string) => void) => void;
 }
 
 // Only these types get duplicate-checked (not text/name/date/dropdown/checkbox etc.)
@@ -553,14 +553,18 @@ export function AddRecordModal({
                           onClick={(e) => {
                             if (openDatePicker) {
                               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              openDatePicker(-1, col.id, val, rect as DOMRect);
+                              openDatePicker(-1, col.id, val, rect as DOMRect, (selectedDate) => {
+                                handleChange(colIdStr, selectedDate, col.type, col.name);
+                              });
                             }
                           }}
                           onKeyDown={(e) => {
                             e.preventDefault();
                             if ((e.key === 'Enter' || e.key === ' ') && openDatePicker) {
                               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              openDatePicker(-1, col.id, val, rect as DOMRect);
+                              openDatePicker(-1, col.id, val, rect as DOMRect, (selectedDate) => {
+                                handleChange(colIdStr, selectedDate, col.type, col.name);
+                              });
                             }
                           }}
                         />
