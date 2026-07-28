@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../lib/auth';
 import type { RegisterSummary, Business } from '../../lib/api';
-import { getRegister, getRegisterColumnsOnly, addEntry, formatDateToDDMMYYYY, listFolders, createFolder, renameFolder, deleteFolder, moveRegisterToFolder, moveRegistersToFolder, duplicateRegister, searchAllRegisters } from '../../lib/api';
+import { getRegister, getRegisterColumnsOnly, addEntry, formatDateToDDMMYYYY, listFolders, createFolder, renameFolder, deleteFolder, moveRegisterToFolder, moveRegistersToFolder, duplicateRegister, searchAllRegisters, canUserSelectBackDates } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { ImageCompressionModule } from '../../lib/imageCompressionModule';
 import { firebaseLogWorkspaceAction } from '../../lib/firebaseAuth';
@@ -77,6 +77,7 @@ export const Sidebar = memo(function Sidebar({
   const { id: currentRegId } = useParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const canSelectBackDates = canUserSelectBackDates(user);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
@@ -1575,6 +1576,24 @@ export const Sidebar = memo(function Sidebar({
                                       return;
                                     }
                                   }
+                                  if (col.type === 'date') {
+                                    const v = entryValues[col.id.toString()];
+                                    if (v && v.trim() !== '') {
+                                      const parts = v.trim().split(/[-/.]/);
+                                      if (parts.length === 3) {
+                                        const d = parseInt(parts[0], 10);
+                                        const m = parseInt(parts[1], 10);
+                                        const y = parseInt(parts[2], 10);
+                                        const inputDate = new Date(y, m - 1, d);
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        if (inputDate < today && !canSelectBackDates) {
+                                          toast.error(`${col.name}: Backdated entries are not allowed (requires admin permission).`);
+                                          return;
+                                        }
+                                      }
+                                    }
+                                  }
                                 }
                                 const cells: Record<string, string> = {};
                                 Object.entries(entryValues).forEach(([k, v]) => {
@@ -1710,6 +1729,7 @@ export const Sidebar = memo(function Sidebar({
             onClose={() => setQuickEntryDateCol(null)}
             currentValue={quickEntryDateCol.val}
             dateRect={quickEntryDateCol.rect}
+            canSelectBackDates={canSelectBackDates}
             onSelectDate={(dateStr) => {
               setEntryValues(prev => ({ ...prev, [quickEntryDateCol.colId]: dateStr }));
               setQuickEntryDateCol(null);
