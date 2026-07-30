@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { ImageCompressionModule } from '../../lib/imageCompressionModule';
 import { firebaseLogWorkspaceAction } from '../../lib/firebaseAuth';
 import { DatePickerModal } from '../register/modals/DatePickerModal';
+import { RearrangeModal } from '../common/RearrangeModal';
 interface SidebarProps {
   businesses?: Business[];
   filtered?: RegisterSummary[];
@@ -84,6 +85,8 @@ export const Sidebar = memo(function Sidebar({
   const [folderMenuId, setFolderMenuId] = useState<number | null>(null);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedRegIds, setSelectedRegIds] = useState<Set<number>>(new Set());
+  const [showRearrangeModal, setShowRearrangeModal] = useState(false);
+  const [orderNonce, setOrderNonce] = useState(0);
 
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isFooterMenuOpen, setIsFooterMenuOpen] = useState(false);
@@ -121,6 +124,38 @@ export const Sidebar = memo(function Sidebar({
     enabled: !!businessId,
   });
 
+  const sortedFolders = useMemo(() => {
+    const allowed = folders.filter(f => {
+      if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return true;
+      const allowedFolders = (user as any).permissions?.allowedFolders;
+      return Array.isArray(allowedFolders) && allowedFolders.map(String).includes(f.id.toString());
+    });
+    const customOrder: number[] = (() => {
+      try { return JSON.parse(localStorage.getItem('admin_folder_order') || '[]'); } catch { return []; }
+    })();
+    if (customOrder.length === 0) return allowed;
+    const orderMap = new Map(customOrder.map((id, index) => [id, index]));
+    return [...allowed].sort((a, b) => {
+      const posA = orderMap.has(a.id) ? orderMap.get(a.id)! : 9999;
+      const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
+      return posA - posB;
+    });
+  }, [folders, user, orderNonce]);
+
+  const sortedFiltered = useMemo(() => {
+    if (!filtered) return [];
+    const customRegOrder: number[] = (() => {
+      try { return JSON.parse(localStorage.getItem('admin_register_order') || '[]'); } catch { return []; }
+    })();
+    if (customRegOrder.length === 0) return filtered;
+    const regOrderMap = new Map(customRegOrder.map((id, index) => [id, index]));
+    return [...filtered].sort((a, b) => {
+      const posA = regOrderMap.has(a.id) ? regOrderMap.get(a.id)! : 9999;
+      const posB = regOrderMap.has(b.id) ? regOrderMap.get(b.id)! : 9999;
+      return posA - posB;
+    });
+  }, [filtered, orderNonce]);
+
   const { data: register } = useQuery({
     queryKey: ['register', Number(currentRegId)],
     queryFn: () => getRegister(Number(currentRegId)),
@@ -130,12 +165,12 @@ export const Sidebar = memo(function Sidebar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_2.0.1') !== 'true';
+      return localStorage.getItem('seen_version_2.1') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'2.0.1' | '2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.0.1');
+  const [versionTab, setVersionTab] = useState<'2.1' | '2.0.1' | '2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.1');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
   
   // Slideshow state
@@ -145,16 +180,16 @@ export const Sidebar = memo(function Sidebar({
   const handleCloseVersionModal = useCallback(() => {
     setShowVersionModal(false);
     try {
-      localStorage.setItem('seen_version_2.0.1', 'true');
+      localStorage.setItem('seen_version_2.1', 'true');
     } catch (e) {
       console.error(e);
     }
   }, []);
 
   useEffect(() => {
-    const isSlideshowVersion = versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
+    const isSlideshowVersion = versionTab === '2.1' || versionTab === '2.0.1' || versionTab === '2.0' || versionTab === '1.9.7' || versionTab === '1.9.6' || versionTab === '1.9.5' || versionTab === '1.8.8' || versionTab === '1.7.7';
     if (!isSlideshowVersion || !showVersionModal || !isPlaying) return;
-    const slideCount = versionTab === '2.0.1' ? 3 : (versionTab === '2.0' ? 6 : (versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5)))));
+    const slideCount = versionTab === '2.1' ? 4 : (versionTab === '2.0.1' ? 3 : (versionTab === '2.0' ? 6 : (versionTab === '1.9.7' ? 4 : (versionTab === '1.9.6' ? 5 : (versionTab === '1.9.5' ? 10 : (versionTab === '1.8.8' ? 3 : 5))))));
     const interval = setInterval(() => {
       setActiveSlide(prev => (prev + 1) % slideCount);
     }, 4500);
@@ -398,6 +433,15 @@ export const Sidebar = memo(function Sidebar({
           <div className="context-menu" onClick={(e) => e.stopPropagation()}>
             <div className="context-title">{folders.find(f => f.id === folderMenuId)?.name || 'Folder'}</div>
             <button className="context-item" onClick={() => {
+              if (folderMenuId) {
+                navigate(`/folder/${folderMenuId}`);
+                closeSidebar();
+              }
+              setFolderMenuId(null);
+            }}>
+              <Eye size={16} />Open Folder Page
+            </button>
+            <button className="context-item" onClick={() => {
               const name = prompt('Rename folder:', folders.find(f => f.id === folderMenuId)?.name || '');
               if (name && name.trim()) renameFolderMutation.mutate({ id: folderMenuId, name: name.trim() });
               setFolderMenuId(null);
@@ -440,71 +484,146 @@ export const Sidebar = memo(function Sidebar({
         className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''} ${isCollapsed ? 'sidebar--collapsed' : ''}`}
         style={sidebarWidth && !isCollapsed ? { width: sidebarWidth, minWidth: sidebarWidth } : undefined}
       >
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-group" onClick={() => navigate('/')}>
-            <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" />
-            <div className="sidebar-brand-text">
-              <div className="sidebar-brand-name">AG <span>Trust</span></div>
-              <div className="sidebar-brand-sub">Record Book</div>
-            </div>
+        <div className="sidebar-brand" style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="sidebar-brand-group" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
+            {!isCollapsed && (
+              <div className="sidebar-brand-text">
+                <div className="sidebar-brand-name" style={{ fontSize: '15px', fontWeight: 800, color: 'var(--navy)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                  AG <span style={{ color: 'var(--accent)' }}>Trust</span>
+                </div>
+                <div className="sidebar-brand-sub" style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                  Record Book
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="sidebar-brand-actions">
-            <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+          <div className="sidebar-brand-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} style={{ display: isMobile ? 'flex' : 'none' }}>
               <X size={18} />
             </button>
 
-            <button
-              className="sidebar-collapse-btn"
-              onClick={toggleThemeMode}
-              title={`Switch theme mode (Current: ${themeMode})`}
-              aria-label="Switch theme mode"
-            >
-              {themeMode === 'light' ? (
-                <Sun size={16} />
-              ) : themeMode === 'dark' ? (
-                <Moon size={16} />
-              ) : (
-                <Monitor size={16} />
-              )}
-            </button>
+            {!isCollapsed && (
+              <>
+                <button
+                  className="sidebar-collapse-btn"
+                  onClick={toggleThemeMode}
+                  title={`Switch theme mode (Current: ${themeMode})`}
+                  aria-label="Switch theme mode"
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  {themeMode === 'light' ? (
+                    <Sun size={15} />
+                  ) : themeMode === 'dark' ? (
+                    <Moon size={15} />
+                  ) : (
+                    <Monitor size={15} />
+                  )}
+                </button>
 
-            <button
-              className="sidebar-collapse-btn"
-              onClick={() => onToggleNotifications()}
-              title="Notifications"
-              style={{ position: 'relative' }}
-            >
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span className="notif-badge">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </button>
+                <button
+                  className="sidebar-collapse-btn"
+                  onClick={() => onToggleNotifications()}
+                  title="Notifications"
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    position: 'relative'
+                  }}
+                >
+                  <Bell size={15} />
+                  {unreadCount > 0 && (
+                    <span className="notif-badge" style={{ position: 'absolute', top: '-4px', right: '-4px' }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
 
             <button
               className="sidebar-collapse-btn"
               onClick={toggleCollapse}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
             >
               {isCollapsed ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><polyline points="13 8 17 12 13 16"></polyline></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><polyline points="13 8 17 12 13 16"></polyline></svg>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="11 8 7 12 11 16"></polyline></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line><polyline points="11 8 7 12 11 16"></polyline></svg>
               )}
             </button>
           </div>
         </div>
+
         {/* Sidebar Add Button — only visible to users with canCreateSheets permission or admins */}
         {(isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
-          <div className="sidebar-add-section" style={{ padding: '8px 8px 4px', position: 'relative' }}>
+          <div className="sidebar-add-section" style={{ padding: '10px 10px 6px', position: 'relative' }}>
             <button
               className="sidebar-add-btn"
               onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
               title="Add new item"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                gap: '8px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
+                color: '#ffffff',
+                fontSize: '13.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0, 45, 93, 0.22)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 45, 93, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 45, 93, 0.22)';
+              }}
             >
-              <Plus size={15} /> <span className="sidebar-add-text">Add</span>
+              <Plus size={16} strokeWidth={2.5} /> <span className="sidebar-add-text">Add</span>
             </button>
 
             {isAddMenuOpen && (
@@ -521,29 +640,30 @@ export const Sidebar = memo(function Sidebar({
                     top: '0',
                     ...(isCollapsed
                       ? { left: 'calc(100% + 8px)' }   // pop to the RIGHT in collapsed mode
-                      : { top: '44px', left: '8px', right: '8px' }  // drop down normally
+                      : { top: '50px', left: '10px', right: '10px' }  // drop down normally
                     ),
                     background: 'white',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
                     overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
                     zIndex: 1000,
-                    minWidth: '180px',
+                    minWidth: '190px',
                     whiteSpace: 'nowrap',
+                    padding: '4px'
                   }}
                 >
-                  <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
                     <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
                   </button>
-                  <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
                     <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
                   </button>
-                  <label className="context-item" style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                  <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
                     <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
                     <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
                   </label>
-                  <button className="context-item" style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', fontSize: '12.5px' }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
                     <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
                   </button>
                 </div>
@@ -554,38 +674,38 @@ export const Sidebar = memo(function Sidebar({
 
         {/* Entry Button — Quick Add Entry to any register */}
         {!isCollapsed && (
-          <div style={{ padding: '0 8px 4px' }}>
+          <div style={{ padding: '2px 10px 6px' }}>
             <button
               onClick={() => setIsEntryPanelOpen(true)}
               style={{
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid #e2e8f0',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                border: '1px solid #bbf7d0',
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                 color: '#15803d',
                 cursor: 'pointer',
-                fontSize: '11.5px',
-                fontWeight: 600,
+                fontSize: '12.5px',
+                fontWeight: 700,
                 transition: 'all 0.2s',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)';
                 e.currentTarget.style.borderColor = '#86efac';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,163,74,0.15)';
+                e.currentTarget.style.boxShadow = '0 3px 10px rgba(22,163,74,0.18)';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)';
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
+                e.currentTarget.style.borderColor = '#bbf7d0';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(22, 163, 74, 0.08)';
               }}
               title="Quick add entry to any register"
             >
-              <PenLine size={13} />
+              <PenLine size={14} />
               <span>Entry</span>
             </button>
           </div>
@@ -594,18 +714,54 @@ export const Sidebar = memo(function Sidebar({
         {/* Global Search Bar */}
         {!isCollapsed && (
           <div style={{ padding: '2px 10px 8px' }}>
-            <div className="gs-input-wrap">
-              <Search size={12} className="gs-input-icon" />
+            <div
+              className="gs-input-wrap"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Search size={14} style={{ color: '#94a3b8', flexShrink: 0 }} />
               <input
                 placeholder="Search all registers…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="gs-input"
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  width: '100%',
+                  fontSize: '12.5px',
+                  color: '#0f172a'
+                }}
                 autoComplete="off"
               />
               {search && (
-                <button onClick={() => setSearch('')} className="gs-input-clear" title="Clear">
-                  <X size={12} />
+                <button
+                  onClick={() => setSearch('')}
+                  style={{
+                    border: 'none',
+                    background: '#e2e8f0',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '16px',
+                    height: '16px',
+                    padding: 0
+                  }}
+                  title="Clear"
+                >
+                  <X size={11} />
                 </button>
               )}
             </div>
@@ -673,7 +829,7 @@ export const Sidebar = memo(function Sidebar({
           </div>
         )}
 
-        <div className="sidebar-list sidebar-list--local">
+        <div className="sidebar-list sidebar-list--local" style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
           {search.trim().length > 0 ? (
             <>
               {/* Status line */}
@@ -722,47 +878,69 @@ export const Sidebar = memo(function Sidebar({
             </>
           ) : (
             <>
-              {/* Multiselect controls */}
+              {/* Multiselect & Rearrange controls */}
               {!isCollapsed && (
-                <div style={{ padding: '4px 20px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isMultiSelectMode ? '1px solid #f1f5f9' : 'none', marginBottom: isMultiSelectMode ? '8px' : '0' }}>
-                  <button
-                    onClick={() => {
-                      setIsMultiSelectMode(prev => !prev);
-                      setSelectedRegIds(new Set());
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: isMultiSelectMode ? 'var(--primary)' : 'var(--muted)',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      backgroundColor: isMultiSelectMode ? 'rgba(30,45,120,0.08)' : 'transparent',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    <CheckCircle2 size={13} />
-                    {isMultiSelectMode ? 'Cancel Selection' : 'Select Multiple'}
-                  </button>
+                <div style={{ padding: '6px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isMultiSelectMode ? '1px solid #e2e8f0' : '1px solid #f1f5f9', marginBottom: '6px', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      onClick={() => {
+                        setIsMultiSelectMode(prev => !prev);
+                        setSelectedRegIds(new Set());
+                      }}
+                      style={{
+                        background: isMultiSelectMode ? '#eff6ff' : '#f8fafc',
+                        border: `1px solid ${isMultiSelectMode ? '#bfdbfe' : '#e2e8f0'}`,
+                        color: isMultiSelectMode ? '#1d4ed8' : '#64748b',
+                        cursor: 'pointer',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        transition: 'all 0.15s ease',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      <CheckCircle2 size={13} color={isMultiSelectMode ? '#1d4ed8' : '#64748b'} />
+                      {isMultiSelectMode ? 'Cancel Selection' : 'Select Multiple'}
+                    </button>
+
+                    {isSystemAdmin && (
+                      <button
+                        onClick={() => setShowRearrangeModal(true)}
+                        title="Rearrange folders & registers as per Admin need"
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          color: '#475569',
+                          cursor: 'pointer',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          borderRadius: '8px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <ArrowUpDown size={13} color="var(--navy)" /> Rearrange
+                      </button>
+                    )}
+                  </div>
+
                   {isMultiSelectMode && selectedRegIds.size > 0 && (
-                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)' }}>
-                      {selectedRegIds.size} selected (Drag to move)
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '12px' }}>
+                      {selectedRegIds.size} selected
                     </span>
                   )}
                 </div>
               )}
 
-              {folders.filter(f => {
-                if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return true;
-                const allowedFolders = (user as any).permissions?.allowedFolders;
-                return Array.isArray(allowedFolders) && allowedFolders.map(String).includes(f.id.toString());
-              }).map(folder => {
-                const folderRegs = filtered?.filter(r => r.folderId === folder.id) || [];
+              {sortedFolders.map(folder => {
+                const folderRegs = sortedFiltered.filter(r => r.folderId === folder.id);
                 const isExpanded = expandedFolders[folder.id];
 
                 return (
@@ -796,7 +974,10 @@ export const Sidebar = memo(function Sidebar({
                           }
                         }
                       }}
-                      onClick={() => setExpandedFolders(prev => ({ ...prev, [folder.id]: !prev[folder.id] ? true : false }))}
+                      onClick={() => {
+                        setExpandedFolders(prev => ({ ...prev, [folder.id]: !prev[folder.id] }));
+                        startTransition(() => { navigate(`/folder/${folder.id}`); closeSidebar(); });
+                      }}
                       data-tooltip={isCollapsed ? folder.name : undefined}
                     >
                       {isExpanded ? (
@@ -805,13 +986,6 @@ export const Sidebar = memo(function Sidebar({
                         <Folder size={16} fill="#fbbf24" color="#f59e0b" className="folder-icon" />
                       )}
                       <span style={{ fontSize: '13px', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
-                      <button
-                        className="register-item-menu"
-                        onClick={(e) => { e.stopPropagation(); setFolderMenuId(folderMenuId === folder.id ? null : folder.id); }}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--muted)' }}
-                      >
-                        <span style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-1px', lineHeight: 1 }}>⋮</span>
-                      </button>
                     </div>
 
                     {isExpanded && (
@@ -862,8 +1036,17 @@ export const Sidebar = memo(function Sidebar({
                     </button>
                   )}
                 </div>
-                {filtered?.filter(r => !r.folderId).map(reg => renderRegister(reg, 0))}
+                {sortedFiltered.filter(r => !r.folderId).map(reg => renderRegister(reg, 0))}
               </div>
+
+              {/* Rearrange Modal */}
+              <RearrangeModal
+                isOpen={showRearrangeModal}
+                onClose={() => setShowRearrangeModal(false)}
+                folders={folders}
+                registers={filtered || []}
+                onSaveOrder={() => setOrderNonce(n => n + 1)}
+              />
             </>
           )}
         </div>
@@ -899,7 +1082,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('2.0');
+                    setVersionTab('2.1');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -909,9 +1092,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v2.0.1"
+                  title="View what's new in v2.1"
                 >
-                  v2.0.1
+                  v2.1
                 </span>
               </div>
             </div>
@@ -1948,7 +2131,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '2.0.1', '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '2.1', '2.0.1', '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -1979,7 +2162,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '2.0.1' ? 'v2.0.1 (Current)' : `v${v}`}
+                          {v === '2.1' ? 'v2.1 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -1988,7 +2171,181 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '2.0.1' ? (
+            {versionTab === '2.1' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.1 • Feature 1 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Dedicated Folder Page & Bulk Actions
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Dedicated folder management page with Bulk Move, Bulk Delete to Recycle Bin, Select All/Deselect All controls, and real-time in-folder search.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <FolderOpen size={24} fill="#fbbf24" color="#d97706" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Folder Workspace</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Bulk move, bulk delete, & folder search</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.1 • Feature 2 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          2-Tier Back Navigation & Header Clean-up
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Breadcrumbs removed for clean file view. Back button (`←`) navigates from open file directly to parent folder, and back again to main registers overview.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <ArrowLeft size={24} color="#002d5d" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>2-Tier Back System</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>File → Folder → All Registers</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#1d4ed8', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.1 • Feature 3 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Admin Folder & Register Rearrangement
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Dedicated Rearrange modal for Admins to customize display positioning of folders and registers with Move Up/Down controls and rank badges.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <ArrowUpDown size={24} color="#002d5d" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Custom Rearrange</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Custom display ordering for Admin</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.1 • Feature 4 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Dated Excel Exports & UI Polish
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Downloaded Excel files now automatically include Register Name & Date (DD-MM-YYYY), plus hover-revealed card checkboxes and top sidebar UI design polish.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <FileSpreadsheet size={24} color="#107c41" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Dated Excel Downloads</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Automatic date inclusion & hover checkboxes</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer / Controls */}
+                <div style={{ padding: '12px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ffffff' }}>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600 }}
+                  >
+                    {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+                    <span>{isPlaying ? 'Pause' : 'Play'}</span>
+                  </button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {[0, 1, 2, 3].map(idx => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveSlide(idx)}
+                        style={{
+                          width: activeSlide === idx ? '24px' : '8px',
+                          height: '8px',
+                          borderRadius: '4px',
+                          background: activeSlide === idx ? '#002d5d' : '#cbd5e1',
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => setActiveSlide(prev => (prev > 0 ? prev - 1 : 3))}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', color: '#334155', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => setActiveSlide(prev => (prev < 3 ? prev + 1 : 0))}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#002d5d', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}
+                    >
+                      {activeSlide === 3 ? 'Got it' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : versionTab === '2.0.1' ? (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes slideInUp {

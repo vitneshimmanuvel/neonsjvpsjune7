@@ -3622,56 +3622,22 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       {/* ── Header ── */}
       <div className="register-header">
         <div className="register-header-left">
-          <button className="register-header-back-btn" onClick={() => navigate('/')}>
+          <button 
+            className="register-header-back-btn" 
+            title={register?.folderId ? "Back to Folder" : "Back to All Registers"}
+            onClick={() => {
+              if (register?.folderId) {
+                navigate(`/folder/${register.folderId}`);
+              } else {
+                navigate('/');
+              }
+            }}
+          >
             <ArrowLeft size={18} />
           </button>
-          <div className="register-breadcrumb">
-            <span className="breadcrumb-item link" onClick={() => navigate('/')}>
-              <Home size={14} className="breadcrumb-icon" />
-              Home
-            </span>
-            <ChevronRight size={14} className="breadcrumb-separator" />
-            {currentFolder && (
-              <>
-                <div className="breadcrumb-folder-wrapper" ref={folderDropdownRef}>
-                  <span 
-                    className={`breadcrumb-item link folder-trigger ${showFolderDropdown ? 'active-trigger' : ''}`} 
-                    onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-                  >
-                    <FolderIcon size={14} className="breadcrumb-icon" />
-                    {currentFolder.name}
-                  </span>
-                  {showFolderDropdown && (
-                    <div className="breadcrumb-folder-dropdown">
-                      <div className="dropdown-header">Registers in {currentFolder.name}</div>
-                      <div className="dropdown-list">
-                        {allRegisters
-                          .filter((r: any) => r.folderId === currentFolder.id)
-                          .map((r: any) => (
-                            <div
-                              key={r.id}
-                              className={`dropdown-item ${r.id === registerId ? 'active' : ''}`}
-                              onClick={() => {
-                                setShowFolderDropdown(false);
-                                navigate(`/register/${r.id}`);
-                              }}
-                            >
-                              <span className="item-name" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <FileSpreadsheet size={13} className="item-icon" />
-                                {r.name}
-                              </span>
-                              {r.id === registerId && <Check size={14} className="active-check" />}
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <ChevronRight size={14} className="breadcrumb-separator" />
-              </>
-            )}
-            <h1 className="register-header-title breadcrumb-item active">
-              <FileSpreadsheet size={14} className="breadcrumb-icon" />
+          <div className="register-single-file-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileSpreadsheet size={18} color="var(--navy)" />
+            <h1 className="register-header-title" style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
               {register.name}
             </h1>
           </div>

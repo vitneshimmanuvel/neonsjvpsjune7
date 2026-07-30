@@ -24,10 +24,16 @@ const HistoryPage = lazy(() => import('./HistoryPage'));
 const RecycleBinPage = lazy(() => import('./RecycleBinPage'));
 const ProfilePage = lazy(() => import('./ProfilePage'));
 const BackupPage = lazy(() => import('./BackupPage'));
+const FolderPage = lazy(() => import('./FolderPage'));
 
 const RegisterPageWrapper = memo(() => {
   const { id } = useParams();
   return <RegisterPage key={id} />;
+});
+
+const FolderPageWrapper = memo(() => {
+  const { folderId } = useParams();
+  return <FolderPage key={folderId} />;
 });
 
 
@@ -547,6 +553,7 @@ export default function HomePage() {
             />
           } />
           <Route path="register/:id" element={<RegisterPageWrapper />} />
+          <Route path="folder/:folderId" element={<FolderPageWrapper />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="templates/:categoryId" element={<TemplatesPage />} />
           <Route path="history" element={<HistoryPage />} />

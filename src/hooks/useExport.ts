@@ -330,8 +330,14 @@ export function useExport({
         { name: "_metadata_", Hidden: 1 }
       ];
 
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      const dateStr = `${dd}-${mm}-${yyyy}`;
+
       const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-      const fileName = `${register.name || 'Export'}.xlsx`;
+      const fileName = `${register.name || 'Export'}_${dateStr}.xlsx`;
       await mobileDownloadFile(new Uint8Array(xlsxData), fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     } catch (err) {
       console.error("Export Error: ", err);
@@ -683,10 +689,16 @@ export function useExport({
         ...colWidthsArray
       ];
 
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      const dateStr = `${dd}-${mm}-${yyyy}`;
+
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Row Data');
       const xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
-      const fileName = `${register.name || 'Record'}_Row${rowIdx}.xlsx`;
+      const fileName = `${register.name || 'Record'}_Row${rowIdx}_${dateStr}.xlsx`;
       await mobileDownloadFile(new Uint8Array(xlsxData), fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     } catch (err) {
       console.error('Row Excel Error:', err);
