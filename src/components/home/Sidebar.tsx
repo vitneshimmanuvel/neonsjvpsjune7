@@ -261,13 +261,11 @@ export const Sidebar = memo(function Sidebar({
     if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return searchResults;
     const allowedRegs = (user as any).permissions?.allowedRegisters;
     const allowedFolders = (user as any).permissions?.allowedFolders;
-    if (Array.isArray(allowedRegs)) {
-      return searchResults.filter(r => allowedRegs.map(String).includes(String(r.registerId)));
-    }
-    if (Array.isArray(allowedFolders)) {
-      return searchResults.filter(r => r.folderId && allowedFolders.map(String).includes(String(r.folderId)));
-    }
-    return [];
+    return searchResults.filter(r => {
+      const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(String(r.registerId));
+      const hasFolderAccess = Array.isArray(allowedFolders) && r.folderId && allowedFolders.map(String).includes(String(r.folderId));
+      return hasRegAccess || hasFolderAccess;
+    });
   }, [searchResults, user]);
 
 

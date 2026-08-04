@@ -52,9 +52,13 @@ export default function DualRegisterPage() {
     // Apply permission filter for non-admin users
     if (user && !((user as any).permissions?.isAdmin || (user as any).permissions?.fullSheetAccess || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin')) {
       const allowedRegs = (user as any).permissions?.allowedRegisters;
-      if (Array.isArray(allowedRegs)) {
-        regs = regs.filter(r => allowedRegs.map(String).includes(r.id.toString()));
-      }
+      const allowedFolders = (user as any).permissions?.allowedFolders;
+      regs = regs.filter(r => {
+        const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(r.id.toString());
+        const folderIdStr = r.folderId ? r.folderId.toString() : '';
+        const hasFolderAccess = Array.isArray(allowedFolders) && !!(folderIdStr && allowedFolders.map(String).includes(folderIdStr));
+        return hasRegAccess || hasFolderAccess;
+      });
     }
 
     if (pickerSearch.trim()) {

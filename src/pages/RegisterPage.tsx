@@ -175,18 +175,11 @@ export default function RegisterPage({ overrideRegisterId, compact, onSplitView,
     const allowedRegs = (user as any).permissions?.allowedRegisters;
     const allowedFolders = (user as any).permissions?.allowedFolders;
 
-    // Granular register permissions: if allowedRegisters is defined, strictly require register ID to be present
-    if (Array.isArray(allowedRegs)) {
-      return allowedRegs.map(String).includes(String(registerId));
-    }
-    
-    // Fallback for folder-level access if allowedRegisters is not set
+    const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(String(registerId));
     const folderId = (register as any)?.folderId;
-    if (Array.isArray(allowedFolders)) {
-      return !!(folderId && allowedFolders.map(String).includes(folderId.toString()));
-    }
+    const hasFolderAccess = Array.isArray(allowedFolders) && !!(folderId && allowedFolders.map(String).includes(folderId.toString()));
 
-    return false;
+    return hasRegAccess || hasFolderAccess;
   }, [user, registerId, register]);
 
   const isFullyRestricted = useMemo(() => !hasRegisterAccess, [hasRegisterAccess]);
