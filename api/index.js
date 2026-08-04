@@ -1085,13 +1085,41 @@ export default async function handler(req, res) {
         const folderMap = new Map();
         foldersRes.rows.forEach(r => folderMap.set(Number(r.id), r.name));
 
-        // 2. Fetch all active registers with columns
+        // 2. Fetch all active registers
         const regsRes = await query('SELECT * FROM registers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY name ASC', [mailBizId]);
+        const regIds = regsRes.rows.map(r => Number(r.id));
 
-        // 3. Build CSV files per register and add to ZIP
+        // 3. Fetch ALL entries in ONE bulk query (instead of 271 individual queries)
+        let allEntries = [];
+        if (regIds.length > 0) {
+          const placeholders = regIds.map((_, i) => `$${i + 1}`).join(',');
+          const entriesRes = await query(
+            `SELECT * FROM entries WHERE register_id IN (${placeholders}) ORDER BY register_id, row_number ASC`,
+            regIds
+          );
+          allEntries = entriesRes.rows;
+        }
+
+        // Group entries by register_id in memory
+        const entriesByRegId = new Map();
+        allEntries.forEach(e => {
+          const rid = Number(e.register_id);
+          if (!entriesByRegId.has(rid)) entriesByRegId.set(rid, []);
+          entriesByRegId.get(rid).push(e);
+        });
+
+        // 4. Build CSV files per register and add to ZIP
         const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
-        let totalEntries = 0;
+        let totalEntries = allEntries.length;
+
+        const escCsv = (val) => {
+          const s = String(val ?? '');
+          if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+          }
+          return s;
+        };
 
         for (const row of regsRes.rows) {
           const regId = Number(row.id);
@@ -1099,7 +1127,6 @@ export default async function handler(req, res) {
           const folderId = row.folder_id ? Number(row.folder_id) : null;
           const folderName = folderId ? (folderMap.get(folderId) || 'Unorganized') : 'Unorganized';
 
-          // Parse columns from the register
           let columns = [];
           try {
             columns = Array.isArray(row.columns) ? row.columns : JSON.parse(row.columns || '[]');
@@ -1109,21 +1136,10 @@ export default async function handler(req, res) {
           columns.sort((a, b) => (a.position || 0) - (b.position || 0));
           const visibleCols = columns.filter(c => c.type !== 'image' && c.type !== 'signature');
 
-          // Fetch entries
-          const entriesRes = await query('SELECT * FROM entries WHERE register_id = $1 ORDER BY row_number ASC', [regId]);
-          totalEntries += entriesRes.rows.length;
-
-          // Build CSV content
-          const escCsv = (val) => {
-            const s = String(val ?? '');
-            if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-              return '"' + s.replace(/"/g, '""') + '"';
-            }
-            return s;
-          };
+          const regEntries = entriesByRegId.get(regId) || [];
 
           const headerRow = ['S.No.', ...visibleCols.map(c => escCsv(c.name))].join(',');
-          const dataRows = entriesRes.rows.map((entry, idx) => {
+          const dataRows = regEntries.map((entry, idx) => {
             const cells = entry.cells || {};
             const rowData = [idx + 1];
             visibleCols.forEach(c => {
