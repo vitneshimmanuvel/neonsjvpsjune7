@@ -1106,9 +1106,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v2.2"
+                  title="View what's new in v2.2.5"
                 >
-                  v2.2
+                  v2.2.5
                 </span>
               </div>
             </div>
