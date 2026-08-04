@@ -3710,6 +3710,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
               setStorageOptimizerTab(tab || 'analytics');
               setStorageOptimizerOpen(true);
             }}
+            onSplitView={!compact ? (onSplitView || (() => navigate(`/register/${registerId}/split`))) : undefined}
           />
           
           <RegisterHeader 
