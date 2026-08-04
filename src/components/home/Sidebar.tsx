@@ -128,7 +128,9 @@ export const Sidebar = memo(function Sidebar({
     const allowed = folders.filter(f => {
       if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return true;
       const allowedFolders = (user as any).permissions?.allowedFolders;
-      return Array.isArray(allowedFolders) && allowedFolders.map(String).includes(f.id.toString());
+      const isFolderAllowed = Array.isArray(allowedFolders) && allowedFolders.map(String).includes(f.id.toString());
+      const hasChildRegAllowed = (filtered || []).some(r => r.folderId === f.id);
+      return isFolderAllowed || hasChildRegAllowed;
     });
     const customOrder: number[] = (() => {
       try { return JSON.parse(localStorage.getItem('admin_folder_order') || '[]'); } catch { return []; }
@@ -140,7 +142,7 @@ export const Sidebar = memo(function Sidebar({
       const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
       return posA - posB;
     });
-  }, [folders, user, orderNonce]);
+  }, [folders, user, filtered, orderNonce]);
 
   const sortedFiltered = useMemo(() => {
     if (!filtered) return [];
@@ -260,12 +262,14 @@ export const Sidebar = memo(function Sidebar({
     if (!searchResults) return [];
     if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return searchResults;
     const allowedRegs = (user as any).permissions?.allowedRegisters;
+    if (Array.isArray(allowedRegs)) {
+      return searchResults.filter(r => allowedRegs.map(String).includes(String(r.registerId)));
+    }
     const allowedFolders = (user as any).permissions?.allowedFolders;
-    return searchResults.filter(r => {
-      const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(String(r.registerId));
-      const hasFolderAccess = Array.isArray(allowedFolders) && r.folderId && allowedFolders.map(String).includes(String(r.folderId));
-      return hasRegAccess || hasFolderAccess;
-    });
+    if (Array.isArray(allowedFolders)) {
+      return searchResults.filter(r => r.folderId && allowedFolders.map(String).includes(String(r.folderId)));
+    }
+    return [];
   }, [searchResults, user]);
 
 

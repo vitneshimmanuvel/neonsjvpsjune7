@@ -98,17 +98,20 @@ export default function FolderPage() {
         return true;
       }
 
-      // Non-admin staff: check both register-level and folder-level access
+      // Non-admin staff: only show registers they have explicit access to
       if (user) {
         const allowedRegs = (user as any).permissions?.allowedRegisters;
+        if (Array.isArray(allowedRegs)) {
+          return allowedRegs.map(String).includes(r.id.toString());
+        }
+
         const allowedFolders = (user as any).permissions?.allowedFolders;
-
-        // A register is visible if it is explicitly granted OR belongs to a granted folder
-        const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(r.id.toString());
         const folderIdStr = r.folderId ? r.folderId.toString() : '';
-        const hasFolderAccess = Array.isArray(allowedFolders) && !!(folderIdStr && allowedFolders.map(String).includes(folderIdStr));
+        if (Array.isArray(allowedFolders)) {
+          return !!(folderIdStr && allowedFolders.map(String).includes(folderIdStr));
+        }
 
-        return hasRegAccess || hasFolderAccess;
+        return false;
       }
 
       return true;

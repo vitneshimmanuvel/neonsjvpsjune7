@@ -173,13 +173,17 @@ export default function RegisterPage({ overrideRegisterId, compact, onSplitView,
     if ((user as any).permissions?.isAdmin || (user as any).permissions?.fullSheetAccess || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return true;
     
     const allowedRegs = (user as any).permissions?.allowedRegisters;
+    if (Array.isArray(allowedRegs)) {
+      return allowedRegs.map(String).includes(String(registerId));
+    }
+
     const allowedFolders = (user as any).permissions?.allowedFolders;
-
-    const hasRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(String(registerId));
     const folderId = (register as any)?.folderId;
-    const hasFolderAccess = Array.isArray(allowedFolders) && !!(folderId && allowedFolders.map(String).includes(folderId.toString()));
+    if (Array.isArray(allowedFolders)) {
+      return !!(folderId && allowedFolders.map(String).includes(folderId.toString()));
+    }
 
-    return hasRegAccess || hasFolderAccess;
+    return false;
   }, [user, registerId, register]);
 
   const isFullyRestricted = useMemo(() => !hasRegisterAccess, [hasRegisterAccess]);
