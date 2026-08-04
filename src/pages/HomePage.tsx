@@ -483,12 +483,18 @@ export default function HomePage() {
         const allowedRegs = (user as any).permissions?.allowedRegisters;
         const allowedFolders = (user as any).permissions?.allowedFolders;
         
-        const hasExplicitRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(r.id.toString());
+        // Granular register permissions: if allowedRegisters is defined, strictly require register ID to be present
+        if (Array.isArray(allowedRegs)) {
+          return allowedRegs.map(String).includes(r.id.toString());
+        }
         
+        // Fallback for folder-level access if allowedRegisters is not set
         const folderIdStr = r.folderId ? r.folderId.toString() : '';
-        const hasFolderAccess = folderIdStr && Array.isArray(allowedFolders) && allowedFolders.map(String).includes(folderIdStr);
+        if (Array.isArray(allowedFolders)) {
+          return !!(folderIdStr && allowedFolders.map(String).includes(folderIdStr));
+        }
 
-        return !!(hasExplicitRegAccess || hasFolderAccess);
+        return false;
       }
       return true;
     });

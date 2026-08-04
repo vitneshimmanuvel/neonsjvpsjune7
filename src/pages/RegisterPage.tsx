@@ -167,12 +167,18 @@ export default function RegisterPage() {
     const allowedRegs = (user as any).permissions?.allowedRegisters;
     const allowedFolders = (user as any).permissions?.allowedFolders;
 
-    const hasExplicitRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(String(registerId));
+    // Granular register permissions: if allowedRegisters is defined, strictly require register ID to be present
+    if (Array.isArray(allowedRegs)) {
+      return allowedRegs.map(String).includes(String(registerId));
+    }
     
+    // Fallback for folder-level access if allowedRegisters is not set
     const folderId = (register as any)?.folderId;
-    const hasFolderAccess = folderId && Array.isArray(allowedFolders) && allowedFolders.map(String).includes(folderId.toString());
+    if (Array.isArray(allowedFolders)) {
+      return !!(folderId && allowedFolders.map(String).includes(folderId.toString()));
+    }
 
-    return !!(hasExplicitRegAccess || hasFolderAccess);
+    return false;
   }, [user, registerId, register]);
 
   const isFullyRestricted = useMemo(() => !hasRegisterAccess, [hasRegisterAccess]);

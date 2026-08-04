@@ -256,6 +256,20 @@ export const Sidebar = memo(function Sidebar({
     staleTime: 60 * 1000,
   });
 
+  const filteredSearchResults = useMemo(() => {
+    if (!searchResults) return [];
+    if (!user || (user as any).permissions?.isAdmin || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin') return searchResults;
+    const allowedRegs = (user as any).permissions?.allowedRegisters;
+    const allowedFolders = (user as any).permissions?.allowedFolders;
+    if (Array.isArray(allowedRegs)) {
+      return searchResults.filter(r => allowedRegs.map(String).includes(String(r.registerId)));
+    }
+    if (Array.isArray(allowedFolders)) {
+      return searchResults.filter(r => r.folderId && allowedFolders.map(String).includes(String(r.folderId)));
+    }
+    return [];
+  }, [searchResults, user]);
+
 
   const createFolderMutation = useMutation({
     mutationFn: (name: string) => createFolder(businessId!, name),
@@ -838,12 +852,12 @@ export const Sidebar = memo(function Sidebar({
                   ? 'Type at least 2 characters…'
                   : isSearching
                     ? 'Searching…'
-                    : `${searchResults?.length || 0} results`}
+                    : `${filteredSearchResults?.length || 0} results`}
                 {isSearching && <div className="gs-status-bar" />}
               </div>
 
               {/* Results */}
-              {searchResults?.map((res, i) => (
+              {filteredSearchResults?.map((res, i) => (
                 <div
                   key={i}
                   className="gs-card"
@@ -872,7 +886,7 @@ export const Sidebar = memo(function Sidebar({
               ))}
 
               {/* Empty */}
-              {!isSearching && deferredSearch.trim().length >= 2 && (!searchResults || searchResults.length === 0) && (
+              {!isSearching && deferredSearch.trim().length >= 2 && (!filteredSearchResults || filteredSearchResults.length === 0) && (
                 <div className="gs-empty">No results for "{search}"</div>
               )}
             </>
