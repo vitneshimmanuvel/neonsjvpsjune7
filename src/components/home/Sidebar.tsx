@@ -5916,8 +5916,8 @@ function OnlineUsersModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         };
       });
 
-      const sortOrder = { online: 0, away: 1, recent: 2, offline: 3, inactive: 4 };
-      processed.sort((a: any, b: any) => sortOrder[a.computedStatus] - sortOrder[b.computedStatus]);
+      const sortOrder: Record<string, number> = { online: 0, away: 1, recent: 2, offline: 3, inactive: 4 };
+      processed.sort((a: any, b: any) => (sortOrder[a.computedStatus] ?? 99) - (sortOrder[b.computedStatus] ?? 99));
 
       setAllUsers(processed);
     } catch (err) {
