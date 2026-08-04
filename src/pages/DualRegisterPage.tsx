@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { listRegisters, listFolders } from '../lib/api';
+import { listRegisters, listFolders, listBusinesses, getRegister } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import RegisterPage from './RegisterPage';
 import { X, ChevronDown, FileSpreadsheet, Folder as FolderIcon, ArrowLeft, Columns } from 'lucide-react';
@@ -15,21 +15,33 @@ export default function DualRegisterPage() {
   const [showPicker, setShowPicker] = useState(true);
   const [pickerSearch, setPickerSearch] = useState('');
 
-  // Fetch registers for the picker
+  // Fetch left register details to get its businessId
+  const { data: leftRegister } = useQuery({
+    queryKey: ['register', leftRegisterId],
+    queryFn: () => getRegister(leftRegisterId),
+    enabled: !!leftRegisterId,
+  });
+
+  // Fetch businesses as fallback
+  const { data: businesses = [] } = useQuery({
+    queryKey: ['businesses'],
+    queryFn: listBusinesses,
+  });
+
+  const businessId = leftRegister?.businessId || businesses?.[0]?.id;
+
+  // Fetch registers for the picker using resolved businessId
   const { data: registers = [] } = useQuery({
-    queryKey: ['registers-for-split'],
-    queryFn: async () => {
-      // We need to get the businessId from the left register's data
-      // but we can use a simple approach: list from businessId 1 (or get from cache)
-      const regs = await listRegisters(1);
-      return regs;
-    },
+    queryKey: ['registers', businessId],
+    queryFn: () => listRegisters(businessId!),
+    enabled: !!businessId,
     staleTime: 60 * 1000,
   });
 
   const { data: folders = [] } = useQuery({
-    queryKey: ['folders-for-split'],
-    queryFn: () => listFolders(1),
+    queryKey: ['folders', businessId],
+    queryFn: () => listFolders(businessId!),
+    enabled: !!businessId,
     staleTime: 60 * 1000,
   });
 

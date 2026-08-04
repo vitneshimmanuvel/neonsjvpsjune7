@@ -3631,7 +3631,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
     <div className="content-area">
       {/* ── Header ── */}
       <div className="register-header">
-        <div className="register-header-left">
+        <div className="register-header-left" style={{ minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
           <button 
             className="register-header-back-btn" 
             title={register?.folderId ? "Back to Folder" : "Back to All Registers"}
@@ -3642,12 +3642,13 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                 navigate('/');
               }
             }}
+            style={{ flexShrink: 0 }}
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="register-single-file-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileSpreadsheet size={18} color="var(--navy)" />
-            <h1 className="register-header-title" style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          <div className="register-single-file-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+            <FileSpreadsheet size={18} color="var(--navy)" style={{ flexShrink: 0 }} />
+            <h1 className="register-header-title" style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {register.name}
             </h1>
           </div>
