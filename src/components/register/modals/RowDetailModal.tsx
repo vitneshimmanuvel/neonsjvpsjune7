@@ -3,7 +3,7 @@ import {
   Clock, FileText, Download, X, Plus, AlertCircle, 
   Image as ImageIcon, FlaskConical, ChevronDown, Maximize2, 
   ListOrdered, Globe, Phone, Mail,
-  Link as LinkIcon, Lock as LockIcon, PenTool, Paperclip, ZoomIn, ZoomOut, Eraser
+  Link as LinkIcon, Lock as LockIcon, PenTool, Paperclip, ZoomIn, ZoomOut, Eraser, User
 } from 'lucide-react';
 import { type Entry, listRowHistory, updateEntry } from '../../../lib/api';
 import { ImageCompressionModule } from '../../../lib/imageCompressionModule';

@@ -397,7 +397,8 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   }, [shortcuts, countShortcutSearch, shortcutsOrder]);
 
   const onlineUserCount = useMemo(() => {
-    return usersList.filter(u => getUserOnlineStatus(u, allActivities, user?.id).status === 'online').length;
+    const currentUserIdStr = user?.id != null ? String(user.id) : undefined;
+    return usersList.filter(u => getUserOnlineStatus(u, allActivities, currentUserIdStr).status === 'online').length;
   }, [usersList, allActivities, user?.id]);
 
   const activeAccountCount = useMemo(() => {
@@ -409,9 +410,10 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
   }, [usersList]);
 
   const filteredUsersForStatus = useMemo(() => {
+    const currentUserIdStr = user?.id != null ? String(user.id) : undefined;
     return usersList.filter(u => {
       if (u.role === 'superadmin') return false;
-      const st = getUserOnlineStatus(u, allActivities, user?.id);
+      const st = getUserOnlineStatus(u, allActivities, currentUserIdStr);
       if (userSearchTerm.trim()) {
         const q = userSearchTerm.toLowerCase();
         const match = (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.role || '').toLowerCase().includes(q);
@@ -2270,7 +2272,7 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
             {/* User Active Status Cards Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
               {filteredUsersForStatus.map(u => {
-                const st = getUserOnlineStatus(u, allActivities, user?.id);
+                const st = getUserOnlineStatus(u, allActivities, user?.id != null ? String(user.id) : undefined);
                 return (
                   <div
                     key={u.id}
