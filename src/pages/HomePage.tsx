@@ -25,6 +25,7 @@ const RecycleBinPage = lazy(() => import('./RecycleBinPage'));
 const ProfilePage = lazy(() => import('./ProfilePage'));
 const BackupPage = lazy(() => import('./BackupPage'));
 const FolderPage = lazy(() => import('./FolderPage'));
+const DualRegisterPage = lazy(() => import('./DualRegisterPage'));
 
 const RegisterPageWrapper = memo(() => {
   const { id } = useParams();
@@ -559,6 +560,7 @@ export default function HomePage() {
             />
           } />
           <Route path="register/:id" element={<RegisterPageWrapper />} />
+          <Route path="register/:id/split" element={<DualRegisterPage />} />
           <Route path="folder/:folderId" element={<FolderPageWrapper />} />
           <Route path="templates" element={<TemplatesPage />} />
           <Route path="templates/:categoryId" element={<TemplatesPage />} />

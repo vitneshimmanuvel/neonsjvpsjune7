@@ -1,0 +1,205 @@
+import { useState, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { listRegisters, listFolders } from '../lib/api';
+import { useAuth } from '../lib/auth';
+import RegisterPage from './RegisterPage';
+import { X, ChevronDown, FileSpreadsheet, Folder as FolderIcon, ArrowLeft, Columns } from 'lucide-react';
+
+export default function DualRegisterPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const leftRegisterId = Number(id) || 0;
+  const [rightRegisterId, setRightRegisterId] = useState<number | null>(null);
+  const [showPicker, setShowPicker] = useState(true);
+  const [pickerSearch, setPickerSearch] = useState('');
+
+  // Fetch registers for the picker
+  const { data: registers = [] } = useQuery({
+    queryKey: ['registers-for-split'],
+    queryFn: async () => {
+      // We need to get the businessId from the left register's data
+      // but we can use a simple approach: list from businessId 1 (or get from cache)
+      const regs = await listRegisters(1);
+      return regs;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  const { data: folders = [] } = useQuery({
+    queryKey: ['folders-for-split'],
+    queryFn: () => listFolders(1),
+    staleTime: 60 * 1000,
+  });
+
+  // Filter registers for picker (exclude the left one, apply search, apply permissions)
+  const filteredRegisters = useMemo(() => {
+    let regs = registers.filter(r => r.id !== leftRegisterId);
+    
+    // Apply permission filter for non-admin users
+    if (user && !((user as any).permissions?.isAdmin || (user as any).permissions?.fullSheetAccess || (user as any).role === 'superadmin' || (user as any).role === 'admin' || (user as any).role === 'sheet_admin')) {
+      const allowedRegs = (user as any).permissions?.allowedRegisters;
+      if (Array.isArray(allowedRegs)) {
+        regs = regs.filter(r => allowedRegs.map(String).includes(r.id.toString()));
+      }
+    }
+
+    if (pickerSearch.trim()) {
+      regs = regs.filter(r => r.name.toLowerCase().includes(pickerSearch.toLowerCase()));
+    }
+    return regs;
+  }, [registers, leftRegisterId, pickerSearch, user]);
+
+  // Group by folder
+  const groupedRegisters = useMemo(() => {
+    const folderMap = new Map(folders.map(f => [f.id, f.name]));
+    const groups: Record<string, typeof filteredRegisters> = {};
+    const unassigned: typeof filteredRegisters = [];
+
+    filteredRegisters.forEach(r => {
+      if (r.folderId) {
+        const folderName = folderMap.get(r.folderId) || 'Unknown Folder';
+        if (!groups[folderName]) groups[folderName] = [];
+        groups[folderName].push(r);
+      } else {
+        unassigned.push(r);
+      }
+    });
+
+    return { groups, unassigned };
+  }, [filteredRegisters, folders]);
+
+  const handleCloseSplit = () => {
+    navigate(`/register/${leftRegisterId}`);
+  };
+
+  const handleSelectRight = (regId: number) => {
+    setRightRegisterId(regId);
+    setShowPicker(false);
+  };
+
+  return (
+    <div className="dual-register-container">
+      {/* Left Pane */}
+      <div className="dual-pane dual-pane-left">
+        <RegisterPage 
+          overrideRegisterId={leftRegisterId} 
+          compact={true}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="dual-pane-divider">
+        <div className="dual-pane-divider-line" />
+      </div>
+
+      {/* Right Pane */}
+      <div className="dual-pane dual-pane-right">
+        {/* Right pane header */}
+        <div className="dual-pane-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Columns size={16} color="var(--accent)" />
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>Split View</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {rightRegisterId && (
+              <button
+                className="dual-pane-change-btn"
+                onClick={() => { setShowPicker(true); setRightRegisterId(null); }}
+                title="Change Register"
+              >
+                <ChevronDown size={14} />
+                Change
+              </button>
+            )}
+            <button
+              className="dual-pane-close-btn"
+              onClick={handleCloseSplit}
+              title="Close Split View"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Register Picker or Register Content */}
+        {showPicker || !rightRegisterId ? (
+          <div className="dual-pane-picker">
+            <div className="dual-pane-picker-header">
+              <h3>Select a Register</h3>
+              <p>Choose which register to display in the right pane</p>
+            </div>
+            <input
+              className="dual-pane-picker-search"
+              type="text"
+              placeholder="Search registers…"
+              value={pickerSearch}
+              onChange={e => setPickerSearch(e.target.value)}
+              autoFocus
+            />
+            <div className="dual-pane-picker-list">
+              {/* Grouped by folder */}
+              {Object.entries(groupedRegisters.groups).map(([folderName, regs]) => (
+                <div key={folderName} className="dual-pane-picker-group">
+                  <div className="dual-pane-picker-folder">
+                    <FolderIcon size={14} />
+                    <span>{folderName}</span>
+                    <span className="dual-pane-picker-count">{regs.length}</span>
+                  </div>
+                  {regs.map(r => (
+                    <button
+                      key={r.id}
+                      className="dual-pane-picker-item"
+                      onClick={() => handleSelectRight(r.id)}
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>{r.name}</span>
+                      <span className="dual-pane-picker-entries">{r.entryCount ?? ''} entries</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+              {/* Unassigned */}
+              {groupedRegisters.unassigned.length > 0 && (
+                <div className="dual-pane-picker-group">
+                  <div className="dual-pane-picker-folder">
+                    <FolderIcon size={14} />
+                    <span>Unorganized</span>
+                    <span className="dual-pane-picker-count">{groupedRegisters.unassigned.length}</span>
+                  </div>
+                  {groupedRegisters.unassigned.map(r => (
+                    <button
+                      key={r.id}
+                      className="dual-pane-picker-item"
+                      onClick={() => handleSelectRight(r.id)}
+                    >
+                      <FileSpreadsheet size={14} />
+                      <span>{r.name}</span>
+                      <span className="dual-pane-picker-entries">{r.entryCount ?? ''} entries</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {filteredRegisters.length === 0 && (
+                <div className="dual-pane-picker-empty">
+                  No registers found
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="dual-pane-register-content">
+            <RegisterPage 
+              key={rightRegisterId}
+              overrideRegisterId={rightRegisterId} 
+              compact={true}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

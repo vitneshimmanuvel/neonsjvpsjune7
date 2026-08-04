@@ -85,13 +85,19 @@ function parseDateString(dStr: string) {
   return dStr;
 }
 
-export default function RegisterPage() {
+interface RegisterPageProps {
+  overrideRegisterId?: number;
+  compact?: boolean;
+  onSplitView?: () => void;
+}
+
+export default function RegisterPage({ overrideRegisterId, compact, onSplitView }: RegisterPageProps = {}) {
   const { user } = useAuth();
   const canSelectBackDates = canUserSelectBackDates(user);
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const registerId = Number(id) || 0;
+  const registerId = overrideRegisterId || Number(id) || 0;
   const queryClient = useQueryClient();
   const { addNotification, scheduleReminder, reminders, setReminders } = useNotifications();
 
@@ -3716,6 +3722,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
               setStorageOptimizerTab('analytics');
               setStorageOptimizerOpen(true);
             }}
+            onSplitView={!compact ? (onSplitView || (() => navigate(`/register/${registerId}/split`))) : undefined}
           />
         </div>
       </div>
