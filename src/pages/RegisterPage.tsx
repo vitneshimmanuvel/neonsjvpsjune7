@@ -89,9 +89,11 @@ interface RegisterPageProps {
   overrideRegisterId?: number;
   compact?: boolean;
   onSplitView?: () => void;
+  onCloseSplit?: () => void;
+  onChangeSplit?: () => void;
 }
 
-export default function RegisterPage({ overrideRegisterId, compact, onSplitView }: RegisterPageProps = {}) {
+export default function RegisterPage({ overrideRegisterId, compact, onSplitView, onCloseSplit, onChangeSplit }: RegisterPageProps = {}) {
   const { user } = useAuth();
   const canSelectBackDates = canUserSelectBackDates(user);
   const { id } = useParams();
@@ -3710,7 +3712,6 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
               setStorageOptimizerTab(tab || 'analytics');
               setStorageOptimizerOpen(true);
             }}
-            onSplitView={!compact ? (onSplitView || (() => navigate(`/register/${registerId}/split`))) : undefined}
           />
           
           <RegisterHeader 
@@ -3725,6 +3726,8 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
               setStorageOptimizerOpen(true);
             }}
             onSplitView={!compact ? (onSplitView || (() => navigate(`/register/${registerId}/split`))) : undefined}
+            onCloseSplit={onCloseSplit}
+            onChangeSplit={onChangeSplit}
           />
         </div>
       </div>

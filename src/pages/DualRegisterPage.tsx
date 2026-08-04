@@ -98,6 +98,7 @@ export default function DualRegisterPage() {
         <RegisterPage 
           overrideRegisterId={leftRegisterId} 
           compact={true}
+          onCloseSplit={handleCloseSplit}
         />
       </div>
 
@@ -108,39 +109,21 @@ export default function DualRegisterPage() {
 
       {/* Right Pane */}
       <div className="dual-pane dual-pane-right">
-        {/* Right pane header */}
-        <div className="dual-pane-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Columns size={16} color="var(--accent)" />
-            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy)' }}>Split View</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {rightRegisterId && (
-              <button
-                className="dual-pane-change-btn"
-                onClick={() => { setShowPicker(true); setRightRegisterId(null); }}
-                title="Change Register"
-              >
-                <ChevronDown size={14} />
-                Change
-              </button>
-            )}
-            <button
-              className="dual-pane-close-btn"
-              onClick={handleCloseSplit}
-              title="Close Split View"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
         {/* Register Picker or Register Content */}
         {showPicker || !rightRegisterId ? (
           <div className="dual-pane-picker">
-            <div className="dual-pane-picker-header">
-              <h3>Select a Register</h3>
-              <p>Choose which register to display in the right pane</p>
+            <div className="dual-pane-picker-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3>Select a Register</h3>
+                <p>Choose which register to display in the right pane</p>
+              </div>
+              <button
+                className="dual-pane-close-btn"
+                onClick={handleCloseSplit}
+                title="Close Split View"
+              >
+                <X size={16} />
+              </button>
             </div>
             <input
               className="dual-pane-picker-search"
@@ -208,6 +191,8 @@ export default function DualRegisterPage() {
               key={rightRegisterId}
               overrideRegisterId={rightRegisterId} 
               compact={true}
+              onCloseSplit={handleCloseSplit}
+              onChangeSplit={() => { setShowPicker(true); setRightRegisterId(null); }}
             />
           </div>
         )}

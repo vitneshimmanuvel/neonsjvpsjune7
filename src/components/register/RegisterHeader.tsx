@@ -1,4 +1,4 @@
-import { Bookmark, Download, Share2, X, MoreHorizontal, Trash2, Lock, Bell, HardDrive, Columns } from 'lucide-react';
+import { Bookmark, Download, Share2, X, MoreHorizontal, Trash2, Lock, Bell, HardDrive, Columns, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { RequestModal } from './modals/RequestModal';
@@ -22,6 +22,8 @@ interface RegisterHeaderProps {
   onViewReminders?: () => void;
   onOpenStorageOptimizer?: () => void;
   onSplitView?: () => void;
+  onCloseSplit?: () => void;
+  onChangeSplit?: () => void;
 }
 
 export function RegisterHeader({ 
@@ -32,7 +34,9 @@ export function RegisterHeader({
   canEdit = true,
   onViewReminders,
   onOpenStorageOptimizer,
-  onSplitView
+  onSplitView,
+  onCloseSplit,
+  onChangeSplit
 }: RegisterHeaderProps) {
   const [saveTemplateModal, setSaveTemplateModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -125,7 +129,7 @@ export function RegisterHeader({
   };
 
   return (
-    <div className="register-header-actions" ref={menuRef}>
+    <div className="register-header-actions" ref={menuRef} style={{ display: 'flex', alignItems: 'center' }}>
       <button 
         className={`register-header-btn${showMoreMenu ? ' active' : ''}`} 
         onClick={() => setShowMoreMenu(!showMoreMenu)}
@@ -133,6 +137,17 @@ export function RegisterHeader({
       >
         <MoreHorizontal size={20} />
       </button>
+
+      {onCloseSplit && (
+        <button 
+          className="register-header-btn" 
+          onClick={onCloseSplit}
+          title="Close Split View"
+          style={{ marginLeft: '4px', color: '#64748b' }}
+        >
+          <X size={18} />
+        </button>
+      )}
 
       {showMoreMenu && (
         <div className="header-more-menu">
@@ -174,6 +189,20 @@ export function RegisterHeader({
             <button className="more-menu-item" onClick={() => { onSplitView(); setShowMoreMenu(false); }}>
               <Columns size={16} />
               <span>Split View</span>
+            </button>
+          )}
+
+          {onChangeSplit && (
+            <button className="more-menu-item" onClick={() => { onChangeSplit(); setShowMoreMenu(false); }}>
+              <RefreshCw size={16} />
+              <span>Change Register</span>
+            </button>
+          )}
+
+          {onCloseSplit && (
+            <button className="more-menu-item" onClick={() => { onCloseSplit(); setShowMoreMenu(false); }}>
+              <X size={16} />
+              <span>Close Split View</span>
             </button>
           )}
 

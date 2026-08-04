@@ -36,7 +36,6 @@ interface RegisterToolbarProps {
   pendingDebounceCount?: number;
   pendingTempRowEditsCount?: number;
   onOpenStorageOptimizer?: (tab?: 'analytics' | 'config' | 'sandbox' | 'chunks' | 'ledger') => void;
-  onSplitView?: () => void;
 }
 
 export const RegisterToolbar = memo(function RegisterToolbar({
@@ -54,8 +53,7 @@ export const RegisterToolbar = memo(function RegisterToolbar({
   uploadingImagesCount = 0,
   pendingDebounceCount = 0,
   pendingTempRowEditsCount = 0,
-  onOpenStorageOptimizer,
-  onSplitView
+  onOpenStorageOptimizer
 }: RegisterToolbarProps) {
 
   const isSyncing = isSaving || uploadingImagesCount > 0 || pendingDebounceCount > 0 || pendingTempRowEditsCount > 0;
@@ -205,18 +203,6 @@ export const RegisterToolbar = memo(function RegisterToolbar({
         <Eye size={13} />
         {hiddenColumns.size > 0 && <span className="pab-badge">{hiddenColumns.size}</span>}
       </button>
-
-      {/* Split View Button */}
-      {onSplitView && (
-        <button 
-          className="pab-icon-btn" 
-          title="Split View (Dual Register)"
-          onClick={onSplitView}
-          aria-label="Split View"
-        >
-          <Columns size={13} />
-        </button>
-      )}
 
       {/* Bulk delete */}
       {canEdit && selectedRows.size > 0 && (
