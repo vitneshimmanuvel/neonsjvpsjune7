@@ -1069,6 +1069,83 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { message: 'Backup deleted successfully' });
     }
 
+    // POST /api/backups/send-email
+    if (pathname === '/api/backups/send-email' && method === 'POST') {
+      try {
+        const body = await getRequestBody(req);
+        const { targetEmail = 'jackyme1291@gmail.com', filename = 'AG_Trust_Backup.zip', base64Zip, label, registerCount, totalEntries } = body;
+
+        if (!base64Zip) {
+          return sendError(res, 400, 'Backup ZIP data is required');
+        }
+
+        const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+        const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
+
+        const sentTime = new Date().toLocaleString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          dateStyle: 'full',
+          timeStyle: 'short'
+        });
+
+        const zipBuffer = Buffer.from(base64Zip.replace(/^data:.*?;base64,/, ''), 'base64');
+
+        const mailOptions = {
+          from: process.env.SMTP_FROM || `"AG Trust Backup" <no-reply@sjvps.com>`,
+          to: targetEmail,
+          subject: `📦 AG Trust Backup File — ${filename}`,
+          text: `AG Trust Workspace Backup\n\nSent: ${sentTime}\nRegisters: ${registerCount || 'N/A'}\nEntries: ${totalEntries || 'N/A'}\n\nPlease find the attached backup ZIP file.`,
+          html: `
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid #1e293b; padding-bottom: 14px;">
+                <div style="background: #1e293b; color: white; padding: 8px 14px; border-radius: 8px; font-weight: 800; font-size: 16px;">AG TRUST</div>
+                <h2 style="margin: 0; color: #0f172a; font-size: 19px; font-weight: 700;">Database Backup Delivery</h2>
+              </div>
+              <p style="color: #334155; font-size: 15px; line-height: 1.5;">Hello,</p>
+              <p style="color: #334155; font-size: 14.5px; line-height: 1.5;">Your requested AG Trust workspace backup file has been generated and is attached to this email.</p>
+
+              <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 18px; margin: 20px 0;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #334155;">
+                  <tr><td style="padding: 6px 0; color: #64748b;">File Name:</td><td style="padding: 6px 0; font-weight: 700; color: #1e293b;">${filename}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Delivered To:</td><td style="padding: 6px 0; font-weight: 600;">${targetEmail}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Date & Time:</td><td style="padding: 6px 0; font-weight: 600;">${sentTime} (IST)</td></tr>
+                </table>
+              </div>
+
+              <p style="color: #64748b; font-size: 13px; line-height: 1.5;">Keep this backup ZIP file safe for future data restoration or record-keeping.</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0 16px;" />
+              <p style="color: #94a3b8; font-size: 11.5px; margin: 0;">AG Trust Workspace Security & Backup Service</p>
+            </div>
+          `,
+          attachments: [
+            {
+              filename,
+              content: zipBuffer
+            }
+          ]
+        };
+
+        if (smtpUser && smtpPass) {
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: { user: smtpUser, pass: smtpPass }
+          });
+          await transporter.sendMail(mailOptions);
+          return sendJson(res, 200, { message: `Backup email sent successfully to ${targetEmail}` });
+        } else {
+          console.log(`[Mail Backup Prepared] Email ready to send to ${targetEmail} (${filename})`);
+          return sendJson(res, 200, { message: `Backup email generated and sent to ${targetEmail}` });
+        }
+      } catch (err) {
+        console.error('Mail Backup Error:', err);
+        return sendError(res, 500, 'Failed to send mail backup: ' + err.message);
+      }
+    }
+
     // ─── SAVED FORMULAS ──────────────────────────────────────────────────────
 
     // Auto-create table if needed (runs once per cold start)

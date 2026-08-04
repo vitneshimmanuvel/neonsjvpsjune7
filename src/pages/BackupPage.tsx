@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   listBusinesses, listBackups, createBackup, restoreBackup, deleteBackup,
-  listFolders, listRegisters, getRegister,
+  listFolders, listRegisters, getRegister, sendEmailBackup,
   type BackupMeta,
 } from '../lib/api';
 import JSZip from 'jszip';
@@ -11,7 +11,7 @@ import { mobileDownloadFile } from '../lib/mobileDownload';
 
 import {
   ArrowLeft, CloudUpload, RotateCcw, Trash2, CheckCircle, AlertCircle,
-  Database, FolderOpen, FileText, Clock, Lock, RefreshCw, Calendar, Check, Download,
+  Database, FolderOpen, FileText, Clock, Lock, RefreshCw, Calendar, Check, Download, Mail, Send, X,
 } from 'lucide-react';
 
 type Tab = 'backup' | 'restore';
@@ -28,6 +28,8 @@ export default function BackupPage() {
   const [tab, setTab] = useState<Tab>('backup');
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showMailModal, setShowMailModal] = useState(false);
+  const [targetEmailInput, setTargetEmailInput] = useState('jackyme1291@gmail.com');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', msg: string) => {
@@ -146,6 +148,92 @@ export default function BackupPage() {
     },
     onSuccess: () => showToast('success', 'Full backup downloaded successfully!'),
     onError: (err: any) => showToast('error', `Download failed: ${err.message}`),
+  });
+
+  const mailBackupMutation = useMutation({
+    mutationFn: async () => {
+      const email = targetEmailInput.trim() || 'jackyme1291@gmail.com';
+      const zip = new JSZip();
+      
+      const [folders, registers] = await Promise.all([
+        listFolders(businessId!),
+        listRegisters(businessId!)
+      ]);
+
+      const { evaluateFormula } = await import('../lib/api');
+      const XLSX = await import('xlsx');
+
+      const folderMap = new Map<number, string>();
+      folders.forEach(f => folderMap.set(f.id, f.name));
+
+      const fullRegisters = await Promise.all(
+        registers.map(async (r) => {
+          try {
+            return await getRegister(r.id);
+          } catch (err) {
+            console.error(`Failed to fetch register ${r.id}:`, err);
+            return null;
+          }
+        })
+      );
+
+      for (const reg of fullRegisters) {
+        if (!reg) continue;
+        
+        const cols = (reg.columns || []).sort((a, b) => a.position - b.position);
+        const visibleCols = cols.filter(c => c.type !== 'image');
+        const headerRow = ['S.No.', ...visibleCols.map(c => c.name)];
+        const dataAOA: any[][] = [headerRow];
+
+        (reg.entries || []).forEach((entry, idx) => {
+          const rowData: any[] = [idx + 1];
+          visibleCols.forEach(c => {
+            const val = c.type === 'formula' 
+              ? evaluateFormula(c.formula || '', entry, cols)
+              : (entry.cells?.[c.id.toString()] || '');
+            
+            if (c.type === 'checkbox') {
+              rowData.push(String(val) === 'true' ? 'YES' : '');
+            } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
+                const cleaned = val.toString().replace(/[^\d.-]/g, '');
+                const n = parseFloat(cleaned);
+                rowData.push(isNaN(n) ? val : n);
+            } else {
+                rowData.push(val);
+            }
+          });
+          dataAOA.push(rowData);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(dataAOA);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Records");
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+        const folderName = reg.folderId ? folderMap.get(reg.folderId) || 'Unorganized' : 'Unorganized';
+        const safeRegName = reg.name.replace(/[\\/:*?"<>|]/g, '_');
+        zip.file(`${folderName}/${safeRegName}.xlsx`, excelBuffer);
+      }
+
+      const content = await zip.generateAsync({ type: 'base64' });
+      const now = new Date();
+      const timestamp = `${now.getDate().toString().padStart(2, '0')}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
+      const filename = `AG_Trust_Backup_[${timestamp}].zip`;
+
+      await sendEmailBackup({
+        targetEmail: email,
+        filename,
+        base64Zip: content,
+        label: lastBackup?.label,
+        registerCount: lastBackup?.registerCount,
+        totalEntries: lastBackup?.totalEntries
+      });
+    },
+    onSuccess: () => {
+      setShowMailModal(false);
+      showToast('success', `Backup email sent to ${targetEmailInput.trim() || 'jackyme1291@gmail.com'}!`);
+    },
+    onError: (err: any) => showToast('error', `Mail Backup failed: ${err.message}`),
   });
 
   const deleteMutation = useMutation({
@@ -278,21 +366,21 @@ export default function BackupPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <button
                   onClick={() => createMutation.mutate()}
                   disabled={createMutation.isPending}
                   style={{
-                    flex: 1, padding: '14px',
+                    padding: '14px',
                     background: `linear-gradient(135deg, var(--navy), var(--navy-light))`,
                     color: 'white', border: 'none', borderRadius: '12px',
-                    fontSize: '15px', fontWeight: 600, cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                    fontSize: '14px', fontWeight: 600, cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                     opacity: createMutation.isPending ? 0.7 : 1, transition: 'opacity 0.2s',
                     boxShadow: '0 4px 12px rgba(13,42,92,0.15)',
                   }}
                 >
-                  <CloudUpload size={20} />
+                  <CloudUpload size={18} />
                   {createMutation.isPending ? 'Creating…' : 'Back Up Now'}
                 </button>
 
@@ -300,21 +388,51 @@ export default function BackupPage() {
                   onClick={() => downloadAllMutation.mutate()}
                   disabled={downloadAllMutation.isPending}
                   style={{
-                    flex: 1, padding: '14px',
+                    padding: '14px',
                     background: `#fff`,
                     color: 'var(--navy)', border: '1.5px solid var(--navy)', borderRadius: '12px',
-                    fontSize: '15px', fontWeight: 600, cursor: downloadAllMutation.isPending ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                    fontSize: '14px', fontWeight: 600, cursor: downloadAllMutation.isPending ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                     opacity: downloadAllMutation.isPending ? 0.7 : 1, transition: 'all 0.2s',
                   }}
                 >
                   {downloadAllMutation.isPending ? (
-                    <><RefreshCw size={20} className="animate-spin" /> Preparing ZIP...</>
+                    <><RefreshCw size={18} className="animate-spin" /> Preparing ZIP...</>
                   ) : (
-                    <><Download size={20} /> Download All (ZIP)</>
+                    <><Download size={18} /> Download ZIP</>
                   )}
                 </button>
               </div>
+
+              {/* Mail Backup Button */}
+              <button
+                onClick={() => setShowMailModal(true)}
+                disabled={mailBackupMutation.isPending}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: mailBackupMutation.isPending ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  opacity: mailBackupMutation.isPending ? 0.7 : 1,
+                  boxShadow: '0 4px 12px rgba(37,99,235,0.2)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {mailBackupMutation.isPending ? (
+                  <><RefreshCw size={18} className="animate-spin" /> Sending Email Backup...</>
+                ) : (
+                  <><Mail size={18} /> Mail Backup (Send ZIP via Email)</>
+                )}
+              </button>
 
               <p style={{ textAlign: 'center', fontSize: '12px', color: '#7E8DA6', marginTop: '12px', marginBottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <Calendar size={13} /> Reminder every 3 days if no backup is created
@@ -400,6 +518,83 @@ export default function BackupPage() {
           </div>
         )}
       </div>
+      {/* Mail Backup Dialog */}
+      {showMailModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '28px', maxWidth: '440px', width: '90%', position: 'relative' }}>
+            <button
+              onClick={() => setShowMailModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
+            >
+              <X size={16} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                <Mail size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: NAV }}>Mail Backup</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Send complete ZIP database backup to email</p>
+              </div>
+            </div>
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              Destination Email Address:
+            </label>
+            <input
+              type="email"
+              value={targetEmailInput}
+              onChange={(e) => setTargetEmailInput(e.target.value)}
+              placeholder="jackyme1291@gmail.com"
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '14px',
+                color: '#0f172a',
+                outline: 'none',
+                marginBottom: '20px',
+                boxSizing: 'border-box'
+              }}
+            />
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowMailModal(false)}
+                style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#475569' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => mailBackupMutation.mutate()}
+                disabled={mailBackupMutation.isPending || !targetEmailInput.trim()}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: mailBackupMutation.isPending ? 0.7 : 1
+                }}
+              >
+                {mailBackupMutation.isPending ? (
+                  <><RefreshCw size={14} className="animate-spin" /> Sending...</>
+                ) : (
+                  <><Send size={14} /> Send Mail Backup</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

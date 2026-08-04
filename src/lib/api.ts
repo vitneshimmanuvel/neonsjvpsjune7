@@ -2960,6 +2960,29 @@ export async function deleteBackup(backupId: string): Promise<void> {
 }
 
 /**
+ * Send full ZIP database backup via email attachment to destination address.
+ */
+export async function sendEmailBackup(data: {
+  targetEmail: string;
+  filename: string;
+  base64Zip: string;
+  label?: string;
+  registerCount?: number;
+  totalEntries?: number;
+}): Promise<{ message: string }> {
+  const res = await fetch(apiUrl('/api/backups/send-email'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to send mail backup');
+  }
+  return res.json();
+}
+
+/**
  * Check if a new backup is due (every 3 days).
  * Returns true if no backup exists or last backup is older than 3 days.
  */
