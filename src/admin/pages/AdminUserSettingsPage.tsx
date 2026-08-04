@@ -226,8 +226,11 @@ export default function AdminUserSettingsPage() {
         padding: '16px 24px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <button onClick={() => navigate('/admin/dashboard')} className="admin-btn-secondary-flat" style={{ padding: '8px 16px', borderRadius: '10px', height: '38px' }}>
-            <ArrowLeft size={16} /> Back
+          <button onClick={() => navigate('/admin/dashboard')} className="btn-back">
+            <div className="btn-back-icon">
+              <ArrowLeft size={16} />
+            </div>
+            <span>Back to Dashboard</span>
           </button>
           <div>
             <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '-0.02em' }}>

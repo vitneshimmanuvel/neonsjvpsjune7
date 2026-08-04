@@ -15,8 +15,30 @@ import { AdminNotificationBell } from '../components/AdminNotificationBell';
 export default function AdminDashboard() {
   const { user, logout, token } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview'|'users'|'activity'|'report'|'downloads'|'analytics'|'recycle'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview'|'users'|'activity'|'report'|'downloads'|'analytics'|'recycle'>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(tabParam)) {
+        return tabParam as any;
+      }
+      const savedTab = sessionStorage.getItem('admin_active_tab');
+      if (savedTab && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(savedTab)) {
+        return savedTab as any;
+      }
+    } catch (e) {}
+    return 'overview';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Sync tab with URL search parameter if changed externally
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [window.location.search]);
 
   // Clear workspace mode when entering admin dashboard
   useEffect(() => {
@@ -32,6 +54,7 @@ export default function AdminDashboard() {
 
   const handleTabClick = (tab: typeof activeTab) => {
     setActiveTab(tab);
+    sessionStorage.setItem('admin_active_tab', tab);
     setSidebarOpen(false); // auto-close on mobile
   };
 

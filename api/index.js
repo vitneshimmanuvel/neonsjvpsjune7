@@ -232,6 +232,107 @@ export default async function handler(req, res) {
       });
     }
 
+    // ─── USER PRESENCE & ONLINE STATUS ────────────────────────────────────────
+
+    if (!globalThis._activePresence) {
+      globalThis._activePresence = new Map();
+    }
+
+    // POST /api/presence/heartbeat
+    if (pathname === '/api/presence/heartbeat' && method === 'POST') {
+      const data = await getRequestBody(req);
+      if (data.userId) {
+        globalThis._activePresence.set(String(data.userId), {
+          userId: String(data.userId),
+          userName: data.userName || 'User',
+          email: data.email || '',
+          role: data.role || 'user',
+          currentActivity: data.currentActivity || 'Active in app',
+          lastActive: Date.now()
+        });
+      }
+      return sendJson(res, 200, { success: true });
+    }
+
+    // GET /api/presence/online
+    if (pathname === '/api/presence/online' && method === 'GET') {
+      const now = Date.now();
+      const onlineUsersMap = new Map();
+
+      // 1. Load active users from in-memory presence store
+      for (const [uid, presence] of globalThis._activePresence.entries()) {
+        const diffMs = now - presence.lastActive;
+        // Keep users active within the last 30 minutes
+        if (diffMs <= 30 * 60 * 1000) {
+          const status = diffMs <= 3 * 60 * 1000 ? 'online' : 'idle';
+          onlineUsersMap.set(uid, {
+            id: presence.userId,
+            name: presence.userName,
+            email: presence.email,
+            role: presence.role,
+            currentActivity: presence.currentActivity,
+            lastActive: new Date(presence.lastActive).toISOString(),
+            status
+          });
+        }
+      }
+
+      // 2. Fetch latest registered users from DB to supplement presence if missing
+      try {
+        const dbUsers = await query('SELECT id, name, email, role, status, last_login FROM users');
+        const dbActivities = await query(`
+          SELECT DISTINCT ON (user_id) user_id, details, register_name, timestamp 
+          FROM activity_logs 
+          WHERE user_id IS NOT NULL 
+          ORDER BY user_id, timestamp DESC
+        `);
+
+        const activityMap = new Map();
+        for (const act of dbActivities.rows) {
+          activityMap.set(String(act.user_id), act);
+        }
+
+        for (const u of dbUsers.rows) {
+          const uid = String(u.id);
+          if (!onlineUsersMap.has(uid) && u.status !== 'inactive') {
+            const lastAct = activityMap.get(uid);
+            const lastTimeStr = lastAct?.timestamp || u.last_login;
+            if (lastTimeStr) {
+              const lastTime = new Date(lastTimeStr).getTime();
+              const diffMs = now - lastTime;
+              if (diffMs <= 24 * 60 * 60 * 1000) { // Active within 24 hrs
+                const status = diffMs <= 3 * 60 * 1000 ? 'online' : (diffMs <= 15 * 60 * 1000 ? 'idle' : 'offline');
+                const activityText = lastAct?.register_name 
+                  ? `Last active in ${lastAct.register_name}` 
+                  : (lastAct?.details || 'Signed in');
+                onlineUsersMap.set(uid, {
+                  id: uid,
+                  name: u.name,
+                  email: u.email,
+                  role: u.role,
+                  currentActivity: activityText,
+                  lastActive: new Date(lastTime).toISOString(),
+                  status
+                });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch DB presence fallback:', err);
+      }
+
+      const usersList = Array.from(onlineUsersMap.values()).sort((a, b) => {
+        const order = { online: 0, idle: 1, offline: 2 };
+        if (order[a.status] !== order[b.status]) {
+          return order[a.status] - order[b.status];
+        }
+        return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime();
+      });
+
+      return sendJson(res, 200, { users: usersList });
+    }
+
     // POST /api/auth/change-password
     if (pathname === '/api/auth/change-password' && method === 'POST') {
       const authHeader = req.headers.authorization || '';

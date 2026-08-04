@@ -1,6 +1,6 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip, Users } from 'lucide-react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../lib/auth';
@@ -8,7 +8,7 @@ import type { RegisterSummary, Business } from '../../lib/api';
 import { getRegister, getRegisterColumnsOnly, addEntry, formatDateToDDMMYYYY, listFolders, createFolder, renameFolder, deleteFolder, moveRegisterToFolder, moveRegistersToFolder, duplicateRegister, searchAllRegisters, canUserSelectBackDates } from '../../lib/api';
 import toast from 'react-hot-toast';
 import { ImageCompressionModule } from '../../lib/imageCompressionModule';
-import { firebaseLogWorkspaceAction } from '../../lib/firebaseAuth';
+import { firebaseLogWorkspaceAction, sendPresenceHeartbeat, firebaseGetOnlineUsers, firebaseGetUsers, firebaseGetActivity, type OnlineUserItem } from '../../lib/firebaseAuth';
 import { DatePickerModal } from '../register/modals/DatePickerModal';
 import { RearrangeModal } from '../common/RearrangeModal';
 interface SidebarProps {
@@ -116,7 +116,53 @@ export const Sidebar = memo(function Sidebar({
   const businessId = businesses?.[0]?.id;
   const deferredSearch = useDeferredValue(search);
   const { logout, user: authUser } = useAuth();
-  const isSystemAdmin = (authUser as any)?.role === 'admin' || (authUser as any)?.role === 'superadmin';
+  const isSystemAdmin = (authUser as any)?.role === 'admin' || (authUser as any)?.role === 'superadmin' || (authUser as any)?.permissions?.isAdmin;
+  const location = useLocation();
+  const [showOnlineUsersModal, setShowOnlineUsersModal] = useState(false);
+
+  const { data: register } = useQuery({
+    queryKey: ['register', Number(currentRegId)],
+    queryFn: () => getRegister(Number(currentRegId)),
+    enabled: !!currentRegId,
+  });
+
+  useEffect(() => {
+    if (!(authUser as any)?.id) return;
+
+    const pathname = location.pathname;
+    let activityDesc = 'Browsing workspace';
+    if (register?.name) {
+      activityDesc = `Viewing register: ${register.name}`;
+    } else if (currentRegId) {
+      activityDesc = `Viewing register #${currentRegId}`;
+    } else if (pathname.startsWith('/folder/')) {
+      activityDesc = 'Browsing folder';
+    } else if (pathname.startsWith('/admin')) {
+      activityDesc = 'Managing admin dashboard';
+    } else if (pathname === '/') {
+      activityDesc = 'Browsing registers (Home)';
+    }
+
+    sendPresenceHeartbeat({
+      userId: (authUser as any).id,
+      userName: (authUser as any).name || 'User',
+      email: (authUser as any).email || '',
+      role: (authUser as any).role || 'user',
+      currentActivity: activityDesc
+    });
+
+    const interval = setInterval(() => {
+      sendPresenceHeartbeat({
+        userId: (authUser as any).id,
+        userName: (authUser as any).name || 'User',
+        email: (authUser as any).email || '',
+        role: (authUser as any).role || 'user',
+        currentActivity: activityDesc
+      });
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [authUser, currentRegId, register?.name, location.pathname]);
 
   const { data: folders = [] } = useQuery({
     queryKey: ['folders', businessId],
@@ -158,21 +204,15 @@ export const Sidebar = memo(function Sidebar({
     });
   }, [filtered, orderNonce]);
 
-  const { data: register } = useQuery({
-    queryKey: ['register', Number(currentRegId)],
-    queryFn: () => getRegister(Number(currentRegId)),
-    enabled: !!currentRegId,
-  });
-
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
-      return localStorage.getItem('seen_version_2.2') !== 'true';
+      return localStorage.getItem('seen_version_2.6') !== 'true';
     } catch {
       return false;
     }
   });
-  const [versionTab, setVersionTab] = useState<'2.2' | '2.1' | '2.0.1' | '2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.2');
+  const [versionTab, setVersionTab] = useState<'2.6' | '2.2' | '2.1' | '2.0.1' | '2.0' | '1.9.7' | '1.9.6' | '1.9.5' | '1.8.8' | '1.8.7' | '1.8.5' | '1.8.2' | '1.8.1' | '1.8.0' | '1.7.9' | '1.7.7' | '1.7.6' | '1.7.5' | '1.7.1' | '1.7.0' | '1.6.10' | '1.6.9' | '1.6.3' | '1.6.2' | '1.6.1' | '1.6.0' | '1.5.6' | '1.5.5' | '1.5.2' | '1.5.1' | '1.5' | '1.3.1' | '1.2'>('2.6');
   const [showOlderVersionsDropdown, setShowOlderVersionsDropdown] = useState(false);
   
   // Slideshow state
@@ -304,7 +344,11 @@ export const Sidebar = memo(function Sidebar({
         return (old || []).map(r => r.id === variables.regId ? { ...r, folderId: variables.fId === null ? undefined : variables.fId } : r);
       });
       queryClient.invalidateQueries({ queryKey: ['registers', businessId] });
+      toast.success('Moved register to folder');
     },
+    onError: () => {
+      toast.error('Failed to move register');
+    }
   });
 
   const moveMultipleMutation = useMutation({
@@ -501,17 +545,69 @@ export const Sidebar = memo(function Sidebar({
         style={sidebarWidth && !isCollapsed ? { width: sidebarWidth, minWidth: sidebarWidth } : undefined}
       >
         <div className="sidebar-brand" style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div className="sidebar-brand-group" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-            <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
-            {!isCollapsed && (
-              <div className="sidebar-brand-text">
-                <div className="sidebar-brand-name" style={{ fontSize: '15px', fontWeight: 800, color: 'var(--navy)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
-                  AG <span style={{ color: 'var(--accent)' }}>Trust</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="sidebar-brand-group" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
+              {!isCollapsed && (
+                <div className="sidebar-brand-text">
+                  <div className="sidebar-brand-name" style={{ fontSize: '15px', fontWeight: 800, color: 'var(--navy)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                    AG <span style={{ color: 'var(--accent)' }}>Trust</span>
+                  </div>
+                  <div className="sidebar-brand-sub" style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                    Record Book
+                  </div>
                 </div>
-                <div className="sidebar-brand-sub" style={{ fontSize: '10px', fontWeight: 600, color: '#64748b', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                  Record Book
-                </div>
-              </div>
+              )}
+            </div>
+
+            {/* Admin-Only Online Status & Activity Icon */}
+            {isSystemAdmin && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowOnlineUsersModal(true);
+                }}
+                title="View Online Users & Live Activity (Admin Only)"
+                aria-label="View online users"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  color: '#10b981',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  marginLeft: '2px',
+                  padding: 0
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.18)';
+                  e.currentTarget.style.transform = 'scale(1.06)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <Users size={15} />
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    width: '7px',
+                    height: '7px',
+                    backgroundColor: '#10b981',
+                    borderRadius: '50%',
+                    boxShadow: '0 0 0 2px #ffffff, 0 0 6px #10b981'
+                  }}
+                />
+              </button>
             )}
           </div>
 
@@ -1098,7 +1194,7 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setVersionTab('2.2');
+                    setVersionTab('2.6');
                     setActiveSlide(0); // Reset slideshow to first slide
                     setShowVersionModal(true);
                   }}
@@ -1108,9 +1204,9 @@ export const Sidebar = memo(function Sidebar({
                   onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'var(--brand-blue-light)';
                   }}
-                  title="View what's new in v2.2.5"
+                  title="View what's new in v2.6"
                 >
-                  v2.2.5
+                  v2.6
                 </span>
               </div>
             </div>
@@ -2147,7 +2243,7 @@ export const Sidebar = memo(function Sidebar({
                       padding: '4px'
                     }}>
                       {[
-                        '2.2', '2.1', '2.0.1', '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
+                        '2.6', '2.2', '2.1', '2.0.1', '2.0', '1.9.7', '1.9.6', '1.9.5', '1.8.8', '1.8.7', '1.8.5', '1.8.2', '1.8.1', '1.8.0', '1.7.9', '1.7.7', '1.7.6', '1.7.5', 
                         '1.7.1', '1.7.0', '1.6.10', '1.6.9', '1.6.3', '1.6.2', '1.6.1', 
                         '1.6.0', '1.5.6', '1.5.5', '1.5.2', '1.5.1', '1.5', '1.3.1', '1.2'
                       ].map(v => (
@@ -2178,7 +2274,7 @@ export const Sidebar = memo(function Sidebar({
                             if (versionTab !== v) e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          {v === '2.1' ? 'v2.1 (Current)' : `v${v}`}
+                          {v === '2.6' ? 'v2.6 (Current)' : `v${v}`}
                         </button>
                       ))}
                     </div>
@@ -2187,7 +2283,187 @@ export const Sidebar = memo(function Sidebar({
               </div>
             </div>
 
-            {versionTab === '2.2' ? (
+            {versionTab === '2.6' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
+                <style>{`
+                  @keyframes slideInUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                  }
+                  @keyframes slideInLeft {
+                    from { transform: translateX(-24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  @keyframes slideInRight {
+                    from { transform: translateX(24px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                  }
+                  .animate-slide-left {
+                    animation: slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                  .animate-slide-right {
+                    animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                  }
+                `}</style>
+
+                {/* Main Slides Content */}
+                <div style={{ flex: 1, position: 'relative' }}>
+                  {activeSlide === 0 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.6 • Feature 1 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Multi-Select Drag & Drop
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Select single or multiple registers and drag them directly into any sidebar folder. Features real-time multi-card ghost badges and active target folder outlines.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Folder size={24} color="#2563eb" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Folder Drag & Drop</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Move single & bulk selected registers effortlessly</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 1 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.6 • Feature 2 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          User Active Status Center
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Admin-only live status overlay next to the sidebar logo displaying active staff presence, online count, and quick jump to Manage Users & Roles.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Users size={24} color="#16a34a" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Live Presence Tracker</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Fixed-size status center overlay for admins</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 2 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.6 • Feature 3 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          App-Wide Smooth Animations
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Modern spring press dynamics for buttons, logo rotate interactions, sidebar item hover nudges, and backdrop blur pop-in dialogs.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Sparkles size={24} color="#d97706" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Micro-Interactions</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Elevated hover lifts & spring physics</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide === 3 && (
+                    <div style={{ display: 'flex', height: '100%', animation: 'fadeIn 0.4s ease-out' }}>
+                      <div style={{ flex: 1, padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className="animate-slide-left">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f3e8ff', color: '#7e22ce', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, width: 'fit-content', marginBottom: '14px' }}>
+                          <Sparkles size={12} />
+                          <span>v2.6 • Feature 4 of 4</span>
+                        </div>
+                        <h3 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: '#0f172a', lineHeight: '1.2' }}>
+                          Premium Animated Back Buttons
+                        </h3>
+                        <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: '#475569', lineHeight: '1.5', fontWeight: 500 }}>
+                          Unified back button design featuring smooth left slide nudges, blue glow borders, and interactive icon color flips on hover.
+                        </p>
+                      </div>
+                      <div style={{ flex: 1.1, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', borderLeft: '1px solid #e2e8f0' }} className="animate-slide-right">
+                        <div style={{ background: 'white', padding: '16px 20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <ArrowLeft size={24} color="#7e22ce" />
+                          <div>
+                            <strong style={{ fontSize: '13px', color: '#0f172a' }}>Animated Back UI</strong>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>Integrated across all app pages</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Slideshow Controls Footer */}
+                <div style={{ height: '56px', padding: '0 24px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'white' }}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {[0, 1, 2, 3].map(idx => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveSlide(idx)}
+                        style={{
+                          width: activeSlide === idx ? '20px' : '8px',
+                          height: '8px',
+                          borderRadius: '4px',
+                          background: activeSlide === idx ? '#2563eb' : '#cbd5e1',
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {activeSlide > 0 && (
+                      <button
+                        onClick={() => setActiveSlide(prev => prev - 1)}
+                        style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer', color: '#475569' }}
+                      >
+                        Previous
+                      </button>
+                    )}
+                    {activeSlide < 3 ? (
+                      <button
+                        onClick={() => setActiveSlide(prev => prev + 1)}
+                        style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#2563eb', color: 'white', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Next Feature
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          try { localStorage.setItem('seen_version_2.6', 'true'); } catch {}
+                          setShowVersionModal(false);
+                        }}
+                        style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', background: '#16a34a', color: 'white', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Got it, thanks!
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : versionTab === '2.2' ? (
               <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '440px', position: 'relative', overflow: 'hidden' }}>
                 <style>{`
                   @keyframes slideInUp {
@@ -5565,6 +5841,479 @@ export const Sidebar = memo(function Sidebar({
           </div>
         </div>
       )}
+
+      {/* Online Users & Live Activity Modal (Admin Only) */}
+      <OnlineUsersModal
+        isOpen={showOnlineUsersModal}
+        onClose={() => setShowOnlineUsersModal(false)}
+      />
     </>
   );
 });
+
+function OnlineUsersModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const navigate = useNavigate();
+  const { user: authUser } = useAuth();
+  const isSystemAdmin = (authUser as any)?.role === 'admin' || (authUser as any)?.role === 'superadmin' || (authUser as any)?.permissions?.isAdmin;
+
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'online' | 'active' | 'inactive'>('all');
+
+  const fetchUsersData = useCallback(async () => {
+    try {
+      const [usersRes, onlineRes, actRes] = await Promise.all([
+        firebaseGetUsers().catch(() => ({ users: [] })),
+        firebaseGetOnlineUsers().catch(() => ({ users: [] })),
+        firebaseGetActivity(300).catch(() => ({ activities: [] }))
+      ]);
+
+      const usersList = usersRes.users || [];
+      const onlineList = onlineRes.users || [];
+      const activitiesList = actRes.activities || [];
+
+      const onlineMap = new Map<string, any>();
+      onlineList.forEach((u: any) => onlineMap.set(String(u.id), u));
+
+      const latestActMap = new Map<string, string>();
+      activitiesList.forEach((a: any) => {
+        if (a.userId && !latestActMap.has(String(a.userId))) {
+          latestActMap.set(String(a.userId), a.timestamp);
+        }
+      });
+
+      const now = Date.now();
+      const processed = usersList.map((u: any) => {
+        const uid = String(u.id);
+        const presence = onlineMap.get(uid);
+        const actTimeStr = presence?.lastActive || latestActMap.get(uid) || u.lastLogin || u.createdAt;
+        const actTime = actTimeStr ? new Date(actTimeStr).getTime() : now - 30 * 86400 * 1000;
+        const diffMs = now - actTime;
+
+        let computedStatus: 'online' | 'away' | 'recent' | 'offline' | 'inactive' = 'offline';
+        if (u.status === 'inactive') {
+          computedStatus = 'inactive';
+        } else if (presence?.status === 'online' || diffMs <= 3 * 60 * 1000) {
+          computedStatus = 'online';
+        } else if (diffMs <= 60 * 60 * 1000) {
+          computedStatus = 'away';
+        } else if (diffMs <= 24 * 60 * 60 * 1000) {
+          computedStatus = 'recent';
+        } else {
+          computedStatus = 'offline';
+        }
+
+        return {
+          id: uid,
+          name: u.name || 'User',
+          email: u.email || '',
+          role: (u.role || 'user').toUpperCase(),
+          accountStatus: u.status || 'active',
+          computedStatus,
+          lastActive: actTimeStr,
+          currentActivity: presence?.currentActivity || 'Active in app'
+        };
+      });
+
+      const sortOrder = { online: 0, away: 1, recent: 2, offline: 3, inactive: 4 };
+      processed.sort((a: any, b: any) => sortOrder[a.computedStatus] - sortOrder[b.computedStatus]);
+
+      setAllUsers(processed);
+    } catch (err) {
+      console.error('Failed to load user active status center:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !isSystemAdmin) return;
+    fetchUsersData();
+    const interval = setInterval(fetchUsersData, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen, isSystemAdmin, fetchUsersData]);
+
+  if (!isOpen || !isSystemAdmin) return null;
+
+  const onlineCount = allUsers.filter(u => u.computedStatus === 'online').length;
+  const activeCount = allUsers.filter(u => u.accountStatus === 'active').length;
+  const inactiveCount = allUsers.filter(u => u.accountStatus === 'inactive').length;
+
+  const filteredUsers = allUsers.filter(u => {
+    // Tab filter
+    if (activeTab === 'online' && u.computedStatus !== 'online') return false;
+    if (activeTab === 'active' && u.accountStatus !== 'active') return false;
+    if (activeTab === 'inactive' && u.accountStatus !== 'inactive') return false;
+
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      return (
+        u.name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.role?.toLowerCase().includes(q) ||
+        u.computedStatus?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const getAvatarBg = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#10b981', '#6366f1', '#f59e0b', '#0284c7', '#8b5cf6', '#ec4899', '#14b8a6', '#059669'];
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(5px)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px'
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="modal-animate-pop"
+        style={{
+          width: '740px',
+          maxWidth: '92vw',
+          height: '560px',
+          maxHeight: '90vh',
+          backgroundColor: '#ffffff',
+          borderRadius: '20px',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid #e2e8f0'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '20px 24px 16px',
+          borderBottom: '1px solid #f1f5f9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Users size={22} color="#2563eb" />
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.2px' }}>
+              User Active Status Center
+            </h3>
+            <span style={{
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '3px 10px',
+              borderRadius: '16px',
+              border: '1px solid #a7f3d0',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span className="status-pulse-dot" style={{ width: '7px', height: '7px', backgroundColor: '#22c55e', borderRadius: '50%' }} />
+              {onlineCount} Online Now
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => {
+                sessionStorage.setItem('admin_active_tab', 'users');
+                sessionStorage.removeItem('admin_workspace_mode');
+                onClose();
+                navigate('/admin/dashboard?tab=users');
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#2563eb',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: 0
+              }}
+            >
+              Manage Users & Roles →
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+                color: '#64748b',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: '4px'
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs & Search Row */}
+        <div style={{
+          padding: '14px 24px',
+          borderBottom: '1px solid #f1f5f9',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {[
+              { id: 'all', label: `All (${allUsers.length})` },
+              { id: 'online', label: `Online (${onlineCount})` },
+              { id: 'active', label: `Active (${activeCount})` },
+              { id: 'inactive', label: `Inactive (${inactiveCount})` },
+            ].map(tab => {
+              const isSelected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: isSelected ? 700 : 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                    background: isSelected ? '#eff6ff' : '#ffffff',
+                    color: isSelected ? '#2563eb' : '#475569'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Box */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#f8fafc',
+            border: '1px solid #cbd5e1',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            width: '200px'
+          }}>
+            <Search size={14} color="#94a3b8" />
+            <input
+              type="text"
+              placeholder="Filter users..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: '12px', color: '#0f172a' }}
+            />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Users Cards Grid */}
+        <div style={{
+          flex: '1 1 0%',
+          minHeight: '360px',
+          overflowY: 'auto',
+          padding: '20px 24px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+          gap: '14px',
+          alignContent: 'start',
+          backgroundColor: '#fafafa'
+        }}>
+          {loading && allUsers.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '60px', textAlign: 'center', color: '#64748b', fontSize: '13px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+              <Loader2 size={26} className="animate-spin" color="#2563eb" />
+              Loading user status center...
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div style={{ gridColumn: '1 / -1', padding: '60px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+              No users found matching current filters
+            </div>
+          ) : (
+            filteredUsers.map(u => {
+              const statusCfg: Record<string, { label: string; dot: string; bg: string; text: string; border: string }> = {
+                online: { label: 'Online', dot: '#22c55e', bg: '#dcfce7', text: '#15803d', border: '#bbf7d0' },
+                away: { label: 'Away', dot: '#f59e0b', bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' },
+                recent: { label: 'Recent', dot: '#3b82f6', bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
+                offline: { label: 'Offline', dot: '#94a3b8', bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' },
+                inactive: { label: 'Inactive', dot: '#ef4444', bg: '#fef2f2', text: '#dc2626', border: '#fecaca' }
+              };
+
+              const cfg = statusCfg[u.computedStatus] || statusCfg.offline;
+
+              return (
+                <div
+                  key={u.id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '14px',
+                    border: `1.5px solid ${cfg.border}`,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    position: 'relative',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {/* Top Row: Avatar & Details & Role Tag */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                      {/* Avatar */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '50%',
+                          backgroundColor: getAvatarBg(u.name),
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '16px',
+                          fontWeight: 800
+                        }}>
+                          {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '-1px',
+                          right: '-1px',
+                          width: '11px',
+                          height: '11px',
+                          borderRadius: '50%',
+                          backgroundColor: cfg.dot,
+                          border: '2px solid #ffffff',
+                          boxShadow: u.computedStatus === 'online' ? '0 0 6px #22c55e' : 'none'
+                        }} />
+                      </div>
+
+                      {/* User Info */}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          fontSize: '13.5px',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.2px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {u.name}
+                        </div>
+                        <div style={{
+                          fontSize: '11.5px',
+                          color: '#64748b',
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {u.email}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Role Tag */}
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.4px',
+                      backgroundColor: '#f1f5f9',
+                      color: '#475569',
+                      flexShrink: 0
+                    }}>
+                      {u.role}
+                    </span>
+                  </div>
+
+                  {/* Status Pill Row */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', marginTop: '2px' }}>
+                    <span style={{
+                      backgroundColor: cfg.bg,
+                      color: cfg.text,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '3px 9px',
+                      borderRadius: '6px',
+                      border: `1px solid ${cfg.border}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: cfg.dot }} />
+                      {cfg.label}
+                      {u.computedStatus !== 'inactive' && (
+                        <span style={{ fontWeight: 500, opacity: 0.85, marginLeft: '3px' }}>
+                          {formatRelativeTime(u.lastActive)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function formatRelativeTime(isoStr?: string): string {
+  if (!isoStr) return 'Just now';
+  const diffSec = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (isNaN(diffSec) || diffSec < 10) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.floor(diffHr / 24)}d ago`;
+}
+

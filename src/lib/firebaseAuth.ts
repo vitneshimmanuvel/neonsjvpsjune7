@@ -350,3 +350,41 @@ export async function firebaseMarkAllNotificationsRead(userId: string) {
     throw new Error(err.error || 'Failed to mark all read');
   }
 }
+
+export interface OnlineUserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  currentActivity: string;
+  lastActive: string;
+  status: 'online' | 'idle' | 'offline';
+}
+
+export async function sendPresenceHeartbeat(data: {
+  userId: string;
+  userName: string;
+  email?: string;
+  role?: string;
+  currentActivity?: string;
+}) {
+  try {
+    await fetch(apiUrl('/api/presence/heartbeat'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (err) {
+    // Ignore silent heartbeat errors
+  }
+}
+
+export async function firebaseGetOnlineUsers(): Promise<{ users: OnlineUserItem[] }> {
+  const res = await fetch(apiUrl('/api/presence/online'));
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to fetch online users');
+  }
+  return res.json();
+}
+

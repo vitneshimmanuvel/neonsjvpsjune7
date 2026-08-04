@@ -29,6 +29,7 @@ export default function FolderPage() {
   // Local states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [draggingRegIds, setDraggingRegIds] = useState<number[]>([]);
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<number | null>(null);
@@ -299,44 +300,11 @@ export default function FolderPage() {
       <div style={{ marginBottom: '24px' }}>
         <button
           onClick={() => navigate('/')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--background)',
-            border: '1px solid var(--border)',
-            borderRadius: '10px',
-            padding: '7px 14px',
-            color: 'var(--foreground)',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            marginBottom: '16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            transition: 'all 0.2s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--muted)';
-            e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.08)';
-            e.currentTarget.style.transform = 'translateX(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-            e.currentTarget.style.transform = 'translateX(0)';
-          }}
+          className="btn-back"
+          style={{ marginBottom: '16px' }}
         >
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '50%',
-            background: 'var(--surface)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--navy)'
-          }}>
-            <ArrowLeft size={14} />
+          <div className="btn-back-icon">
+            <ArrowLeft size={15} />
           </div>
           <span>Back to All Registers</span>
         </button>
@@ -561,28 +529,6 @@ export default function FolderPage() {
               {selectedIds.size} selected
             </span>
 
-            {/* Bulk Move Button */}
-            <button
-              onClick={() => setShowMoveModal(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '7px 14px',
-                background: 'var(--background)',
-                color: 'var(--foreground)',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                transition: 'all 0.15s'
-              }}
-            >
-              <MoveRight size={15} color="var(--navy)" /> Bulk Move
-            </button>
-
             {/* Bulk Delete Button */}
             <button
               onClick={() => setShowDeleteModal(true)}
@@ -685,10 +631,57 @@ export default function FolderPage() {
         <div className="categories-grid categories-grid--no-pad">
           {displayedRegisters.map(reg => {
             const isSelected = selectedIds.has(reg.id);
+            const isCardDragging = draggingRegIds.includes(reg.id);
+
             return (
               <div
                 key={reg.id}
-                className="category-card"
+                className={`category-card ${isCardDragging ? 'is-dragging' : ''}`}
+                draggable={true}
+                onDragStart={(e) => {
+                  const idsToMove = selectedIds.has(reg.id)
+                    ? Array.from(selectedIds)
+                    : (selectedIds.size > 0 ? Array.from(new Set([...selectedIds, reg.id])) : [reg.id]);
+
+                  e.dataTransfer.setData('text/plain', JSON.stringify(idsToMove));
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDraggingRegIds(idsToMove);
+
+                  const count = idsToMove.length;
+                  const ghost = document.createElement('div');
+                  ghost.style.position = 'absolute';
+                  ghost.style.top = '-1000px';
+                  ghost.style.left = '-1000px';
+                  ghost.style.padding = '8px 16px';
+                  ghost.style.background = '#002d5d';
+                  ghost.style.color = '#ffffff';
+                  ghost.style.borderRadius = '12px';
+                  ghost.style.fontSize = '13px';
+                  ghost.style.fontWeight = '700';
+                  ghost.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.35)';
+                  ghost.style.display = 'flex';
+                  ghost.style.alignItems = 'center';
+                  ghost.style.gap = '8px';
+                  ghost.style.zIndex = '999999';
+                  ghost.style.border = '1.5px solid #2563eb';
+
+                  if (count > 1) {
+                    ghost.innerHTML = `<span style="background:#2563eb;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;">${count}</span> Moving ${count} Registers`;
+                  } else {
+                    ghost.innerHTML = `<span style="color:#60a5fa;font-size:14px;">📄</span> Moving "${reg.name.length > 22 ? reg.name.slice(0, 22) + '…' : reg.name}"`;
+                  }
+
+                  document.body.appendChild(ghost);
+                  if (e.dataTransfer.setDragImage) {
+                    e.dataTransfer.setDragImage(ghost, 20, 20);
+                  }
+                  setTimeout(() => {
+                    if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+                  }, 0);
+                }}
+                onDragEnd={() => {
+                  setDraggingRegIds([]);
+                }}
                 onClick={() => navigate(`/register/${reg.id}`)}
                 onMouseEnter={() => setHoveredRegId(reg.id)}
                 onMouseLeave={() => setHoveredRegId(null)}
@@ -697,7 +690,7 @@ export default function FolderPage() {
                   border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
                   backgroundColor: isSelected ? 'rgba(30, 45, 120, 0.03)' : 'var(--background)',
                   transition: 'all 0.2s ease',
-                  cursor: 'pointer'
+                  cursor: 'grab'
                 }}
               >
                 {/* Selection Checkbox */}

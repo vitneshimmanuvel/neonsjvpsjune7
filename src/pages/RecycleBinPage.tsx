@@ -182,8 +182,11 @@ export default function RecycleBinPage({ isAdminPanel = false }: RecycleBinPageP
       {/* Header */}
       <div className="rbin-header">
         {!isPageAdmin && (
-          <button className="rbin-back" onClick={() => navigate('/')}>
-            <ArrowLeft size={18} />
+          <button className="btn-back" onClick={() => navigate('/')}>
+            <div className="btn-back-icon">
+              <ArrowLeft size={16} />
+            </div>
+            <span>Back</span>
           </button>
         )}
         <div className="rbin-header-text">
