@@ -17,7 +17,7 @@ import {
   subscribeToMutationStatus, updateEntriesOrder, flushAllPendingWrites,
   getPendingMutationsCount,
   updateEntryCellStyles, unlinkColumn,
-  formatDateToDDMMYYYY, canUserSelectBackDates,
+  formatDateToDDMMYYYY, validatePhoneNumber, canUserSelectBackDates,
   listFolders,
   type Entry, type CellStyle, type HistoryEntry, type Folder,
 } from '../lib/api';
@@ -2427,9 +2427,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(valStr)) return { isValid: false, error: 'Invalid email format' };
       } else if (col.type === 'phone') {
-        const cleanedPhone = valStr.trim().replace(/[\s()-]/g, '');
-        const phoneRegex = /^(\+91)?\d{10}$/;
-        if (!phoneRegex.test(cleanedPhone)) return { isValid: false, error: 'Invalid phone format (must be 10 digits or +91 followed by 10 digits)' };
+        return validatePhoneNumber(valStr);
       } else if (col.type === 'date') {
         const dateRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
         if (!dateRegex.test(valStr)) return { isValid: false, error: 'Use DD-MM-YYYY format' };

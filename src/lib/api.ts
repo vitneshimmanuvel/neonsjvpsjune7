@@ -853,6 +853,48 @@ export function formatDateToDDMMYYYY(val: any): string {
   return s;
 }
 
+/**
+ * Validates a phone number value (supporting single numbers and dual/multiple numbers).
+ * Enforces exactly 10 digits for each mobile number (allowing optional +91 prefix).
+ * Returns { isValid: boolean, error: string | null } with exact count of digits entered on failure.
+ */
+export function validatePhoneNumber(valStr: string): { isValid: boolean; error: string | null } {
+  if (!valStr || !valStr.trim()) return { isValid: true, error: null };
+
+  // Split by common dual number separators: '|||', '/', ',', ';', '&', '|', '\n', 'and', 'or'
+  const parts = valStr.split(/(?:\s*(?:\|\|\||\/|,|;|\||&|\n|\band\b|\bor\b)\s*)+/i);
+
+  for (const rawPart of parts) {
+    const trimmed = rawPart.trim();
+    if (!trimmed) continue;
+
+    // Clean formatting characters (spaces, hyphens, parentheses)
+    let cleaned = trimmed.replace(/[\s()-]/g, '');
+
+    // Strip optional +91 or 91 country code prefix if present
+    if (cleaned.startsWith('+91')) {
+      cleaned = cleaned.substring(3);
+    } else if (cleaned.startsWith('91') && cleaned.length > 10) {
+      cleaned = cleaned.substring(2);
+    } else if (cleaned.startsWith('+')) {
+      cleaned = cleaned.replace(/^\+\d{1,3}/, '');
+    }
+
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    const digitCount = digitsOnly.length;
+
+    if (digitCount !== 10) {
+      const unit = digitCount === 1 ? 'digit' : 'digits';
+      return {
+        isValid: false,
+        error: `Phone number must be exactly 10 digits (you entered ${digitCount} ${unit})`
+      };
+    }
+  }
+
+  return { isValid: true, error: null };
+}
+
 
 /** Check if a value looks like a plausible Excel serial date (roughly 1968 to 2077). */
 function looksLikeExcelSerial(val: unknown): boolean {
@@ -1774,6 +1816,37 @@ export async function hideColumn(registerId: number, columnId: number, hidden: b
 
 // ─── Entry Operations ────────────────────────────────────────────────────────
 
+export function getStudentIdentityInfo(columns: Column[] = [], cells: Record<string, string> = {}): string {
+  if (!columns || !cells) return '';
+  let rbVal = '';
+  let nameVal = '';
+
+  for (const col of columns) {
+    const colNameLower = (col.name || '').toLowerCase().trim();
+    const val = (cells[col.id.toString()] || '').trim();
+    if (!val) continue;
+
+    if (!rbVal && (
+      colNameLower === 'rb number' || colNameLower === 'rb no' || colNameLower === 'rb' ||
+      colNameLower === 'register number' || colNameLower === 'roll no' || colNameLower === 'roll number' ||
+      colNameLower === 'reg no' || colNameLower === 'admission no' || colNameLower === 'student id' || colNameLower === 'id'
+    )) {
+      rbVal = val;
+    }
+    if (!nameVal && (
+      colNameLower === 'student name' || colNameLower === 'name' || colNameLower === 'student' ||
+      colNameLower === 'candidate name' || colNameLower === 'full name'
+    )) {
+      nameVal = val;
+    }
+  }
+
+  if (rbVal && nameVal) return `[RB: ${rbVal} | Student: ${nameVal}]`;
+  if (rbVal) return `[RB: ${rbVal}]`;
+  if (nameVal) return `[Student: ${nameVal}]`;
+  return '';
+}
+
 export async function addEntry(registerId: number, cells: Record<string, string> = {}, pageIndex: number = 0): Promise<Entry> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
@@ -1813,7 +1886,8 @@ export async function addEntry(registerId: number, cells: Record<string, string>
       const c = reg.columns.find(col => col.id.toString() === id);
       return `${c?.name || id}: ${val}`;
     }).join(', ');
-    logAction(reg.businessId, 'Add Row', `Added new row to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
+    const identityTag = getStudentIdentityInfo(reg.columns, cells);
+    logAction(reg.businessId, 'Add Row', `Added new row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
 
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
@@ -1881,7 +1955,8 @@ export async function insertEntry(registerId: number, cells: Record<string, stri
       const c = reg.columns.find(col => col.id.toString() === id);
       return `${c?.name || id}: ${val}`;
     }).join(', ');
-    await logAction(reg.businessId, 'Insert Row', `Inserted row at position ${atIndex + 1} in "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id });
+    const identityTag = getStudentIdentityInfo(reg.columns, cells);
+    await logAction(reg.businessId, 'Insert Row', `Inserted row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} at position ${atIndex + 1} in "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id });
 
     const insertTargetRegIds = new Set<number>();
     for (const col of reg.columns) {
@@ -1939,9 +2014,10 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
       return `${colName} changed from "${oldVal}" to "${newVal}"`;
     }).join(', ');
 
+  const identityTag = getStudentIdentityInfo(reg.columns, entry.cells);
   const details = changes
-    ? `Updated row #${entry.rowNumber} in "${reg.name}": ${changes}`
-    : `Updated row #${entry.rowNumber} in "${reg.name}"`;
+    ? `Updated row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} in "${reg.name}": ${changes}`
+    : `Updated row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} in "${reg.name}"`;
   await logAction(reg.businessId, 'Edit Row', details, { registerId, registerName: reg.name, entryId });
 
   for (const [colIdStr, value] of Object.entries(cells)) {
@@ -2378,7 +2454,8 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
     await saveRegDocImmediate(reg);
-    await logAction(reg.businessId, 'Delete Row', `Deleted row #${entry.rowNumber} from "${reg.name}"`, { registerId, registerName: reg.name, entryId });
+    const identityTag = getStudentIdentityInfo(reg.columns, entry.cells);
+    await logAction(reg.businessId, 'Delete Row', `Deleted row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} from "${reg.name}"`, { registerId, registerName: reg.name, entryId });
   });
 }
 

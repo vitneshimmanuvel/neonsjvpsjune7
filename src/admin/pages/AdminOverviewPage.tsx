@@ -166,6 +166,124 @@ const renderActivityDetails = (details: string) => {
   );
 };
 
+function getUserOnlineStatus(user: ServerUser, activities: any[], currentUserId?: string) {
+  if (user.status === 'inactive') {
+    return {
+      status: 'disabled',
+      label: 'Inactive',
+      badgeBg: 'rgba(239, 68, 68, 0.08)',
+      badgeColor: '#ef4444',
+      borderColor: 'rgba(239, 68, 68, 0.2)',
+      dotColor: '#ef4444',
+      pulse: false,
+      subtext: 'Account inactive'
+    };
+  }
+
+  let latestTs: number | null = null;
+  if ((user as any).lastLogin) {
+    const t = new Date((user as any).lastLogin).getTime();
+    if (!isNaN(t)) latestTs = t;
+  }
+
+  const userLogs = activities.filter(a =>
+    (a.userId && String(a.userId) === String(user.id)) ||
+    (a.user_id && String(a.user_id) === String(user.id)) ||
+    (a.userName && user.name && a.userName.toLowerCase() === user.name.toLowerCase()) ||
+    (a.user_name && user.name && a.user_name.toLowerCase() === user.name.toLowerCase()) ||
+    (a.details && user.email && a.details.toLowerCase().includes(user.email.toLowerCase()))
+  );
+
+  for (const log of userLogs) {
+    const tsStr = log.timestamp || log.created_at || log.createdAt;
+    if (tsStr) {
+      const t = new Date(tsStr).getTime();
+      if (!isNaN(t) && (latestTs === null || t > latestTs)) {
+        latestTs = t;
+      }
+    }
+  }
+
+  const isSelf = currentUserId && String(user.id) === String(currentUserId);
+  if (isSelf) {
+    return {
+      status: 'online',
+      label: 'Online',
+      badgeBg: 'rgba(16, 185, 129, 0.12)',
+      badgeColor: '#059669',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      dotColor: '#10b981',
+      pulse: true,
+      subtext: 'Active now'
+    };
+  }
+
+  if (!latestTs) {
+    return {
+      status: 'offline',
+      label: 'Offline',
+      badgeBg: 'rgba(148, 163, 184, 0.1)',
+      badgeColor: '#64748b',
+      borderColor: 'rgba(148, 163, 184, 0.2)',
+      dotColor: '#94a3b8',
+      pulse: false,
+      subtext: 'No recent activity'
+    };
+  }
+
+  const now = Date.now();
+  const diffMs = Math.max(0, now - latestTs);
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 15) {
+    return {
+      status: 'online',
+      label: 'Online',
+      badgeBg: 'rgba(16, 185, 129, 0.12)',
+      badgeColor: '#059669',
+      borderColor: 'rgba(16, 185, 129, 0.3)',
+      dotColor: '#10b981',
+      pulse: true,
+      subtext: diffMins === 0 ? 'Active just now' : `${diffMins}m ago`
+    };
+  } else if (diffMins < 60) {
+    return {
+      status: 'away',
+      label: 'Away',
+      badgeBg: 'rgba(245, 158, 11, 0.12)',
+      badgeColor: '#d97706',
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+      dotColor: '#f59e0b',
+      pulse: false,
+      subtext: `${diffMins}m ago`
+    };
+  } else if (diffHours < 24) {
+    return {
+      status: 'recent',
+      label: 'Recent',
+      badgeBg: 'rgba(59, 130, 246, 0.1)',
+      badgeColor: '#2563eb',
+      borderColor: 'rgba(59, 130, 246, 0.25)',
+      dotColor: '#3b82f6',
+      pulse: false,
+      subtext: `${diffHours}h ago`
+    };
+  } else {
+    return {
+      status: 'offline',
+      label: 'Offline',
+      badgeBg: 'rgba(148, 163, 184, 0.1)',
+      badgeColor: '#64748b',
+      borderColor: 'rgba(148, 163, 184, 0.2)',
+      dotColor: '#94a3b8',
+      pulse: false,
+      subtext: `${diffDays}d ago`
+    };
+  }
+}
+
 export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (tab: any) => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -180,6 +298,10 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     recycleBinCount: 0
   });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [allActivities, setAllActivities] = useState<any[]>([]);
+  const [usersList, setUsersList] = useState<ServerUser[]>([]);
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'online' | 'active' | 'inactive'>('all');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [adminNote, setAdminNote] = useState('');
@@ -274,6 +396,40 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     return list;
   }, [shortcuts, countShortcutSearch, shortcutsOrder]);
 
+  const onlineUserCount = useMemo(() => {
+    return usersList.filter(u => getUserOnlineStatus(u, allActivities, user?.id).status === 'online').length;
+  }, [usersList, allActivities, user?.id]);
+
+  const activeAccountCount = useMemo(() => {
+    return usersList.filter(u => u.status === 'active' && u.role !== 'superadmin').length;
+  }, [usersList]);
+
+  const inactiveAccountCount = useMemo(() => {
+    return usersList.filter(u => u.status === 'inactive' && u.role !== 'superadmin').length;
+  }, [usersList]);
+
+  const filteredUsersForStatus = useMemo(() => {
+    return usersList.filter(u => {
+      if (u.role === 'superadmin') return false;
+      const st = getUserOnlineStatus(u, allActivities, user?.id);
+      if (userSearchTerm.trim()) {
+        const q = userSearchTerm.toLowerCase();
+        const match = (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q) || (u.role || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (userStatusFilter === 'online') {
+        return st.status === 'online';
+      }
+      if (userStatusFilter === 'active') {
+        return u.status === 'active';
+      }
+      if (userStatusFilter === 'inactive') {
+        return u.status === 'inactive';
+      }
+      return true;
+    });
+  }, [usersList, allActivities, user?.id, userStatusFilter, userSearchTerm]);
+
   const handleDragStartCount = (e: React.DragEvent, index: number) => {
     setDraggedShortcutIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -362,17 +518,19 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
     try {
       // 1. Fetch Users
       const usersData = await firebaseGetUsers();
-      const usersList: ServerUser[] = usersData.users || [];
-      const nonSuperAdminUsers = usersList.filter(u => u.role !== 'superadmin');
+      const usersListFetched: ServerUser[] = usersData.users || [];
+      setUsersList(usersListFetched);
+      const nonSuperAdminUsers = usersListFetched.filter(u => u.role !== 'superadmin');
       const activeCount = nonSuperAdminUsers.filter(u => u.status === 'active').length;
 
       // 2. Fetch Pending Requests
       const requestsData = await firebaseGetPendingDownloadRequests();
       const pendingList: PendingRequest[] = requestsData.requests || [];
 
-      // 3. Fetch Recent Activities (fetch more to cover deduplicated results)
-      const activitiesData = await firebaseGetActivity(25);
+      // 3. Fetch Recent Activities (fetch 50 to cover status calculations)
+      const activitiesData = await firebaseGetActivity(50);
       const activitiesList = cleanActivityLogs(activitiesData.activities || []);
+      setAllActivities(activitiesList);
 
       // 4. Fetch Registers Count & Recycle Bin count
       // 4. Fetch Registers Count & Recycle Bin count
@@ -1534,8 +1692,9 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
           </div>
           <div>
             <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--foreground)' }}>{stats.totalUsers}</div>
-            <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <UserCheck size={12} /> {stats.activeUsers} Active Accounts
+            <div style={{ fontSize: '11.5px', color: 'var(--brand-green)', fontWeight: 600, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="admin-glow-pulse" style={{ width: '6px', height: '6px', background: '#10b981', borderRadius: '50%' }} />
+              {onlineUserCount} Online • {stats.activeUsers} Active
             </div>
           </div>
         </div>
@@ -2036,6 +2195,163 @@ export default function AdminOverviewPage({ onNavigateTab }: { onNavigateTab: (t
       {/* Main Grid & Quick Actions */}
       {!showRegistersPanel && (
         <>
+          {/* ── User Active Status Center Panel ── */}
+          <div className="admin-card-glass" style={{ padding: '20px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={18} color="var(--accent)" /> User Active Status Center
+                </h3>
+                {onlineUserCount > 0 && (
+                  <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(16, 185, 129, 0.12)', color: '#059669', padding: '2px 8px', borderRadius: '99px', border: '1px solid rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span className="admin-glow-pulse" style={{ width: '6px', height: '6px', background: '#10b981', borderRadius: '50%' }} />
+                    {onlineUserCount} Online Now
+                  </span>
+                )}
+              </div>
+              
+              <button
+                onClick={() => onNavigateTab('users')}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 700, cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                Manage Users & Roles <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {/* Filter Pills & Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                {(['all', 'online', 'active', 'inactive'] as const).map(tab => {
+                  const isActive = userStatusFilter === tab;
+                  let count = usersList.filter(u => u.role !== 'superadmin').length;
+                  if (tab === 'online') count = onlineUserCount;
+                  else if (tab === 'active') count = activeAccountCount;
+                  else if (tab === 'inactive') count = inactiveAccountCount;
+
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setUserStatusFilter(tab)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: isActive ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: isActive ? 'rgba(26, 115, 232, 0.08)' : 'var(--background)',
+                        color: isActive ? 'var(--accent)' : 'var(--muted)',
+                        textTransform: 'capitalize',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {tab === 'all' ? `All (${count})` : tab === 'online' ? `Online (${count})` : tab === 'active' ? `Active (${count})` : `Inactive (${count})`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ position: 'relative' }}>
+                <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Filter users..."
+                  value={userSearchTerm}
+                  onChange={e => setUserSearchTerm(e.target.value)}
+                  style={{
+                    padding: '5px 10px 5px 26px', borderRadius: '6px', border: '1.5px solid var(--border)',
+                    background: 'var(--background)', color: 'var(--foreground)', fontSize: '11.5px',
+                    outline: 'none', width: '140px', transition: 'all 0.15s'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* User Active Status Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '12px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
+              {filteredUsersForStatus.map(u => {
+                const st = getUserOnlineStatus(u, allActivities, user?.id);
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => onNavigateTab('users')}
+                    style={{
+                      background: 'var(--background)',
+                      border: `1px solid ${st.borderColor}`,
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease-in-out'
+                    }}
+                  >
+                    {/* Avatar with Status Dot */}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {renderUserAvatar(u.name, 36)}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          bottom: '-2px',
+                          right: '-2px',
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: st.dotColor,
+                          border: '2px solid var(--surface)',
+                          boxShadow: st.pulse ? `0 0 0 2px ${st.dotColor}40` : 'none'
+                        }}
+                      />
+                    </div>
+
+                    {/* Details */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 800, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.name}>
+                          {u.name}
+                        </span>
+                        <span style={{ fontSize: '9.5px', fontWeight: 700, padding: '1px 5px', borderRadius: '4px', background: 'var(--border-light)', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                          {u.role}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                        {u.email}
+                      </div>
+                      
+                      {/* Status badge & subtext */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: st.badgeBg,
+                          color: st.badgeColor,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: st.dotColor }} />
+                          {st.label}
+                        </span>
+                        <span style={{ fontSize: '10.5px', color: 'var(--muted)', fontWeight: 500 }}>
+                          {st.subtext}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredUsersForStatus.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '12.5px' }}>
+                  No users match the selected status filter.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Main Grid: Activities & Approvals */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1.8fr 1fr))', gap: '20px' }}>
 

@@ -3,7 +3,7 @@ import { Activity, ArrowLeft, ArrowRight, Calendar, Download, FileText, Link as 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { listBusinesses, listHistory, type HistoryEntry } from '../lib/api';
+import { listBusinesses, listHistory, getRegister, getStudentIdentityInfo, type HistoryEntry, type RegisterDetail } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { cleanActivityLogs } from '../lib/activityHelper';
 
@@ -39,6 +39,49 @@ export default function HistoryPage() {
       const newItems = await listHistory(businessId);
       setHistory(newItems || []);
       setHasMore(false);
+
+      // Asynchronously enrich history logs with live Student Name & RB Number from registers
+      const uniqueRegIds = Array.from(
+        new Set((newItems || []).map((h: any) => h.registerId).filter(Boolean))
+      ) as number[];
+
+      const regMap = new Map<number, RegisterDetail>();
+      await Promise.all(
+        uniqueRegIds.map(async (rid) => {
+          try {
+            const reg = await getRegister(rid, false);
+            if (reg) regMap.set(rid, reg);
+          } catch (e) {
+            console.warn(`Could not load register #${rid} for history enrichment:`, e);
+          }
+        })
+      );
+
+      // Map student name & RB number into each history item
+      const enriched = (newItems || []).map((entry: any) => {
+        if (!entry.registerId || !entry.entryId) return entry;
+        const reg = regMap.get(Number(entry.registerId));
+        if (!reg) return entry;
+
+        let targetEntry = reg.entries?.find((e: any) => String(e.id) === String(entry.entryId));
+        if (!targetEntry && reg.deletedItems) {
+          const delItem = reg.deletedItems.find((d: any) => d.type === 'row' && d.entry && String(d.entry.id) === String(entry.entryId));
+          if (delItem) targetEntry = delItem.entry;
+        }
+
+        if (targetEntry && targetEntry.cells) {
+          const studentInfo = getStudentIdentityInfo(reg.columns, targetEntry.cells);
+          if (studentInfo) {
+            return {
+              ...entry,
+              studentInfo
+            };
+          }
+        }
+        return entry;
+      });
+
+      setHistory(enriched);
     } catch (err: any) {
       console.error("Fetch history failed:", err);
       setIsError(true);
@@ -96,17 +139,22 @@ export default function HistoryPage() {
     setIsExporting(true);
     try {
       const XLSX = await import('xlsx');
-      const rows = filteredHistory.map((entry, idx) => ({
-        'S.No.': idx + 1,
-        'User Name': entry.userName || 'System / Unknown',
-        'User Email': entry.userEmail || '—',
-        'Register Name': entry.registerName || 'System',
-        'Action': entry.action || '—',
-        'Details & Content': entry.details || '—',
-        'Date': new Date(entry.timestamp).toLocaleDateString('en-IN'),
-        'Time': new Date(entry.timestamp).toLocaleTimeString('en-IN'),
-        'Timestamp ISO': entry.timestamp
-      }));
+      const rows = filteredHistory.map((entry, idx) => {
+        const idInfo = extractStudentIdentityFromDetails(entry.details);
+        return {
+          'S.No.': idx + 1,
+          'User Name': entry.userName || 'System / Unknown',
+          'User Email': entry.userEmail || '—',
+          'Register Name': entry.registerName || 'System',
+          'RB Number': idInfo.rb || '—',
+          'Student Name': idInfo.name || '—',
+          'Action': entry.action || '—',
+          'Details & Content': entry.details || '—',
+          'Date': new Date(entry.timestamp).toLocaleDateString('en-IN'),
+          'Time': new Date(entry.timestamp).toLocaleTimeString('en-IN'),
+          'Timestamp ISO': entry.timestamp
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(rows);
       ws['!cols'] = [
@@ -114,6 +162,8 @@ export default function HistoryPage() {
         { wch: 22 }, // User Name
         { wch: 26 }, // User Email
         { wch: 24 }, // Register Name
+        { wch: 16 }, // RB Number
+        { wch: 22 }, // Student Name
         { wch: 18 }, // Action
         { wch: 55 }, // Details
         { wch: 14 }, // Date
@@ -560,11 +610,60 @@ interface HistoryCardProps {
   navigate: ReturnType<typeof useNavigate>;
 }
 
+function extractStudentIdentityFromDetails(details: string, changes: Array<{ column: string; from: string; to: string }> = [], studentInfo?: string) {
+  const combinedText = [studentInfo, details].filter(Boolean).join(' ');
+  if (!combinedText && (!changes || changes.length === 0)) return { rb: null, name: null };
+  let rb: string | null = null;
+  let name: string | null = null;
+
+  // 1. Structured tag check [RB: X | Student: Y]
+  const tagMatch = combinedText.match(/\[(?:RB:\s*([^\|\]]+))?(?:\s*\|\s*)?(?:Student:\s*([^\]]+))?\]/i);
+  if (tagMatch) {
+    if (tagMatch[1]) rb = tagMatch[1].trim();
+    if (tagMatch[2]) name = tagMatch[2].trim();
+  }
+
+  // 2. Details regex check for RB
+  if (!rb && combinedText) {
+    const rbMatch = combinedText.match(/(?:rb\s*number|rb\s*no|rb|roll\s*no|register\s*no)\s*(?:changed\s+from\s+".*?"\s+to\s+"|is\s+|=|\:)\s*"?(.*?)"?(?:\s*,|\s*$|\]|\:)/i);
+    if (rbMatch && rbMatch[1] && rbMatch[1] !== 'empty') {
+      rb = rbMatch[1].trim();
+    }
+  }
+
+  // 3. Details regex check for Name
+  if (!name && combinedText) {
+    const nameMatch = combinedText.match(/(?:student\s*name|candidate\s*name|student|name)\s*(?:changed\s+from\s+".*?"\s+to\s+"|is\s+|=|\:)\s*"?(.*?)"?(?:\s*,|\s*$|\]|\:)/i);
+    if (nameMatch && nameMatch[1] && nameMatch[1] !== 'empty') {
+      name = nameMatch[1].trim();
+    }
+  }
+
+  // 4. Fallback to inspecting changes list
+  if (changes && Array.isArray(changes)) {
+    for (const change of changes) {
+      const colLower = (change.column || '').toLowerCase().trim();
+      const val = (change.to || change.from || '').trim();
+      if (!val || val === 'empty') continue;
+
+      if (!rb && (colLower === 'rb number' || colLower === 'rb no' || colLower === 'rb' || colLower === 'roll no' || colLower === 'register no' || colLower === 'reg no')) {
+        rb = val;
+      }
+      if (!name && (colLower === 'student name' || colLower === 'name' || colLower === 'student' || colLower === 'candidate name' || colLower === 'full name')) {
+        name = val;
+      }
+    }
+  }
+
+  return { rb, name };
+}
+
 function HistoryCard({ entry, navigate }: HistoryCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { icon, color, bg } = getActionStyle(entry.action);
 
   const parsed = React.useMemo(() => parseDetails(entry.details, entry.action), [entry.details, entry.action]);
+  const identity = React.useMemo(() => extractStudentIdentityFromDetails(entry.details, parsed.changes, (entry as any).studentInfo), [entry.details, parsed.changes, (entry as any).studentInfo]);
 
   return (
     <div className={`history-card${entry.registerId ? ' history-card-clickable' : ''}`}
@@ -585,9 +684,11 @@ function HistoryCard({ entry, navigate }: HistoryCardProps) {
       </div>
       <div className="history-card-main">
         <div className="history-card-header">
-          <span className="action-badge" style={{ background: bg, color }}>
-            {entry.action}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span className="action-badge" style={{ background: bg, color }}>
+              {entry.action}
+            </span>
+          </div>
           <span className="timestamp">
             <Calendar size={12} />
             {new Intl.DateTimeFormat('en-IN', {
@@ -600,6 +701,31 @@ function HistoryCard({ entry, navigate }: HistoryCardProps) {
             }).format(new Date(entry.timestamp))}
           </span>
         </div>
+
+        {/* ── Prominent Student Identity Banner ── */}
+        {(identity.name || identity.rb) && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.12) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.25)',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            margin: '8px 0 10px 0',
+            fontSize: '13px',
+            fontWeight: 700,
+            color: '#3730a3'
+          }}>
+            <User size={14} color="#4f46e5" />
+            <span>Student: <strong style={{ color: '#1e1b4b' }}>{identity.name || 'N/A'}</strong></span>
+            {identity.rb && (
+              <span style={{ fontSize: '11px', background: '#4f46e5', color: '#ffffff', padding: '2px 8px', borderRadius: '99px', marginLeft: 'auto' }}>
+                RB No: {identity.rb}
+              </span>
+            )}
+          </div>
+        )}
         
         {parsed.isEditRow && parsed.changes.length > 0 ? (
           <div className="history-changes-container">

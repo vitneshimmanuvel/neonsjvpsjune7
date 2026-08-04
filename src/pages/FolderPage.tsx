@@ -78,12 +78,41 @@ export default function FolderPage() {
     return folders.find(f => f.id === folderId);
   }, [folders, folderId]);
 
-  // Filter registers in current folder
+  // Filter registers in current folder (with access control for non-admin staff)
   const folderRegisters = useMemo(() => {
     const customRegOrder: number[] = (() => {
       try { return JSON.parse(localStorage.getItem('admin_register_order') || '[]'); } catch { return []; }
     })();
-    const regs = allRegisters.filter(r => r.folderId === folderId);
+    const regs = allRegisters.filter(r => {
+      // Must be in this folder
+      if (r.folderId !== folderId) return false;
+
+      // Admins, superadmins, sheet_admins, fullSheetAccess, isAdmin → see all
+      if (user && (
+        (user as any).permissions?.fullSheetAccess ||
+        (user as any).permissions?.isAdmin ||
+        (user as any).role === 'superadmin' ||
+        (user as any).role === 'admin' ||
+        (user as any).role === 'sheet_admin'
+      )) {
+        return true;
+      }
+
+      // Non-admin staff: only show registers they have explicit access to
+      if (user) {
+        const allowedRegs = (user as any).permissions?.allowedRegisters;
+        const allowedFolders = (user as any).permissions?.allowedFolders;
+
+        const hasExplicitRegAccess = Array.isArray(allowedRegs) && allowedRegs.map(String).includes(r.id.toString());
+
+        const folderIdStr = r.folderId ? r.folderId.toString() : '';
+        const hasFolderAccess = folderIdStr && Array.isArray(allowedFolders) && allowedFolders.map(String).includes(folderIdStr);
+
+        return !!(hasExplicitRegAccess || hasFolderAccess);
+      }
+
+      return true;
+    });
     if (customRegOrder.length === 0) return regs;
     const orderMap = new Map(customRegOrder.map((id, index) => [id, index]));
     return [...regs].sort((a, b) => {
@@ -91,7 +120,7 @@ export default function FolderPage() {
       const posB = orderMap.has(b.id) ? orderMap.get(b.id)! : 9999;
       return posA - posB;
     });
-  }, [allRegisters, folderId]);
+  }, [allRegisters, folderId, user]);
 
   // Apply search filter
   const displayedRegisters = useMemo(() => {
@@ -239,9 +268,9 @@ export default function FolderPage() {
     return (
       <div className="content-area">
         <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <FolderIcon size={48} color="#94a3b8" style={{ marginBottom: 16 }} />
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Folder Not Found</h2>
-          <p style={{ color: '#64748b', margin: '8px 0 20px' }}>The requested folder does not exist or may have been deleted.</p>
+          <FolderIcon size={48} color="var(--muted)" style={{ marginBottom: 16 }} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--foreground)' }}>Folder Not Found</h2>
+          <p style={{ color: 'var(--muted)', margin: '8px 0 20px' }}>The requested folder does not exist or may have been deleted.</p>
           <button
             onClick={() => navigate('/')}
             style={{
@@ -271,11 +300,11 @@ export default function FolderPage() {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
+            background: 'var(--background)',
+            border: '1px solid var(--border)',
             borderRadius: '10px',
             padding: '7px 14px',
-            color: '#0f172a',
+            color: 'var(--foreground)',
             fontSize: '13px',
             fontWeight: 600,
             cursor: 'pointer',
@@ -284,12 +313,12 @@ export default function FolderPage() {
             transition: 'all 0.2s ease'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#94a3b8';
+            e.currentTarget.style.borderColor = 'var(--muted)';
             e.currentTarget.style.boxShadow = '0 3px 8px rgba(0,0,0,0.08)';
             e.currentTarget.style.transform = 'translateX(-2px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = '#cbd5e1';
+            e.currentTarget.style.borderColor = 'var(--border)';
             e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
             e.currentTarget.style.transform = 'translateX(0)';
           }}
@@ -298,7 +327,7 @@ export default function FolderPage() {
             width: '24px',
             height: '24px',
             borderRadius: '50%',
-            background: '#f1f5f9',
+            background: 'var(--surface)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -326,19 +355,19 @@ export default function FolderPage() {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.5px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--foreground)', margin: 0, letterSpacing: '-0.5px' }}>
                   {currentFolder?.name || 'Folder'}
                 </h1>
                 <button
                   onClick={() => setShowFolderMenu(!showFolderMenu)}
                   title="Folder Actions"
                   style={{
-                    background: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     padding: '6px',
                     cursor: 'pointer',
-                    color: '#64748b',
+                    color: 'var(--muted)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -360,7 +389,7 @@ export default function FolderPage() {
                         top: '100%',
                         left: '0',
                         marginTop: '8px',
-                        background: 'white',
+                        background: 'var(--background)',
                         border: '1px solid var(--border)',
                         borderRadius: '8px',
                         boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
@@ -398,7 +427,7 @@ export default function FolderPage() {
                   </>
                 )}
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--muted)' }}>
                 {folderRegisters.length} register{folderRegisters.length !== 1 ? 's' : ''} in this folder
               </p>
             </div>
@@ -431,10 +460,10 @@ export default function FolderPage() {
 
       {/* ── Search & Bulk Actions Bar ── */}
       <div style={{
-        background: 'white',
+        background: 'var(--background)',
         borderRadius: '16px',
         padding: '16px 20px',
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--border)',
         marginBottom: '24px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
         display: 'flex',
@@ -454,9 +483,9 @@ export default function FolderPage() {
               gap: '8px',
               padding: '8px 14px',
               borderRadius: '8px',
-              border: `1.5px solid ${isAllSelected ? 'var(--primary)' : '#cbd5e1'}`,
-              background: isAllSelected ? 'rgba(30, 45, 120, 0.06)' : 'white',
-              color: isAllSelected ? 'var(--primary)' : '#475569',
+              border: `1.5px solid ${isAllSelected ? 'var(--primary)' : 'var(--border)'}`,
+              background: isAllSelected ? 'rgba(30, 45, 120, 0.06)' : 'var(--background)',
+              color: isAllSelected ? 'var(--primary)' : 'var(--muted)',
               fontSize: '13px',
               fontWeight: 600,
               cursor: displayedRegisters.length === 0 ? 'not-allowed' : 'pointer',
@@ -464,13 +493,13 @@ export default function FolderPage() {
               transition: 'all 0.15s ease'
             }}
           >
-            {isAllSelected ? <CheckSquare size={16} color="var(--primary)" /> : <Square size={16} color="#94a3b8" />}
+            {isAllSelected ? <CheckSquare size={16} color="var(--primary)" /> : <Square size={16} color="var(--muted)" />}
             <span>{isAllSelected ? 'Deselect All' : 'Select All'}</span>
           </button>
 
           {/* Search box */}
           <div style={{ position: 'relative', flex: 1, maxWidth: '320px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
             <input
               type="text"
               value={searchTerm}
@@ -480,9 +509,9 @@ export default function FolderPage() {
                 width: '100%',
                 padding: '8px 36px',
                 borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                border: '1px solid var(--border)',
                 fontSize: '13px',
-                color: '#0f172a',
+                color: 'var(--foreground)',
                 outline: 'none',
                 transition: 'all 0.15s'
               }}
@@ -496,10 +525,10 @@ export default function FolderPage() {
                   top: '50%',
                   transform: 'translateY(-50%)',
                   border: 'none',
-                  background: '#e2e8f0',
+                  background: 'var(--border)',
                   borderRadius: '50%',
                   cursor: 'pointer',
-                  color: '#64748b',
+                  color: 'var(--muted)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -537,9 +566,9 @@ export default function FolderPage() {
                 alignItems: 'center',
                 gap: '6px',
                 padding: '7px 14px',
-                background: 'white',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -577,7 +606,7 @@ export default function FolderPage() {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#64748b',
+                color: 'var(--muted)',
                 fontSize: '12px',
                 cursor: 'pointer',
                 padding: '4px 6px',
@@ -595,14 +624,14 @@ export default function FolderPage() {
         <div style={{
           textAlign: 'center',
           padding: '60px 20px',
-          background: 'white',
+          background: 'var(--background)',
           borderRadius: '16px',
-          border: '1px solid #e2e8f0',
+          border: '1px solid var(--border)',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
         }}>
           {searchTerm ? (
             <>
-              <p style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: '0 0 8px' }}>
+              <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--foreground)', margin: '0 0 8px' }}>
                 No registers match "{searchTerm}"
               </p>
               <button
@@ -624,10 +653,10 @@ export default function FolderPage() {
           ) : (
             <>
               <FolderOpen size={48} color="#cbd5e1" style={{ marginBottom: '12px' }} />
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--foreground)', margin: '0 0 6px' }}>
                 This folder is empty
               </h3>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '0 0 20px' }}>
                 Start by creating a new register or move existing registers into this folder.
               </p>
               <button
@@ -662,8 +691,8 @@ export default function FolderPage() {
                 onMouseLeave={() => setHoveredRegId(null)}
                 style={{
                   position: 'relative',
-                  border: isSelected ? '2px solid var(--primary)' : '1px solid #e2e8f0',
-                  backgroundColor: isSelected ? 'rgba(30, 45, 120, 0.03)' : 'white',
+                  border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  backgroundColor: isSelected ? 'rgba(30, 45, 120, 0.03)' : 'var(--background)',
                   transition: 'all 0.2s ease',
                   cursor: 'pointer'
                 }}
@@ -690,8 +719,8 @@ export default function FolderPage() {
                     width: '18px',
                     height: '18px',
                     borderRadius: '4px',
-                    border: `2px solid ${isSelected ? 'var(--primary)' : '#cbd5e1'}`,
-                    backgroundColor: isSelected ? 'var(--primary)' : 'white',
+                    border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                    backgroundColor: isSelected ? 'var(--primary)' : 'var(--background)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -714,7 +743,7 @@ export default function FolderPage() {
                     background: 'transparent',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#94a3b8',
+                    color: 'var(--muted)',
                     padding: '4px',
                     borderRadius: '4px',
                     zIndex: 2
@@ -816,7 +845,7 @@ export default function FolderPage() {
                 }}
               >
                 <Layers size={18} color="#64748b" />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>Unassigned (Root)</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)' }}>Unassigned (Root)</span>
               </div>
 
               {/* Folder list */}
@@ -837,7 +866,7 @@ export default function FolderPage() {
                   }}
                 >
                   <FolderIcon size={18} fill="#fbbf24" color="#d97706" />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', flex: 1 }}>{f.name}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--foreground)', flex: 1 }}>{f.name}</span>
                   {f.id === folderId && (
                     <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>(Current)</span>
                   )}

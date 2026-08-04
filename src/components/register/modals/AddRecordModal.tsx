@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, AlertTriangle, CloudUpload, X, Loader2, Link as LinkIcon, Lock as LockIcon, PenTool } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatDateToDDMMYYYY } from '../../../lib/api';
+import { formatDateToDDMMYYYY, validatePhoneNumber } from '../../../lib/api';
 import { ImageCompressionModule } from '../../../lib/imageCompressionModule';
 import { SignatureModal } from './SignatureModal';
 
@@ -170,6 +170,15 @@ export function AddRecordModal({
         toast.error(`Cannot save. ${col.name} must be unique, and "${val}" already exists.`);
         setSubmitType(null);
         return;
+      }
+
+      if (col.type === 'phone' && val && val.trim() !== '') {
+        const phoneVal = validatePhoneNumber(val);
+        if (!phoneVal.isValid) {
+          toast.error(`${col.name}: ${phoneVal.error}`);
+          setSubmitType(null);
+          return;
+        }
       }
 
       if (col.type === 'date' && val && val.trim() !== '') {

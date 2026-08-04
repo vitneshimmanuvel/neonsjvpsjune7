@@ -3,7 +3,7 @@ import {
   Clock, FileText, Download, X, Plus, AlertCircle, 
   Image as ImageIcon, FlaskConical, ChevronDown, Maximize2, 
   ListOrdered, Globe, Phone, Mail,
-  Link as LinkIcon, Lock as LockIcon, PenTool
+  Link as LinkIcon, Lock as LockIcon, PenTool, Paperclip, ZoomIn, ZoomOut, Eraser
 } from 'lucide-react';
 import { type Entry, listRowHistory, updateEntry } from '../../../lib/api';
 import { ImageCompressionModule } from '../../../lib/imageCompressionModule';
@@ -121,6 +121,8 @@ export const RowDetailModal = React.memo(function RowDetailModal({
 }: RowDetailModalProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [activeSignatureCol, setActiveSignatureCol] = useState<{ id: string; name: string; value: string } | null>(null);
+  const [showAttachmentsGallery, setShowAttachmentsGallery] = useState(false);
+  const [galleryZoomIdx, setGalleryZoomIdx] = useState<number | null>(null);
 
   const isRowEditable = !_canEditAny ? false : (!_rowEditRange ? true : (() => {
     const num = detailViewEntry.rowNumber;
@@ -192,6 +194,14 @@ export const RowDetailModal = React.memo(function RowDetailModal({
               }}
             >
               <Clock size={15} />
+            </button>
+            <button
+              className="row-audit-trail-btn"
+              title="View all attachments (images & signatures)"
+              style={{ color: showAttachmentsGallery ? 'var(--primary)' : undefined }}
+              onClick={() => setShowAttachmentsGallery(!showAttachmentsGallery)}
+            >
+              <Paperclip size={15} />
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -614,6 +624,29 @@ export const RowDetailModal = React.memo(function RowDetailModal({
         <div className="row-detail-footer">
           <button className="row-detail-btn-close" onClick={() => { setDetailViewEntry(null); setDetailEdits({}); setDetailErrors({}); setShowRowAuditTrail(false); setRowAuditHistory([]); }}>{isRowEditable ? 'Cancel' : 'Close'}</button>
           {isRowEditable && (
+            <button
+              className="row-detail-btn-close"
+              style={{ color: '#dc2626', borderColor: '#fecaca', background: '#fef2f2', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600 }}
+              title="Clear all field values in this row"
+              onClick={() => {
+                if (!confirm('Are you sure you want to clear all fields in this row? This will empty every editable field. You can still cancel without saving.')) return;
+                const cleared: Record<string, string> = {};
+                modalColumns.forEach(col => {
+                  if (col.type === 'formula' || col.type === 'auto_increment') return;
+                  const isTargetLinked = col.linkedTo && col.linkedTo.role === 'target';
+                  if (isTargetLinked) return;
+                  if (_editableColumnIds && !_editableColumnIds.has(col.id)) return;
+                  cleared[col.id.toString()] = '';
+                });
+                setDetailEdits(prev => ({ ...prev, ...cleared }));
+                setDetailErrors({});
+                toast.success('All fields cleared. Click "Save Changes" to persist or "Cancel" to undo.');
+              }}
+            >
+              <Eraser size={14} /> Clear All
+            </button>
+          )}
+          {isRowEditable && (
             <button 
               className="row-detail-btn-save" 
               disabled={isSaving}
@@ -778,9 +811,189 @@ export const RowDetailModal = React.memo(function RowDetailModal({
           </div>
         </div>
       )}
+
+      {/* ── Attachments Gallery Panel ── */}
+      {showAttachmentsGallery && (() => {
+        const attachmentCols = modalColumns.filter(c => c.type === 'image' || c.type === 'signature');
+        const attachments = attachmentCols.map(col => {
+          const colKey = col.id.toString();
+          const val = detailEdits[colKey] ?? '';
+          const urls = val ? (col.type === 'image' ? val.split('|||').filter(Boolean) : [val]) : [];
+          return { col, urls };
+        }).filter(a => a.urls.length > 0);
+
+        // Flat list for gallery zoom navigation
+        const flatItems: { url: string; colName: string; colType: string }[] = [];
+        attachments.forEach(a => {
+          a.urls.forEach(url => {
+            flatItems.push({ url, colName: a.col.name, colType: a.col.type });
+          });
+        });
+
+        return (
+          <div className="row-history-modal-overlay" onClick={() => { setShowAttachmentsGallery(false); setGalleryZoomIdx(null); }}>
+            <div className="row-history-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
+              <div className="row-history-modal-header">
+                <div className="row-history-modal-title">
+                  <Paperclip size={16} />
+                  <span>Attachments — Row #{localEntries.findIndex(e => e.id === detailViewEntry.id) + 1}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)', marginLeft: '8px', fontWeight: 500 }}>
+                    ({flatItems.length} file{flatItems.length !== 1 ? 's' : ''})
+                  </span>
+                </div>
+                <button className="row-history-modal-close" onClick={() => { setShowAttachmentsGallery(false); setGalleryZoomIdx(null); }}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="row-history-modal-body" style={{ padding: '16px' }}>
+                {attachments.length === 0 ? (
+                  <div className="row-history-empty">
+                    <Paperclip size={36} style={{ opacity: 0.25 }} />
+                    <p>No images or signatures found in this row.</p>
+                  </div>
+                ) : galleryZoomIdx !== null && flatItems[galleryZoomIdx] ? (
+                  /* ── Zoomed Single Image View ── */
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <button
+                        onClick={() => setGalleryZoomIdx(Math.max(0, galleryZoomIdx - 1))}
+                        disabled={galleryZoomIdx === 0}
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', cursor: galleryZoomIdx === 0 ? 'not-allowed' : 'pointer', opacity: galleryZoomIdx === 0 ? 0.4 : 1, fontSize: '12px', fontWeight: 600, color: 'var(--foreground)' }}
+                      >← Prev</button>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--foreground)' }}>{flatItems[galleryZoomIdx].colName}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase' }}>{flatItems[galleryZoomIdx].colType} • {galleryZoomIdx + 1} / {flatItems.length}</div>
+                      </div>
+                      <button
+                        onClick={() => setGalleryZoomIdx(Math.min(flatItems.length - 1, galleryZoomIdx + 1))}
+                        disabled={galleryZoomIdx === flatItems.length - 1}
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', cursor: galleryZoomIdx === flatItems.length - 1 ? 'not-allowed' : 'pointer', opacity: galleryZoomIdx === flatItems.length - 1 ? 0.4 : 1, fontSize: '12px', fontWeight: 600, color: 'var(--foreground)' }}
+                      >Next →</button>
+                    </div>
+                    <div style={{
+                      width: '100%', maxHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: flatItems[galleryZoomIdx].colType === 'signature' ? '#ffffff' : 'var(--surface)',
+                      borderRadius: '10px', border: '1px solid var(--border)', padding: '16px', overflow: 'hidden'
+                    }}>
+                      <img
+                        src={flatItems[galleryZoomIdx].url}
+                        alt={flatItems[galleryZoomIdx].colName}
+                        style={{ maxWidth: '100%', maxHeight: '360px', objectFit: 'contain', borderRadius: '6px' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleImageDownload(flatItems[galleryZoomIdx!].url)}
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      ><Download size={13} /> Download</button>
+                      <button
+                        onClick={() => setGalleryZoomIdx(null)}
+                        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: '5px' }}
+                      ><ZoomOut size={13} /> Back to Grid</button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Thumbnail Grid View ── */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {attachments.map(({ col, urls }) => (
+                      <div key={col.id}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          {col.type === 'image'
+                            ? <ImageIcon size={14} color="var(--primary)" />
+                            : <PenTool size={14} color="var(--primary)" />}
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--foreground)' }}>{col.name}</span>
+                          <span style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', background: 'var(--surface)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)' }}>{col.type}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--muted)' }}>({urls.length} file{urls.length !== 1 ? 's' : ''})</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
+                          {urls.map((url, i) => {
+                            const globalIdx = flatItems.findIndex(fi => fi.url === url && fi.colName === col.name);
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => setGalleryZoomIdx(globalIdx)}
+                                style={{
+                                  position: 'relative', cursor: 'pointer', borderRadius: '8px', overflow: 'hidden',
+                                  border: '1.5px solid var(--border)', aspectRatio: '1', display: 'flex',
+                                  alignItems: 'center', justifyContent: 'center',
+                                  background: col.type === 'signature' ? '#ffffff' : 'var(--surface)',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <img
+                                  src={url}
+                                  alt={`${col.name} ${i + 1}`}
+                                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: col.type === 'signature' ? 'contain' : 'cover', padding: col.type === 'signature' ? '8px' : '0' }}
+                                />
+                                <div style={{
+                                  position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  opacity: 0, transition: 'opacity 0.15s'
+                                }}
+                                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                                  onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                                >
+                                  <ZoomIn size={20} color="white" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 });
+
+function extractStudentIdentityFromDetails(details: string, changes: Array<{ column: string; from: string; to: string }> = []) {
+  if (!details && (!changes || changes.length === 0)) return { rb: null, name: null };
+  let rb: string | null = null;
+  let name: string | null = null;
+
+  const tagMatch = details?.match(/\[(?:RB:\s*([^\|\]]+))?(?:\s*\|\s*)?(?:Student:\s*([^\]]+))?\]/i);
+  if (tagMatch) {
+    if (tagMatch[1]) rb = tagMatch[1].trim();
+    if (tagMatch[2]) name = tagMatch[2].trim();
+  }
+
+  if (!rb && details) {
+    const rbMatch = details.match(/(?:rb\s*number|rb\s*no|rb|roll\s*no|register\s*no)\s*(?:changed\s+from\s+".*?"\s+to\s+"|is\s+|=|\:)\s*"?(.*?)"?(?:\s*,|\s*$|\]|\:)/i);
+    if (rbMatch && rbMatch[1] && rbMatch[1] !== 'empty') {
+      rb = rbMatch[1].trim();
+    }
+  }
+
+  if (!name && details) {
+    const nameMatch = details.match(/(?:student\s*name|candidate\s*name|student|name)\s*(?:changed\s+from\s+".*?"\s+to\s+"|is\s+|=|\:)\s*"?(.*?)"?(?:\s*,|\s*$|\]|\:)/i);
+    if (nameMatch && nameMatch[1] && nameMatch[1] !== 'empty') {
+      name = nameMatch[1].trim();
+    }
+  }
+
+  if (changes && Array.isArray(changes)) {
+    for (const change of changes) {
+      const colLower = (change.column || '').toLowerCase().trim();
+      const val = (change.to || change.from || '').trim();
+      if (!val || val === 'empty') continue;
+
+      if (!rb && (colLower === 'rb number' || colLower === 'rb no' || colLower === 'rb' || colLower === 'roll no' || colLower === 'register no' || colLower === 'reg no')) {
+        rb = val;
+      }
+      if (!name && (colLower === 'student name' || colLower === 'name' || colLower === 'student' || colLower === 'candidate name' || colLower === 'full name')) {
+        name = val;
+      }
+    }
+  }
+
+  return { rb, name };
+}
 
 function RowHistoryCard({ h, isLatest }: { h: any; isLatest: boolean }) {
   const dt = new Date(h.timestamp);
@@ -835,6 +1048,8 @@ function RowHistoryCard({ h, isLatest }: { h: any; isLatest: boolean }) {
     };
   }, [h.details, h.action]);
 
+  const identity = React.useMemo(() => extractStudentIdentityFromDetails(h.details, parsed.changes), [h.details, parsed.changes]);
+
   const actionColor =
     h.action === 'Edit Row' ? '#3b82f6' :
     h.action === 'Add Row' || h.action === 'Insert Row' ? '#16a34a' :
@@ -852,6 +1067,31 @@ function RowHistoryCard({ h, isLatest }: { h: any; isLatest: boolean }) {
           <span>{dateStr} {timeStr}</span>
         </div>
       </div>
+
+      {/* ── Prominent Student Identity Banner ── */}
+      {(identity.name || identity.rb) && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.12) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          padding: '5px 10px',
+          borderRadius: '6px',
+          margin: '6px 0 8px 0',
+          fontSize: '12px',
+          fontWeight: 700,
+          color: '#3730a3'
+        }}>
+          <User size={13} color="#4f46e5" />
+          <span>Student: <strong style={{ color: '#1e1b4b' }}>{identity.name || 'N/A'}</strong></span>
+          {identity.rb && (
+            <span style={{ fontSize: '10.5px', background: '#4f46e5', color: '#ffffff', padding: '2px 6px', borderRadius: '99px', marginLeft: 'auto' }}>
+              RB No: {identity.rb}
+            </span>
+          )}
+        </div>
+      )}
       
       {parsed.isEditRow && parsed.changes.length > 0 ? (
         <div className="row-history-card-changes">
