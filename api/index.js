@@ -46,12 +46,19 @@ async function sendLoginNotificationEmail(userEmail, userName, role) {
     };
 
     if (smtpUser && smtpPass) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass }
-      });
+      const cleanPass = smtpPass.replace(/\s+/g, '');
+      const transporter = (smtpHost.includes('gmail.com') || !process.env.SMTP_HOST)
+        ? nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: smtpUser, pass: cleanPass }
+          })
+        : nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: { user: smtpUser, pass: cleanPass },
+            tls: { rejectUnauthorized: false }
+          });
       await transporter.sendMail(mailOptions);
       console.log(`[Email Alert Sent] Login notification sent to ${userEmail}`);
     } else {
@@ -1218,19 +1225,26 @@ export default async function handler(req, res) {
           ]
         };
 
-        if (smtpUser && smtpPass) {
-          const transporter = nodemailer.createTransport({
-            host: smtpHost,
-            port: smtpPort,
-            secure: smtpPort === 465,
-            auth: { user: smtpUser, pass: smtpPass }
-          });
-          await transporter.sendMail(mailOptions);
-          return sendJson(res, 200, { message: `Backup email sent successfully to ${targetEmail}`, registerCount, totalEntries });
-        } else {
-          console.log(`[Mail Backup Prepared] Email ready for ${targetEmail} (${filename}, ${zipSizeKB} KB)`);
-          return sendJson(res, 200, { message: `Backup email prepared for ${targetEmail}`, registerCount, totalEntries });
+        if (!smtpUser || !smtpPass) {
+          return sendError(res, 400, 'SMTP_USER or SMTP_PASS is missing in Vercel Environment Variables. Please verify environment variables in Vercel Settings.');
         }
+
+        const cleanPass = smtpPass.replace(/\s+/g, '');
+        const transporter = (smtpHost.includes('gmail.com') || !process.env.SMTP_HOST)
+          ? nodemailer.createTransport({
+              service: 'gmail',
+              auth: { user: smtpUser, pass: cleanPass }
+            })
+          : nodemailer.createTransport({
+              host: smtpHost,
+              port: smtpPort,
+              secure: smtpPort === 465,
+              auth: { user: smtpUser, pass: cleanPass },
+              tls: { rejectUnauthorized: false }
+            });
+
+        await transporter.sendMail(mailOptions);
+        return sendJson(res, 200, { message: `Backup email sent successfully to ${targetEmail}`, registerCount, totalEntries });
       } catch (err) {
         console.error('Mail Backup Error:', err);
         return sendError(res, 500, 'Failed to send mail backup: ' + err.message);
