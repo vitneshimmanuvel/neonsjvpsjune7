@@ -153,80 +153,9 @@ export default function BackupPage() {
   const mailBackupMutation = useMutation({
     mutationFn: async () => {
       const email = targetEmailInput.trim() || 'jackyme1291@gmail.com';
-      const zip = new JSZip();
-      
-      const [folders, registers] = await Promise.all([
-        listFolders(businessId!),
-        listRegisters(businessId!)
-      ]);
-
-      const { evaluateFormula } = await import('../lib/api');
-      const XLSX = await import('xlsx');
-
-      const folderMap = new Map<number, string>();
-      folders.forEach(f => folderMap.set(f.id, f.name));
-
-      const fullRegisters = await Promise.all(
-        registers.map(async (r) => {
-          try {
-            return await getRegister(r.id);
-          } catch (err) {
-            console.error(`Failed to fetch register ${r.id}:`, err);
-            return null;
-          }
-        })
-      );
-
-      for (const reg of fullRegisters) {
-        if (!reg) continue;
-        
-        const cols = (reg.columns || []).sort((a, b) => a.position - b.position);
-        const visibleCols = cols.filter(c => c.type !== 'image');
-        const headerRow = ['S.No.', ...visibleCols.map(c => c.name)];
-        const dataAOA: any[][] = [headerRow];
-
-        (reg.entries || []).forEach((entry, idx) => {
-          const rowData: any[] = [idx + 1];
-          visibleCols.forEach(c => {
-            const val = c.type === 'formula' 
-              ? evaluateFormula(c.formula || '', entry, cols)
-              : (entry.cells?.[c.id.toString()] || '');
-            
-            if (c.type === 'checkbox') {
-              rowData.push(String(val) === 'true' ? 'YES' : '');
-            } else if (c.type === 'number' || c.type === 'currency' || c.type === 'formula') {
-                const cleaned = val.toString().replace(/[^\d.-]/g, '');
-                const n = parseFloat(cleaned);
-                rowData.push(isNaN(n) ? val : n);
-            } else {
-                rowData.push(val);
-            }
-          });
-          dataAOA.push(rowData);
-        });
-
-        const ws = XLSX.utils.aoa_to_sheet(dataAOA);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Records");
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-
-        const folderName = reg.folderId ? folderMap.get(reg.folderId) || 'Unorganized' : 'Unorganized';
-        const safeRegName = reg.name.replace(/[\\/:*?"<>|]/g, '_');
-        zip.file(`${folderName}/${safeRegName}.xlsx`, excelBuffer);
-      }
-
-      const content = await zip.generateAsync({ type: 'base64' });
-      const now = new Date();
-      const timestamp = `${now.getDate().toString().padStart(2, '0')}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}`;
-      const filename = `AG_Trust_Backup_[${timestamp}].zip`;
-
       await sendEmailBackup({
         targetEmail: email,
-        filename,
-        base64Zip: content,
-        label: lastBackup?.label,
-        registerCount: lastBackup?.registerCount,
-        totalEntries: lastBackup?.totalEntries
+        businessId: businessId!
       });
     },
     onSuccess: () => {

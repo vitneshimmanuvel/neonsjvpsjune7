@@ -2960,15 +2960,11 @@ export async function deleteBackup(backupId: string): Promise<void> {
 }
 
 /**
- * Send full ZIP database backup via email attachment to destination address.
+ * Send full ZIP database backup via email — server generates the ZIP from the database.
  */
 export async function sendEmailBackup(data: {
   targetEmail: string;
-  filename: string;
-  base64Zip: string;
-  label?: string;
-  registerCount?: number;
-  totalEntries?: number;
+  businessId: number;
 }): Promise<{ message: string }> {
   const res = await fetch(apiUrl('/api/backups/send-email'), {
     method: 'POST',
