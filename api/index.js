@@ -162,6 +162,21 @@ export default async function handler(req, res) {
   const method = req.method;
 
   try {
+    // Auto-create database indexes if needed (runs once per cold start)
+    if (!globalThis._dbIndexesCreated) {
+      globalThis._dbIndexesCreated = true;
+      (async () => {
+        try {
+          await query('CREATE INDEX IF NOT EXISTS idx_entries_register_row ON entries (register_id, row_number ASC)');
+          await query('CREATE INDEX IF NOT EXISTS idx_registers_business_deleted ON registers (business_id, deleted_at)');
+          await query('CREATE INDEX IF NOT EXISTS idx_folders_business ON folders (business_id)');
+          await query('CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs (user_id, timestamp DESC)');
+        } catch (e) {
+          console.error('[DB] Index initialization warning:', e);
+        }
+      })();
+    }
+
     // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────
 
     // POST /api/auth/login
