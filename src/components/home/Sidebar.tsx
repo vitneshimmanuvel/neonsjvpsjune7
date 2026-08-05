@@ -1,5 +1,5 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip, Users, Zap } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip, Users, Zap, GripVertical } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -203,6 +203,30 @@ export const Sidebar = memo(function Sidebar({
       return posA - posB;
     });
   }, [filtered, orderNonce]);
+
+  // Folder Drag-and-Drop Reordering state
+  const [draggedFolderId, setDraggedFolderId] = useState<number | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<number | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<'top' | 'bottom' | null>(null);
+
+  const handleFolderReorder = useCallback((fromId: number, toId: number, insertAfter: boolean) => {
+    const currentFolderIds = sortedFolders.map(f => f.id);
+    const fromIdx = currentFolderIds.indexOf(fromId);
+    if (fromIdx === -1) return;
+    currentFolderIds.splice(fromIdx, 1);
+    let toIdx = currentFolderIds.indexOf(toId);
+    if (toIdx === -1) return;
+    if (insertAfter) toIdx += 1;
+    currentFolderIds.splice(toIdx, 0, fromId);
+
+    try {
+      localStorage.setItem('admin_folder_order', JSON.stringify(currentFolderIds));
+    } catch (e) {
+      console.error('Failed to save folder order:', e);
+    }
+    setOrderNonce(n => n + 1);
+    toast.success('Folder order updated', { duration: 1500 });
+  }, [sortedFolders]);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
@@ -1120,16 +1144,63 @@ export const Sidebar = memo(function Sidebar({
                   <div key={folder.id} className="sidebar-folder-group">
                     <div
                       className="sidebar-folder-header"
+                      draggable={true}
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        setDraggedFolderId(folder.id);
+                        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'FOLDER', folderId: folder.id }));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => {
+                        setDraggedFolderId(null);
+                        setDragOverFolderId(null);
+                        setDragOverPosition(null);
+                      }}
                       onDragOver={(e) => {
                         e.preventDefault();
-                        e.currentTarget.classList.add('drag-over');
+                        const rawTypes = Array.from(e.dataTransfer.types);
+                        const isFolderDrag = rawTypes.includes('application/json') || draggedFolderId !== null;
+
+                        if (isFolderDrag && (draggedFolderId || rawTypes.includes('application/json'))) {
+                          if (draggedFolderId && draggedFolderId === folder.id) return;
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const isBottom = e.clientY - rect.top > rect.height / 2;
+                          setDragOverFolderId(folder.id);
+                          setDragOverPosition(isBottom ? 'bottom' : 'top');
+                        } else {
+                          e.currentTarget.classList.add('drag-over');
+                        }
                       }}
                       onDragLeave={(e) => {
                         e.currentTarget.classList.remove('drag-over');
+                        if (dragOverFolderId === folder.id) {
+                          setDragOverFolderId(null);
+                          setDragOverPosition(null);
+                        }
                       }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.currentTarget.classList.remove('drag-over');
+
+                        // Check if dropping a folder for position reordering
+                        let folderDragData: any = null;
+                        try {
+                          const raw = e.dataTransfer.getData('application/json');
+                          if (raw) folderDragData = JSON.parse(raw);
+                        } catch {}
+
+                        if ((folderDragData && folderDragData.type === 'FOLDER') || draggedFolderId !== null) {
+                          const fromId = folderDragData?.folderId ? Number(folderDragData.folderId) : draggedFolderId;
+                          if (fromId && fromId !== folder.id) {
+                            handleFolderReorder(fromId, folder.id, dragOverPosition === 'bottom');
+                          }
+                          setDraggedFolderId(null);
+                          setDragOverFolderId(null);
+                          setDragOverPosition(null);
+                          return;
+                        }
+
+                        // Otherwise, dropping a register INTO folder
                         const dragData = e.dataTransfer.getData('text/plain');
                         if (dragData) {
                           try {
@@ -1146,13 +1217,36 @@ export const Sidebar = memo(function Sidebar({
                             }
                           }
                         }
+                        setDraggedFolderId(null);
+                        setDragOverFolderId(null);
+                        setDragOverPosition(null);
                       }}
                       onClick={() => {
                         setExpandedFolders(prev => ({ ...prev, [folder.id]: !prev[folder.id] }));
                         startTransition(() => { navigate(`/folder/${folder.id}`); closeSidebar(); });
                       }}
+                      style={{
+                        position: 'relative',
+                        cursor: 'grab',
+                        transition: 'all 0.15s ease',
+                        borderTop: (dragOverFolderId === folder.id && dragOverPosition === 'top') ? '2px solid #2563eb' : undefined,
+                        borderBottom: (dragOverFolderId === folder.id && dragOverPosition === 'bottom') ? '2px solid #2563eb' : undefined,
+                        background: (dragOverFolderId === folder.id) ? '#eff6ff' : undefined,
+                        opacity: (draggedFolderId === folder.id) ? 0.45 : 1,
+                      }}
                       data-tooltip={isCollapsed ? folder.name : undefined}
                     >
+                      {!isCollapsed && (
+                        <GripVertical
+                          size={13}
+                          style={{
+                            color: '#94a3b8',
+                            flexShrink: 0,
+                            opacity: 0.5,
+                            marginRight: '-2px'
+                          }}
+                        />
+                      )}
                       {isExpanded ? (
                         <FolderOpen size={16} fill="#fbbf24" color="#f59e0b" className="folder-icon" />
                       ) : (
