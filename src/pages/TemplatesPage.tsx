@@ -125,28 +125,162 @@ export default function TemplatesPage() {
   const subTemplates = selectedCategory ? TEMPLATES[selectedCategory] || [] : [];
 
   return (
-    <div className="templates-page-root content-area templates-page-scroll">
-      {/* Header */}
-      <div className="register-header">
-        <button className="register-header-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={14} /> Back
-        </button>
-        <h1 className="register-header-title">Choose a Template</h1>
+    <div className="templates-page-root content-area templates-page-scroll" style={{ padding: '24px 32px' }}>
+      <style>{`
+        .tpl-header-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 28px;
+          padding-bottom: 18px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .tpl-back-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 16px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: #ffffff;
+          color: #0f172a;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .tpl-back-btn:hover {
+          background: #f8fafc;
+          border-color: #2563eb;
+          color: #2563eb;
+          transform: translateX(-3px);
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+        }
+        .tpl-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .tpl-main-title {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -0.3px;
+        }
+        .tpl-badge-tag {
+          padding: 3px 10px;
+          border-radius: 20px;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 700;
+          border: 1px solid #bfdbfe;
+        }
+        .tpl-section-sub {
+          margin: 4px 0 24px 0;
+          font-size: 13.5px;
+          color: #64748b;
+          font-weight: 500;
+        }
+        .tpl-card-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 20px;
+        }
+        .tpl-card-item {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 28px 24px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          cursor: pointer;
+          position: relative;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+        }
+        .tpl-card-item:hover {
+          transform: translateY(-4px);
+          border-color: #93c5fd;
+          box-shadow: 0 12px 30px rgba(37, 99, 235, 0.14);
+        }
+        .tpl-icon-circle {
+          width: 60px;
+          height: 60px;
+          border-radius: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 16px;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .tpl-card-item:hover .tpl-icon-circle {
+          transform: scale(1.1) rotate(4deg);
+        }
+        .tpl-card-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 6px;
+        }
+        .tpl-card-sub {
+          font-size: 12.5px;
+          color: #64748b;
+          font-weight: 500;
+        }
+        .tpl-del-btn {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: #fff1f2;
+          border: 1px solid #ffe4e6;
+          color: #e11d48;
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          zIndex: 2;
+          transition: all 0.2s ease;
+          opacity: 0.7;
+        }
+        .tpl-card-item:hover .tpl-del-btn {
+          opacity: 1;
+        }
+        .tpl-del-btn:hover {
+          background: #ffe4e6;
+          transform: scale(1.15);
+        }
+      `}</style>
+
+      {/* Modern Top Header Bar */}
+      <div className="tpl-header-bar">
+        <div className="tpl-title-wrap">
+          <button className="tpl-back-btn" onClick={() => navigate(-1)}>
+            <ArrowLeft size={15} /> Back
+          </button>
+          <h1 className="tpl-main-title">Choose a Template</h1>
+          <span className="tpl-badge-tag">{savedTemplates.length + 1} Available</span>
+        </div>
       </div>
 
-      {/* Category Grid */}
-      <div className="templates-page-body">
-        <h2 className="templates-heading">Select a Template</h2>
-        <p className="templates-subheading">
-          Choose a blank register or use one of your custom templates.
+      {/* Subheading */}
+      <div>
+        <p className="tpl-section-sub">
+          Choose a blank register to build custom columns or select one of your saved templates.
         </p>
-        <div className="categories-grid categories-grid--no-pad">
-          {/* Blank Register */}
-          <CategoryCard 
-            key="blank"
-            cat={{ id: 'blank', icon: 'plus', name: 'Blank Register' }} 
-            icon={Plus} 
-            count={0} 
+
+        {/* Template Cards Grid */}
+        <div className="tpl-card-grid">
+          {/* Blank Register Card */}
+          <div 
+            className="tpl-card-item"
             onClick={() => {
               if (!businessId || creatingTemplate) return;
               setCreatingTemplate('Blank Register');
@@ -157,15 +291,20 @@ export default function TemplatesPage() {
                 iconColor: '#10B981',
                 category: 'general'
               });
-            }} 
-          />
+            }}
+          >
+            <div className="tpl-icon-circle" style={{ background: 'linear-gradient(135deg, #0b2545 0%, #0066cc 100%)', color: '#ffffff' }}>
+              <Plus size={26} strokeWidth={2.5} />
+            </div>
+            <div className="tpl-card-title">Blank Register</div>
+            <div className="tpl-card-sub">Start with default blank sheet</div>
+          </div>
 
           {/* User-saved Custom Templates */}
           {savedTemplates.map((tpl) => (
             <div 
               key={tpl.id} 
-              className="category-card" 
-              style={{ position: 'relative', cursor: 'pointer' }}
+              className="tpl-card-item" 
               onClick={() => {
                 if (!businessId || creatingTemplate) return;
                 setCreatingTemplate(tpl.name);
@@ -178,43 +317,25 @@ export default function TemplatesPage() {
                 });
               }}
             >
-              {/* Trash button to delete template */}
+              {/* Delete button */}
               <button 
-                className="delete-template-btn" 
-                title="Delete template"
+                className="tpl-del-btn" 
+                title="Delete custom template"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (window.confirm(`Are you sure you want to delete the template "${tpl.name}"?`)) {
                     deleteTemplateMutation.mutate(tpl.id);
                   }
                 }}
-                style={{
-                  position: 'absolute',
-                  top: '12px',
-                  right: '12px',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--muted)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 2,
-                  transition: 'color 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--muted)'}
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
               </button>
 
-              <div className="category-icon" style={{ backgroundColor: '#6366F1' }}>
-                <Bookmark size={24} color="#FFF" />
+              <div className="tpl-icon-circle" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', color: '#ffffff' }}>
+                <Bookmark size={24} />
               </div>
-              <div className="category-name">{tpl.name}</div>
-              <div className="category-count">{tpl.columns.length} columns</div>
+              <div className="tpl-card-title">{tpl.name}</div>
+              <div className="tpl-card-sub">{tpl.columns.length} columns defined</div>
             </div>
           ))}
         </div>
