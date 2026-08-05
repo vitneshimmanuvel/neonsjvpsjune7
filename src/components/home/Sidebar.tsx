@@ -1393,8 +1393,12 @@ export const Sidebar = memo(function Sidebar({
           className={`sidebar-footer-profile ${isFooterMenuOpen ? 'open' : ''}`}
           onClick={() => setIsFooterMenuOpen(v => !v)}
         >
-          <div className="sidebar-profile-avatar">
-            {user?.name ? user.name.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : 'U')}
+          <div className="sidebar-profile-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+            {(user as any)?.avatar ? (
+              <img src={(user as any).avatar} alt={user?.name || 'User'} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              user?.name ? user.name.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : 'U')
+            )}
           </div>
           {!isCollapsed && (
             <div className="sidebar-profile-info">

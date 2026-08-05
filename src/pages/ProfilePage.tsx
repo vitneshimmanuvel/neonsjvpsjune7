@@ -1,20 +1,94 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../lib/auth';
+import { useNotifications } from '../lib/NotificationContext';
 import {
   User, Mail, Phone, Shield, Key, Plus, Search, Trash2, UserPlus,
-  CheckCircle2, XCircle, Edit3, Users, Sparkles, RefreshCw, Eye, EyeOff, Lock
+  CheckCircle2, XCircle, Edit3, Users, Sparkles, RefreshCw, Eye, EyeOff, Lock, Camera, Upload
 } from 'lucide-react';
 import {
   firebaseGetUsers, firebaseCreateUser, firebaseDeleteUser,
-  firebaseUpdateUserStatus, firebaseChangePassword, type AppUser
+  firebaseUpdateUserStatus, firebaseChangePassword, firebaseUpdateUser, type AppUser
 } from '../lib/firebaseAuth';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
-  const { user: authUser, token } = useAuth();
+  const { user: authUser, token, updateUser } = useAuth();
+  const { addNotification } = useNotifications();
   const isSystemAdmin = authUser?.role === 'admin' || authUser?.role === 'superadmin' || authUser?.permissions?.isAdmin;
 
   const [activeTab, setActiveTab] = useState<'profile' | 'users'>('profile');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Avatar upload handler
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !authUser) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file (JPEG, PNG, WEBP)');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 300;
+        const MAX_HEIGHT = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const base64Data = canvas.toDataURL('image/jpeg', 0.85);
+
+        try {
+          await firebaseUpdateUser(String(authUser.id), { avatar: base64Data });
+          updateUser({ avatar: base64Data });
+          toast.success('Profile picture updated!');
+          addNotification({
+            title: 'Profile Updated',
+            message: 'Your profile picture has been updated.',
+            type: 'success'
+          });
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to update avatar');
+        } finally {
+          setIsUploadingAvatar(false);
+        }
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!authUser || !(authUser as any).avatar) return;
+    try {
+      await firebaseUpdateUser(String(authUser.id), { avatar: '' });
+      updateUser({ avatar: '' });
+      toast.success('Profile picture removed');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove picture');
+    }
+  };
 
   // Change password form state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -271,25 +345,70 @@ export default function ProfilePage() {
           
           {/* Personal Information Card */}
           <div className="prof-card" style={{ padding: '28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-              <div style={{
-                width: '68px',
-                height: '68px',
-                background: 'linear-gradient(135deg, #002d5d 0%, #0066cc 100%)',
-                color: '#ffffff',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '28px',
-                fontWeight: 800,
-                boxShadow: '0 6px 18px rgba(0, 102, 204, 0.25)'
-              }}>
-                {displayName[0]?.toUpperCase() || 'U'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px' }}>
+              <div style={{ position: 'relative', width: '74px', height: '74px' }}>
+                <div style={{
+                  width: '74px',
+                  height: '74px',
+                  background: (authUser as any)?.avatar ? 'none' : 'linear-gradient(135deg, #002d5d 0%, #0066cc 100%)',
+                  color: '#ffffff',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '28px',
+                  fontWeight: 800,
+                  boxShadow: '0 6px 20px rgba(0, 102, 204, 0.25)',
+                  overflow: 'hidden',
+                  border: '2px solid #ffffff'
+                }}>
+                  {(authUser as any)?.avatar ? (
+                    <img src={(authUser as any).avatar} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    displayName[0]?.toUpperCase() || 'U'
+                  )}
+                </div>
+
+                <label
+                  title="Upload profile picture"
+                  style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    right: '-2px',
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                    border: '2px solid #ffffff',
+                    transition: 'transform 0.2s ease'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.15)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  {isUploadingAvatar ? <RefreshCw size={13} className="spinner" /> : <Camera size={13} />}
+                  <input type="file" accept="image/*" className="hidden-file-input" onChange={handleAvatarChange} style={{ display: 'none' }} />
+                </label>
               </div>
+
               <div>
                 <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>{displayName}</h2>
-                <div style={{ marginTop: '6px' }}>{getRoleBadge(authUser?.role)}</div>
+                <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {getRoleBadge(authUser?.role)}
+                  {(authUser as any)?.avatar && (
+                    <button
+                      onClick={handleRemoveAvatar}
+                      style={{ border: 'none', background: 'transparent', color: '#e11d48', fontSize: '12px', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                    >
+                      Remove photo
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -518,15 +637,21 @@ export default function ProfilePage() {
                             width: '38px',
                             height: '38px',
                             borderRadius: '50%',
-                            background: '#eff6ff',
+                            background: (u as any).avatar ? 'none' : '#eff6ff',
                             color: '#2563eb',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: '15px',
-                            fontWeight: 700
+                            fontWeight: 700,
+                            overflow: 'hidden',
+                            flexShrink: 0
                           }}>
-                            {u.name ? u.name[0].toUpperCase() : 'U'}
+                            {(u as any).avatar ? (
+                              <img src={(u as any).avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              u.name ? u.name[0].toUpperCase() : 'U'
+                            )}
                           </div>
                           <div>
                             <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block' }}>{u.name}</strong>

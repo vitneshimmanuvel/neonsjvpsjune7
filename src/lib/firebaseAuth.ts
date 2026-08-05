@@ -6,6 +6,7 @@ export interface AppUser {
   name: string;
   email: string;
   passwordHash?: string;
+  avatar?: string;
   role: 'superadmin' | 'admin' | 'sheet_admin' | 'user';
   status: 'active' | 'inactive';
   createdAt: string;

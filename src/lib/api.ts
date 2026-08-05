@@ -11,6 +11,7 @@ export interface User {
   email?: string;
   name: string | null;
   createdAt: string;
+  avatar?: string;
   role?: 'superadmin' | 'admin' | 'sheet_admin' | 'user';
   status?: 'active' | 'inactive';
   lastLogin?: string;
