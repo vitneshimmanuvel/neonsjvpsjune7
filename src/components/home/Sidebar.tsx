@@ -1075,67 +1075,6 @@ export const Sidebar = memo(function Sidebar({
             </>
           ) : (
             <>
-              {/* Multiselect & Rearrange controls */}
-              {!isCollapsed && (
-                <div style={{ padding: '6px 14px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: isMultiSelectMode ? '1px solid #e2e8f0' : '1px solid #f1f5f9', marginBottom: '6px', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <button
-                      onClick={() => {
-                        setIsMultiSelectMode(prev => !prev);
-                        setSelectedRegIds(new Set());
-                      }}
-                      style={{
-                        background: isMultiSelectMode ? '#eff6ff' : '#f8fafc',
-                        border: `1px solid ${isMultiSelectMode ? '#bfdbfe' : '#e2e8f0'}`,
-                        color: isMultiSelectMode ? '#1d4ed8' : '#64748b',
-                        cursor: 'pointer',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        transition: 'all 0.15s ease',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                      }}
-                    >
-                      <CheckCircle2 size={13} color={isMultiSelectMode ? '#1d4ed8' : '#64748b'} />
-                      {isMultiSelectMode ? 'Cancel Selection' : 'Select Multiple'}
-                    </button>
-
-                    {isSystemAdmin && (
-                      <button
-                        onClick={() => setShowRearrangeModal(true)}
-                        title="Rearrange folders & registers as per Admin need"
-                        style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          color: '#475569',
-                          cursor: 'pointer',
-                          fontSize: '11.5px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          padding: '4px 8px',
-                          borderRadius: '8px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <ArrowUpDown size={13} color="var(--navy)" /> Rearrange
-                      </button>
-                    )}
-                  </div>
-
-                  {isMultiSelectMode && selectedRegIds.size > 0 && (
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '12px' }}>
-                      {selectedRegIds.size} selected
-                    </span>
-                  )}
-                </div>
-              )}
-
               {sortedFolders.map(folder => {
                 const folderRegs = sortedFiltered.filter(r => r.folderId === folder.id);
                 const isExpanded = expandedFolders[folder.id];
