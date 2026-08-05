@@ -244,6 +244,7 @@ export const Sidebar = memo(function Sidebar({
     };
   }, []);
 
+  const [isQuickToolsOpen, setIsQuickToolsOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
     try {
@@ -664,7 +665,7 @@ export const Sidebar = memo(function Sidebar({
         `}</style>
 
         <div className="sidebar-brand" style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="sidebar-brand-group" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
               <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain', transition: 'transform 0.2s ease' }} />
               {!isCollapsed && (
@@ -678,113 +679,24 @@ export const Sidebar = memo(function Sidebar({
                 </div>
               )}
             </div>
-
-            {/* Admin-Only Online Status & Activity Icon */}
-            {isSystemAdmin && (
-              <button
-                className="sb-tool-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowOnlineUsersModal(true);
-                }}
-                title="View Online Users & Live Activity (Admin Only)"
-                aria-label="View online users"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  background: 'rgba(16, 185, 129, 0.08)',
-                  color: '#10b981',
-                  cursor: 'pointer',
-                  marginLeft: '2px',
-                  padding: 0
-                }}
-              >
-                <Users size={15} />
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '-2px',
-                    right: '-2px',
-                    width: '8px',
-                    height: '8px',
-                    backgroundColor: '#10b981',
-                    borderRadius: '50%',
-                    animation: 'livePulseDot 2s infinite ease-in-out'
-                  }}
-                />
-              </button>
-            )}
           </div>
 
-          <div className="sidebar-brand-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div className="sidebar-brand-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
             <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} style={{ display: isMobile ? 'flex' : 'none' }}>
               <X size={18} />
             </button>
 
             {!isCollapsed && (
               <>
-                <button
-                  className="sidebar-collapse-btn sb-tool-btn"
-                  onClick={() => toggleFullscreen()}
-                  title={isFullscreen ? "Exit Fullscreen (F11)" : "Enter Fullscreen Mode (F11)"}
-                  aria-label="Toggle Fullscreen"
-                  style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: '8px',
-                    border: `1px solid ${isFullscreen ? '#bfdbfe' : '#e2e8f0'}`,
-                    background: isFullscreen ? '#eff6ff' : '#f8fafc',
-                    color: isFullscreen ? '#2563eb' : '#475569',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isFullscreen ? <Minimize2 size={15} color="#2563eb" /> : <Maximize2 size={15} />}
-                </button>
-
-                <button
-                  className="sidebar-collapse-btn sb-tool-btn"
-                  onClick={toggleThemeMode}
-                  title={`Switch theme mode (Current: ${themeMode})`}
-                  aria-label="Switch theme mode"
-                  style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    background: '#f8fafc',
-                    color: '#475569',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {themeMode === 'light' ? (
-                    <Sun size={15} />
-                  ) : themeMode === 'dark' ? (
-                    <Moon size={15} />
-                  ) : (
-                    <Monitor size={15} />
-                  )}
-                </button>
-
+                {/* Notifications Bell */}
                 <button
                   className="sidebar-collapse-btn sb-tool-btn"
                   onClick={() => onToggleNotifications()}
                   title="Notifications"
                   style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: '8px',
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '9px',
                     border: '1px solid #e2e8f0',
                     background: '#f8fafc',
                     color: '#475569',
@@ -802,6 +714,132 @@ export const Sidebar = memo(function Sidebar({
                     </span>
                   )}
                 </button>
+
+                {/* Quick Tools Dropdown Button */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    className="sidebar-collapse-btn sb-tool-btn"
+                    onClick={() => setIsQuickToolsOpen(!isQuickToolsOpen)}
+                    title="Quick Tools (Theme, Fullscreen, Online Users)"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '9px',
+                      border: `1px solid ${isQuickToolsOpen ? '#bfdbfe' : '#e2e8f0'}`,
+                      background: isQuickToolsOpen ? '#eff6ff' : '#f8fafc',
+                      color: isQuickToolsOpen ? '#2563eb' : '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <MoreVertical size={15} />
+                  </button>
+
+                  {isQuickToolsOpen && (
+                    <>
+                      <div
+                        style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                        onClick={() => setIsQuickToolsOpen(false)}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '38px',
+                          right: '0',
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          boxShadow: '0 10px 28px rgba(15, 23, 42, 0.14)',
+                          zIndex: 1000,
+                          minWidth: '210px',
+                          padding: '6px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px'
+                        }}
+                      >
+                        <button
+                          className="context-item"
+                          onClick={() => { toggleFullscreen(); setIsQuickToolsOpen(false); }}
+                          style={{
+                            padding: '9px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            width: '100%',
+                            fontSize: '13px',
+                            borderRadius: '8px',
+                            fontWeight: 600,
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: '#0f172a'
+                          }}
+                        >
+                          {isFullscreen ? <Minimize2 size={16} color="#2563eb" /> : <Maximize2 size={16} color="#2563eb" />}
+                          <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode (F11)'}</span>
+                        </button>
+
+                        <button
+                          className="context-item"
+                          onClick={() => { toggleThemeMode(); setIsQuickToolsOpen(false); }}
+                          style={{
+                            padding: '9px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            width: '100%',
+                            fontSize: '13px',
+                            borderRadius: '8px',
+                            fontWeight: 600,
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: '#0f172a'
+                          }}
+                        >
+                          {themeMode === 'light' ? (
+                            <Sun size={16} color="#f59e0b" />
+                          ) : themeMode === 'dark' ? (
+                            <Moon size={16} color="#8b5cf6" />
+                          ) : (
+                            <Monitor size={16} color="#64748b" />
+                          )}
+                          <span>Theme: {themeMode.charAt(0).toUpperCase() + themeMode.slice(1)}</span>
+                        </button>
+
+                        {isSystemAdmin && (
+                          <button
+                            className="context-item"
+                            onClick={() => { setShowOnlineUsersModal(true); setIsQuickToolsOpen(false); }}
+                            style={{
+                              padding: '9px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              width: '100%',
+                              fontSize: '13px',
+                              borderRadius: '8px',
+                              fontWeight: 600,
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              color: '#0f172a'
+                            }}
+                          >
+                            <div style={{ position: 'relative', display: 'inline-flex' }}>
+                              <Users size={16} color="#10b981" />
+                              <span style={{ position: 'absolute', top: '-2px', right: '-2px', width: '6px', height: '6px', backgroundColor: '#10b981', borderRadius: '50%' }} />
+                            </div>
+                            <span>Online Users & Activity</span>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             )}
 
