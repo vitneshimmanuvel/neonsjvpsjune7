@@ -641,6 +641,59 @@ export const Sidebar = memo(function Sidebar({
           .sb-dd-icon-box.amber { background: #fffbeb !important; color: #d97706 !important; }
           .sb-dd-icon-box.green { background: #f0fdf4 !important; color: #16a34a !important; }
           .sb-dd-icon-box.orange { background: #fff7ed !important; color: #ea580c !important; }
+          @keyframes sbFooterMenuIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          .sb-footer-popup {
+            animation: sbFooterMenuIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          }
+          .sb-footer-item {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            padding: 8px 10px !important;
+            border-radius: 10px !important;
+            border: none !important;
+            background: transparent !important;
+            color: #0f172a !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            width: 100% !important;
+            text-align: left !important;
+          }
+          .sb-footer-item:hover {
+            background: #f1f5f9 !important;
+            transform: translateX(4px) !important;
+          }
+          .sb-footer-item:hover .sb-ft-icon-box {
+            transform: scale(1.12) !important;
+          }
+          .sb-ft-icon-box {
+            width: 30px !important;
+            height: 30px !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+          }
+          .sb-ft-icon-box.blue { background: #eff6ff !important; color: #2563eb !important; }
+          .sb-ft-icon-box.purple { background: #f3e8ff !important; color: #9333ea !important; }
+          .sb-ft-icon-box.rose { background: #ffe4e6 !important; color: #e11d48 !important; }
+          .sb-ft-icon-box.indigo { background: #e0e7ff !important; color: #4f46e5 !important; }
+          .sb-ft-icon-box.emerald { background: #dcfce7 !important; color: #16a34a !important; }
+          .sb-ft-icon-box.violet { background: #f3e8ff !important; color: #7c3aed !important; }
+          .sb-ft-icon-box.red { background: #fff1f2 !important; color: #e11d48 !important; }
+          .sb-footer-item.logout {
+            color: #e11d48 !important;
+          }
+          .sb-footer-item.logout:hover {
+            background: #fff1f2 !important;
+          }
           .sb-action-btn {
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
           }
@@ -1539,44 +1592,100 @@ export const Sidebar = memo(function Sidebar({
               onClick={() => setIsFooterMenuOpen(false)}
             />
             <div
+              className="sb-footer-popup"
               style={{
                 position: 'absolute',
-                bottom: '60px',
+                bottom: '64px',
                 left: '8px',
-                width: '240px',
-                background: 'var(--surface)',
-                borderRadius: '8px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                width: '250px',
+                background: '#ffffff',
+                borderRadius: '16px',
+                boxShadow: '0 20px 48px rgba(15, 23, 42, 0.18), 0 4px 14px rgba(0, 0, 0, 0.05)',
                 display: 'flex',
                 flexDirection: 'column',
-                padding: '8px',
+                padding: '6px',
                 zIndex: 1001,
-                border: '1px solid var(--border)',
+                border: '1px solid #e2e8f0',
               }}
             >
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: 'inherit', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/profile'); }}>
-                <User size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Profile</span>
+              {/* Top User Profile Header Card */}
+              <div style={{
+                padding: '10px 12px',
+                marginBottom: '4px',
+                background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #0b2545 0%, #0066cc 100%)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '14px',
+                  overflow: 'hidden',
+                  flexShrink: 0
+                }}>
+                  {(user as any)?.avatar ? (
+                    <img src={(user as any).avatar} alt={user?.name || 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    (user?.name || user?.email || 'U')[0].toUpperCase()
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {user?.name || 'User'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {user?.email || 'User Account'}
+                  </div>
+                </div>
+              </div>
+
+              <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); navigate('/profile'); }}>
+                <div className="sb-ft-icon-box blue"><User size={15} /></div>
+                <span>Profile & Account</span>
               </button>
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: 'inherit', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/history'); }}>
-                <Activity size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>History</span>
+
+              <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); navigate('/history'); }}>
+                <div className="sb-ft-icon-box purple"><Activity size={15} /></div>
+                <span>Activity History</span>
               </button>
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: 'inherit', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/recycle-bin'); }}>
-                <Trash2 size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Recycle Bin</span>
+
+              <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); navigate('/recycle-bin'); }}>
+                <div className="sb-ft-icon-box rose"><Trash2 size={15} /></div>
+                <span>Recycle Bin</span>
               </button>
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: 'inherit', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/templates'); }}>
-                <LayoutTemplate size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Templates</span>
+
+              <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); navigate('/templates'); }}>
+                <div className="sb-ft-icon-box indigo"><LayoutTemplate size={15} /></div>
+                <span>Templates</span>
               </button>
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: '#128C7E', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); navigate('/backup'); }}>
-                <CloudUpload size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Backup & Restore</span>
+
+              <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); navigate('/backup'); }}>
+                <div className="sb-ft-icon-box emerald"><CloudUpload size={15} /></div>
+                <span>Backup & Restore</span>
               </button>
+
               {isSystemAdmin && (
-                <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: '#7c3aed', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); sessionStorage.removeItem('admin_workspace_mode'); navigate('/admin/dashboard'); }}>
-                  <Shield size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Admin Dashboard</span>
+                <button className="sb-footer-item" onClick={() => { setIsFooterMenuOpen(false); sessionStorage.removeItem('admin_workspace_mode'); navigate('/admin/dashboard'); }}>
+                  <div className="sb-ft-icon-box violet"><Shield size={15} /></div>
+                  <span style={{ fontWeight: 700, color: '#7c3aed' }}>Admin Dashboard</span>
                 </button>
               )}
-              <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
-              <button className="footer-menu-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '6px', color: '#ef4444', background: 'transparent', border: 'none', width: '100%', cursor: 'pointer', textAlign: 'left', font: 'inherit' }} onClick={() => { setIsFooterMenuOpen(false); logout(); navigate('/login'); }}>
-                <LogOut size={16} /> <span style={{ fontSize: '14px', fontWeight: 500 }}>Logout</span>
+
+              <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 6px' }} />
+
+              <button className="sb-footer-item logout" onClick={() => { setIsFooterMenuOpen(false); logout(); navigate('/login'); }}>
+                <div className="sb-ft-icon-box red"><LogOut size={15} /></div>
+                <span>Logout</span>
               </button>
             </div>
           </>
