@@ -110,6 +110,7 @@ function formatUser(row) {
     role: row.role,
     status: row.status,
     phone: row.phone || '',
+    avatar: row.avatar || '',
     createdAt: row.created_at,
     lastLogin: row.last_login,
     permissions: row.permissions || {}
@@ -167,6 +168,7 @@ export default async function handler(req, res) {
       globalThis._dbIndexesCreated = true;
       (async () => {
         try {
+          await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT');
           await query('CREATE INDEX IF NOT EXISTS idx_entries_register_row ON entries (register_id, row_number ASC)');
           await query('CREATE INDEX IF NOT EXISTS idx_registers_business_deleted ON registers (business_id, deleted_at)');
           await query('CREATE INDEX IF NOT EXISTS idx_folders_business ON folders (business_id)');
@@ -443,7 +445,7 @@ export default async function handler(req, res) {
       return sendJson(res, 201, { user: formatUser(freshUser.rows[0]), message: 'User created' });
     }
 
-    // PUT /api/auth/users/:id (update details/status/role)
+    // PUT /api/auth/users/:id (update details/status/role/avatar)
     const userMatch = pathname.match(/^\/api\/auth\/users\/([a-zA-Z0-9]+)$/);
     if (userMatch && method === 'PUT') {
       const userId = userMatch[1];
@@ -461,11 +463,25 @@ export default async function handler(req, res) {
         return sendJson(res, 200, { message: `User status changed to ${data.status}` });
       }
 
+      if (data.avatar !== undefined) {
+        await query('UPDATE users SET avatar = $1 WHERE id = $2', [data.avatar, userId]);
+        return sendJson(res, 200, { message: 'Avatar updated' });
+      }
+
+      // Safe partial user updates (name, phone, role)
+      const currentUserRes = await query('SELECT * FROM users WHERE id = $1', [userId]);
+      if (currentUserRes.rowCount === 0) return sendError(res, 404, 'User not found');
+      const curUser = currentUserRes.rows[0];
+
+      const updatedName = data.name !== undefined ? data.name : curUser.name;
+      const updatedPhone = data.phone !== undefined ? data.phone : (curUser.phone || '');
+      const updatedRole = data.role !== undefined ? data.role : (curUser.role || 'user');
+
       await query(`
         UPDATE users 
         SET name = $1, phone = $2, role = $3
         WHERE id = $4
-      `, [data.name, data.phone || '', data.role || 'user', userId]);
+      `, [updatedName, updatedPhone, updatedRole, userId]);
       
       return sendJson(res, 200, { message: 'User updated' });
     }
