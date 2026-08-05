@@ -149,6 +149,7 @@ export const Sidebar = memo(function Sidebar({
       userName: (authUser as any).name || 'User',
       email: (authUser as any).email || '',
       role: (authUser as any).role || 'user',
+      avatar: (authUser as any).avatar || '',
       currentActivity: activityDesc
     });
 
@@ -158,6 +159,7 @@ export const Sidebar = memo(function Sidebar({
         userName: (authUser as any).name || 'User',
         email: (authUser as any).email || '',
         role: (authUser as any).role || 'user',
+        avatar: (authUser as any).avatar || '',
         currentActivity: activityDesc
       });
     }, 20000);
@@ -6681,15 +6683,20 @@ function OnlineUsersModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                           width: '42px',
                           height: '42px',
                           borderRadius: '50%',
-                          backgroundColor: getAvatarBg(u.name),
+                          backgroundColor: u.avatar ? 'transparent' : getAvatarBg(u.name),
                           color: '#ffffff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '16px',
-                          fontWeight: 800
+                          fontWeight: 800,
+                          overflow: 'hidden'
                         }}>
-                          {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                          {u.avatar ? (
+                            <img src={u.avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            u.name ? u.name.charAt(0).toUpperCase() : 'U'
+                          )}
                         </div>
                         <span style={{
                           position: 'absolute',

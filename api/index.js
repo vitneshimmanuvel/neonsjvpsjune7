@@ -264,6 +264,7 @@ export default async function handler(req, res) {
           userName: data.userName || 'User',
           email: data.email || '',
           role: data.role || 'user',
+          avatar: data.avatar || '',
           currentActivity: data.currentActivity || 'Active in app',
           lastActive: Date.now()
         });
@@ -287,6 +288,7 @@ export default async function handler(req, res) {
             name: presence.userName,
             email: presence.email,
             role: presence.role,
+            avatar: presence.avatar || '',
             currentActivity: presence.currentActivity,
             lastActive: new Date(presence.lastActive).toISOString(),
             status
@@ -296,7 +298,7 @@ export default async function handler(req, res) {
 
       // 2. Fetch latest registered users from DB to supplement presence if missing
       try {
-        const dbUsers = await query('SELECT id, name, email, role, status, last_login FROM users');
+        const dbUsers = await query('SELECT id, name, email, role, status, avatar, last_login FROM users');
         const dbActivities = await query(`
           SELECT DISTINCT ON (user_id) user_id, details, register_name, timestamp 
           FROM activity_logs 
@@ -311,6 +313,11 @@ export default async function handler(req, res) {
 
         for (const u of dbUsers.rows) {
           const uid = String(u.id);
+          const existingPresence = onlineUsersMap.get(uid);
+          if (existingPresence && !existingPresence.avatar && u.avatar) {
+            existingPresence.avatar = u.avatar;
+          }
+
           if (!onlineUsersMap.has(uid) && u.status !== 'inactive') {
             const lastAct = activityMap.get(uid);
             const lastTimeStr = lastAct?.timestamp || u.last_login;
@@ -327,6 +334,7 @@ export default async function handler(req, res) {
                   name: u.name,
                   email: u.email,
                   role: u.role,
+                  avatar: u.avatar || '',
                   currentActivity: activityText,
                   lastActive: new Date(lastTime).toISOString(),
                   status

@@ -357,6 +357,7 @@ export interface OnlineUserItem {
   name: string;
   email: string;
   role: string;
+  avatar?: string;
   currentActivity: string;
   lastActive: string;
   status: 'online' | 'idle' | 'offline';
@@ -367,6 +368,7 @@ export async function sendPresenceHeartbeat(data: {
   userName: string;
   email?: string;
   role?: string;
+  avatar?: string;
   currentActivity?: string;
 }) {
   try {
