@@ -3,6 +3,8 @@ import { useAuth } from '../lib/auth';
 import { firebaseLogin } from '../lib/firebaseAuth';
 import { ArrowRight, Mail, Eye, EyeOff, Lock } from 'lucide-react';
 
+import { enableFullscreen } from '../lib/fullscreen';
+
 export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -16,9 +18,11 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) { setError('Email and password are required'); return; }
+    enableFullscreen();
     setLoading(true); setError('');
     try {
       const result = await firebaseLogin(email, password);
+      enableFullscreen();
       login(result.token, result.user);
     } catch (err: any) { setError(err.message); }
     finally { setLoading(false); }

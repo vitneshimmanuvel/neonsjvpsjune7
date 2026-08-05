@@ -1,5 +1,6 @@
 import { useCallback, memo, useState, useEffect, useRef, startTransition, useDeferredValue, useMemo } from 'react';
-import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip, Users, Zap, GripVertical } from 'lucide-react';
+import { Menu, Search, Plus, FileText, X, Folder, FolderOpen, FileSpreadsheet, ClipboardPaste, Pencil, Trash2, PlusCircle, FolderPlus, Bell, User, Activity, LayoutTemplate, LogOut, CloudUpload, Clock, CheckCircle2, HelpCircle, XCircle, Shield, Sparkles, PenLine, ChevronDown, ChevronRight, ArrowLeft, Check, Loader2, Play, Pause, ChevronLeft, Sun, Moon, Monitor, BookMarked, Database, RefreshCw, Maximize2, Minimize2, Download, Bookmark, Filter, MoreVertical, UserCheck, ShieldAlert, PenTool, Tag, Calendar, Phone, ArrowUpDown, Eye, Lock as LockIcon, Paperclip, Users, Zap, GripVertical } from 'lucide-react';
+import { toggleFullscreen, enableFullscreen } from '../../lib/fullscreen';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
@@ -227,6 +228,21 @@ export const Sidebar = memo(function Sidebar({
     setOrderNonce(n => n + 1);
     toast.success('Folder order updated', { duration: 1500 });
   }, [sortedFolders]);
+
+  // Fullscreen mode state & listener
+  const [isFullscreen, setIsFullscreen] = useState(() => typeof document !== 'undefined' && !!document.fullscreenElement);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(() => {
@@ -713,6 +729,27 @@ export const Sidebar = memo(function Sidebar({
 
             {!isCollapsed && (
               <>
+                <button
+                  className="sidebar-collapse-btn sb-tool-btn"
+                  onClick={() => toggleFullscreen()}
+                  title={isFullscreen ? "Exit Fullscreen (F11)" : "Enter Fullscreen Mode (F11)"}
+                  aria-label="Toggle Fullscreen"
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: `1px solid ${isFullscreen ? '#bfdbfe' : '#e2e8f0'}`,
+                    background: isFullscreen ? '#eff6ff' : '#f8fafc',
+                    color: isFullscreen ? '#2563eb' : '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isFullscreen ? <Minimize2 size={15} color="#2563eb" /> : <Maximize2 size={15} />}
+                </button>
+
                 <button
                   className="sidebar-collapse-btn sb-tool-btn"
                   onClick={toggleThemeMode}
