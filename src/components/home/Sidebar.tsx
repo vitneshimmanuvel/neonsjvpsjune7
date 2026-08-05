@@ -597,6 +597,50 @@ export const Sidebar = memo(function Sidebar({
             75% { transform: rotate(12deg) scale(1.15); }
             100% { transform: rotate(0deg); }
           }
+          @keyframes sbDropdownIn {
+            from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          .sidebar-add-dropdown {
+            animation: sbDropdownIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          }
+          .sb-dd-item {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            padding: 8px 10px !important;
+            border-radius: 10px !important;
+            border: none !important;
+            background: transparent !important;
+            color: #0f172a !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            width: 100% !important;
+            text-align: left !important;
+          }
+          .sb-dd-item:hover {
+            background: #f1f5f9 !important;
+            transform: translateX(3px) !important;
+          }
+          .sb-dd-item:hover .sb-dd-icon-box {
+            transform: scale(1.12) !important;
+          }
+          .sb-dd-icon-box {
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+          }
+          .sb-dd-icon-box.blue { background: #eff6ff !important; color: #2563eb !important; }
+          .sb-dd-icon-box.amber { background: #fffbeb !important; color: #d97706 !important; }
+          .sb-dd-icon-box.green { background: #f0fdf4 !important; color: #16a34a !important; }
+          .sb-dd-icon-box.orange { background: #fff7ed !important; color: #ea580c !important; }
           .sb-action-btn {
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
           }
@@ -904,32 +948,53 @@ export const Sidebar = memo(function Sidebar({
                       className="sidebar-add-dropdown"
                       style={{
                         position: 'absolute',
-                        top: '44px',
+                        top: '46px',
                         left: '0',
-                        background: 'white',
+                        background: '#ffffff',
                         border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.15)',
+                        borderRadius: '14px',
+                        boxShadow: '0 16px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0, 0, 0, 0.04)',
                         zIndex: 1000,
-                        minWidth: '190px',
+                        minWidth: '215px',
                         whiteSpace: 'nowrap',
-                        padding: '4px',
-                        animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                        padding: '6px',
                       }}
                     >
-                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
-                        <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
+                      <div style={{ padding: '6px 12px 6px', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                        Create & Import
+                      </div>
+
+                      <button className="sb-dd-item" onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                        <div className="sb-dd-icon-box blue"><PlusCircle size={16} /></div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>New Register</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Create custom register</div>
+                        </div>
                       </button>
-                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
-                        <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
+
+                      <button className="sb-dd-item" onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                        <div className="sb-dd-icon-box amber"><FolderPlus size={16} /></div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>New File</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Create folder container</div>
+                        </div>
                       </button>
-                      <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
-                        <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
-                        <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
+
+                      <label className="sb-dd-item" style={{ cursor: 'pointer' }}>
+                        <div className="sb-dd-icon-box green"><FileSpreadsheet size={16} /></div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Input Excel</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Import .xlsx or .csv</div>
+                        </div>
+                        <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} style={{ display: 'none' }} />
                       </label>
-                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
-                        <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
+
+                      <button className="sb-dd-item" onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                        <div className="sb-dd-icon-box orange"><Folder size={16} fill="#ffedd5" color="#ea580c" /></div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Input File</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Import register file</div>
+                        </div>
                       </button>
                     </div>
                   </>
@@ -989,29 +1054,51 @@ export const Sidebar = memo(function Sidebar({
                       position: 'absolute',
                       top: '0',
                       left: 'calc(100% + 8px)',
-                      background: 'white',
+                      background: '#ffffff',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.15)',
+                      borderRadius: '14px',
+                      boxShadow: '0 16px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(0, 0, 0, 0.04)',
                       zIndex: 1000,
-                      minWidth: '190px',
+                      minWidth: '215px',
                       whiteSpace: 'nowrap',
-                      padding: '4px'
+                      padding: '6px'
                     }}
                   >
-                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
-                      <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
+                    <div style={{ padding: '6px 12px 6px', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                      Create & Import
+                    </div>
+
+                    <button className="sb-dd-item" onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                      <div className="sb-dd-icon-box blue"><PlusCircle size={16} /></div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>New Register</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Create custom register</div>
+                      </div>
                     </button>
-                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
-                      <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
+
+                    <button className="sb-dd-item" onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                      <div className="sb-dd-icon-box amber"><FolderPlus size={16} /></div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>New File</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Create folder container</div>
+                      </div>
                     </button>
-                    <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
-                      <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
-                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
+
+                    <label className="sb-dd-item" style={{ cursor: 'pointer' }}>
+                      <div className="sb-dd-icon-box green"><FileSpreadsheet size={16} /></div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Input Excel</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Import .xlsx or .csv</div>
+                      </div>
+                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} style={{ display: 'none' }} />
                     </label>
-                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
-                      <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
+
+                    <button className="sb-dd-item" onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                      <div className="sb-dd-icon-box orange"><Folder size={16} fill="#ffedd5" color="#ea580c" /></div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Input File</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>Import register file</div>
+                      </div>
                     </button>
                   </div>
                 </>
