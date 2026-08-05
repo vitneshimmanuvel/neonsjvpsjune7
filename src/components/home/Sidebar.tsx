@@ -568,10 +568,89 @@ export const Sidebar = memo(function Sidebar({
         className={`sidebar ${sidebarOpen ? 'sidebar--open' : ''} ${isCollapsed ? 'sidebar--collapsed' : ''}`}
         style={sidebarWidth && !isCollapsed ? { width: sidebarWidth, minWidth: sidebarWidth } : undefined}
       >
+        <style>{`
+          @keyframes livePulseDot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+          }
+          @keyframes iconTilt {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(-14deg) scale(1.15); }
+            75% { transform: rotate(12deg) scale(1.15); }
+            100% { transform: rotate(0deg); }
+          }
+          .sb-action-btn {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          }
+          .sb-action-add {
+            background: linear-gradient(135deg, #0b2545 0%, #134074 50%, #0066cc 100%) !important;
+            background-size: 200% 200% !important;
+            color: #ffffff !important;
+            border: none !important;
+            box-shadow: 0 3px 10px rgba(0, 102, 204, 0.25) !important;
+          }
+          .sb-action-add:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(0, 102, 204, 0.4) !important;
+          }
+          .sb-action-add:hover .sb-add-icon {
+            transform: rotate(90deg) scale(1.15);
+          }
+          .sb-add-icon {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+          .sb-action-entry {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+            border: 1px solid #a7f3d0 !important;
+            color: #047857 !important;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.1) !important;
+          }
+          .sb-action-entry:hover {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%) !important;
+            border-color: #6ee7b7 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.28) !important;
+          }
+          .sb-action-entry:hover .sb-entry-icon {
+            animation: iconTilt 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+          .sb-search-wrap {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            border: 1px solid #cbd5e1 !important;
+            background: #f8fafc !important;
+          }
+          .sb-search-wrap:hover {
+            border-color: #94a3b8 !important;
+            background: #ffffff !important;
+          }
+          .sb-search-wrap:focus-within {
+            border-color: #2563eb !important;
+            background: #ffffff !important;
+            box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.14), 0 3px 12px rgba(0, 0, 0, 0.05) !important;
+          }
+          .sb-search-wrap:focus-within .sb-search-icon {
+            color: #2563eb !important;
+            transform: scale(1.12);
+          }
+          .sb-search-icon {
+            transition: all 0.2s ease;
+          }
+          .sb-tool-btn {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          }
+          .sb-tool-btn:hover {
+            transform: translateY(-2px) scale(1.05) !important;
+            background: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+          }
+        `}</style>
+
         <div className="sidebar-brand" style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="sidebar-brand-group" onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-              <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
+              <img src="/logo-transparent.png" alt="AG Trust" className="sidebar-brand-logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain', transition: 'transform 0.2s ease' }} />
               {!isCollapsed && (
                 <div className="sidebar-brand-text">
                   <div className="sidebar-brand-name" style={{ fontSize: '15px', fontWeight: 800, color: 'var(--navy)', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
@@ -587,6 +666,7 @@ export const Sidebar = memo(function Sidebar({
             {/* Admin-Only Online Status & Activity Icon */}
             {isSystemAdmin && (
               <button
+                className="sb-tool-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowOnlineUsersModal(true);
@@ -605,17 +685,8 @@ export const Sidebar = memo(function Sidebar({
                   background: 'rgba(16, 185, 129, 0.08)',
                   color: '#10b981',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
                   marginLeft: '2px',
                   padding: 0
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.18)';
-                  e.currentTarget.style.transform = 'scale(1.06)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
-                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
                 <Users size={15} />
@@ -624,11 +695,11 @@ export const Sidebar = memo(function Sidebar({
                     position: 'absolute',
                     top: '-2px',
                     right: '-2px',
-                    width: '7px',
-                    height: '7px',
+                    width: '8px',
+                    height: '8px',
                     backgroundColor: '#10b981',
                     borderRadius: '50%',
-                    boxShadow: '0 0 0 2px #ffffff, 0 0 6px #10b981'
+                    animation: 'livePulseDot 2s infinite ease-in-out'
                   }}
                 />
               </button>
@@ -643,7 +714,7 @@ export const Sidebar = memo(function Sidebar({
             {!isCollapsed && (
               <>
                 <button
-                  className="sidebar-collapse-btn"
+                  className="sidebar-collapse-btn sb-tool-btn"
                   onClick={toggleThemeMode}
                   title={`Switch theme mode (Current: ${themeMode})`}
                   aria-label="Switch theme mode"
@@ -657,8 +728,7 @@ export const Sidebar = memo(function Sidebar({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s'
+                    cursor: 'pointer'
                   }}
                 >
                   {themeMode === 'light' ? (
@@ -671,7 +741,7 @@ export const Sidebar = memo(function Sidebar({
                 </button>
 
                 <button
-                  className="sidebar-collapse-btn"
+                  className="sidebar-collapse-btn sb-tool-btn"
                   onClick={() => onToggleNotifications()}
                   title="Notifications"
                   style={{
@@ -685,7 +755,6 @@ export const Sidebar = memo(function Sidebar({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    transition: 'all 0.15s',
                     position: 'relative'
                   }}
                 >
@@ -700,7 +769,7 @@ export const Sidebar = memo(function Sidebar({
             )}
 
             <button
-              className="sidebar-collapse-btn"
+              className="sidebar-collapse-btn sb-tool-btn"
               onClick={toggleCollapse}
               title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
               style={{
@@ -713,8 +782,7 @@ export const Sidebar = memo(function Sidebar({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
+                cursor: 'pointer'
               }}
             >
               {isCollapsed ? (
@@ -726,13 +794,13 @@ export const Sidebar = memo(function Sidebar({
           </div>
         </div>
 
-        {/* Actions Bar — Combined +Add and Entry buttons side-by-side */}
+        {/* Actions Bar — Combined +Add and Entry buttons side-by-side with micro-animations */}
         {!isCollapsed ? (
-          <div style={{ padding: '8px 10px 4px', display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+          <div style={{ padding: '10px 12px 6px', display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
             {(isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
               <div style={{ flex: 1.1, position: 'relative' }}>
                 <button
-                  className="sidebar-add-btn"
+                  className="sidebar-add-btn sb-action-btn sb-action-add"
                   onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
                   title="Add new register or file"
                   style={{
@@ -741,27 +809,14 @@ export const Sidebar = memo(function Sidebar({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    padding: '8px 10px',
+                    padding: '9px 12px',
                     borderRadius: '10px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
-                    color: '#ffffff',
                     fontSize: '12.5px',
                     fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0, 45, 93, 0.2)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 45, 93, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 45, 93, 0.2)';
+                    cursor: 'pointer'
                   }}
                 >
-                  <Plus size={15} strokeWidth={2.5} /> <span className="sidebar-add-text">Add</span>
+                  <Plus size={15} strokeWidth={2.8} className="sb-add-icon" /> <span className="sidebar-add-text">Add</span>
                 </button>
 
                 {isAddMenuOpen && (
@@ -774,17 +829,18 @@ export const Sidebar = memo(function Sidebar({
                       className="sidebar-add-dropdown"
                       style={{
                         position: 'absolute',
-                        top: '42px',
+                        top: '44px',
                         left: '0',
                         background: 'white',
                         border: '1px solid #e2e8f0',
                         borderRadius: '12px',
                         overflow: 'hidden',
-                        boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+                        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.15)',
                         zIndex: 1000,
                         minWidth: '190px',
                         whiteSpace: 'nowrap',
-                        padding: '4px'
+                        padding: '4px',
+                        animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}
                     >
                       <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
@@ -808,36 +864,22 @@ export const Sidebar = memo(function Sidebar({
 
             <button
               onClick={() => setIsEntryPanelOpen(true)}
+              className="sb-action-btn sb-action-entry"
               style={{
                 flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                padding: '8px 10px',
+                padding: '9px 12px',
                 borderRadius: '10px',
-                border: '1px solid #bbf7d0',
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                color: '#15803d',
-                cursor: 'pointer',
                 fontSize: '12.5px',
                 fontWeight: 700,
-                transition: 'all 0.2s',
-                boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)';
-                e.currentTarget.style.borderColor = '#86efac';
-                e.currentTarget.style.boxShadow = '0 3px 10px rgba(22,163,74,0.18)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
-                e.currentTarget.style.borderColor = '#bbf7d0';
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(22, 163, 74, 0.08)';
+                cursor: 'pointer'
               }}
               title="Quick add entry to any register"
             >
-              <PenLine size={15} />
+              <PenLine size={15} className="sb-entry-icon" />
               <span>Entry</span>
             </button>
           </div>
@@ -845,7 +887,7 @@ export const Sidebar = memo(function Sidebar({
           (isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
             <div className="sidebar-add-section" style={{ padding: '8px', position: 'relative' }}>
               <button
-                className="sidebar-add-btn"
+                className="sidebar-add-btn sb-action-btn sb-action-add"
                 onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
                 title="Add new item"
                 style={{
@@ -854,15 +896,10 @@ export const Sidebar = memo(function Sidebar({
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: '10px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0, 45, 93, 0.22)'
+                  borderRadius: '10px'
                 }}
               >
-                <Plus size={16} strokeWidth={2.5} />
+                <Plus size={16} strokeWidth={2.8} className="sb-add-icon" />
               </button>
 
               {isAddMenuOpen && (
@@ -881,7 +918,7 @@ export const Sidebar = memo(function Sidebar({
                       border: '1px solid #e2e8f0',
                       borderRadius: '12px',
                       overflow: 'hidden',
-                      boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+                      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.15)',
                       zIndex: 1000,
                       minWidth: '190px',
                       whiteSpace: 'nowrap',
@@ -908,24 +945,20 @@ export const Sidebar = memo(function Sidebar({
           )
         )}
 
-        {/* Global Search Bar */}
+        {/* Global Search Bar with animated glow and shortcut hint */}
         {!isCollapsed && (
-          <div style={{ padding: '2px 10px 8px' }}>
+          <div style={{ padding: '4px 12px 10px' }}>
             <div
-              className="gs-input-wrap"
+              className="gs-input-wrap sb-search-wrap"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease'
+                padding: '8.5px 12px',
+                borderRadius: '11px'
               }}
             >
-              <Search size={14} style={{ color: '#94a3b8', flexShrink: 0 }} />
+              <Search size={14} className="sb-search-icon" style={{ color: '#94a3b8', flexShrink: 0 }} />
               <input
                 placeholder="Search all registers…"
                 value={search}
@@ -936,10 +969,29 @@ export const Sidebar = memo(function Sidebar({
                   background: 'transparent',
                   width: '100%',
                   fontSize: '12.5px',
-                  color: '#0f172a'
+                  color: '#0f172a',
+                  fontWeight: 500
                 }}
                 autoComplete="off"
               />
+              {!search && (
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: '#94a3b8',
+                    background: '#e2e8f0',
+                    padding: '2px 5px',
+                    borderRadius: '4px',
+                    lineHeight: 1,
+                    letterSpacing: '0.3px',
+                    pointerEvents: 'none',
+                    userSelect: 'none'
+                  }}
+                >
+                  ⌘K
+                </span>
+              )}
               {search && (
                 <button
                   onClick={() => setSearch('')}
@@ -954,9 +1006,12 @@ export const Sidebar = memo(function Sidebar({
                     justifyContent: 'center',
                     width: '16px',
                     height: '16px',
-                    padding: 0
+                    padding: 0,
+                    transition: 'transform 0.15s ease'
                   }}
-                  title="Clear"
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.15) rotate(90deg)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1) rotate(0)'}
+                  title="Clear search"
                 >
                   <X size={11} />
                 </button>
