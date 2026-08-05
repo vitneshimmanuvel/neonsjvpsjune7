@@ -702,99 +702,95 @@ export const Sidebar = memo(function Sidebar({
           </div>
         </div>
 
-        {/* Sidebar Add Button — only visible to users with canCreateSheets permission or admins */}
-        {(isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
-          <div className="sidebar-add-section" style={{ padding: '10px 10px 6px', position: 'relative' }}>
-            <button
-              className="sidebar-add-btn"
-              onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
-              title="Add new item"
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
-                gap: '8px',
-                padding: '10px 16px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
-                color: '#ffffff',
-                fontSize: '13.5px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0, 45, 93, 0.22)',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 45, 93, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 45, 93, 0.22)';
-              }}
-            >
-              <Plus size={16} strokeWidth={2.5} /> <span className="sidebar-add-text">Add</span>
-            </button>
-
-            {isAddMenuOpen && (
-              <>
-                {/* Backdrop to close menu */}
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 999 }}
-                  onClick={() => setIsAddMenuOpen(false)}
-                />
-                <div
-                  className="sidebar-add-dropdown"
+        {/* Actions Bar — Combined +Add and Entry buttons side-by-side */}
+        {!isCollapsed ? (
+          <div style={{ padding: '8px 10px 4px', display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+            {(isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
+              <div style={{ flex: 1.1, position: 'relative' }}>
+                <button
+                  className="sidebar-add-btn"
+                  onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                  title="Add new register or file"
                   style={{
-                    position: 'absolute',
-                    top: '0',
-                    ...(isCollapsed
-                      ? { left: 'calc(100% + 8px)' }   // pop to the RIGHT in collapsed mode
-                      : { top: '50px', left: '10px', right: '10px' }  // drop down normally
-                    ),
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
-                    zIndex: 1000,
-                    minWidth: '190px',
-                    whiteSpace: 'nowrap',
-                    padding: '4px'
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
+                    color: '#ffffff',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0, 45, 93, 0.2)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 45, 93, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 45, 93, 0.2)';
                   }}
                 >
-                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
-                    <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
-                  </button>
-                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
-                    <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
-                  </button>
-                  <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
-                    <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
-                    <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
-                  </label>
-                  <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
-                    <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                  <Plus size={15} strokeWidth={2.5} /> <span className="sidebar-add-text">Add</span>
+                </button>
 
-        {/* Entry Button — Quick Add Entry to any register */}
-        {!isCollapsed && (
-          <div style={{ padding: '2px 10px 6px' }}>
+                {isAddMenuOpen && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                      onClick={() => setIsAddMenuOpen(false)}
+                    />
+                    <div
+                      className="sidebar-add-dropdown"
+                      style={{
+                        position: 'absolute',
+                        top: '42px',
+                        left: '0',
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+                        zIndex: 1000,
+                        minWidth: '190px',
+                        whiteSpace: 'nowrap',
+                        padding: '4px'
+                      }}
+                    >
+                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                        <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
+                      </button>
+                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                        <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
+                      </button>
+                      <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
+                        <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
+                        <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
+                      </label>
+                      <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                        <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             <button
               onClick={() => setIsEntryPanelOpen(true)}
               style={{
-                width: '100%',
+                flex: 1,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '8px 12px',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 10px',
                 borderRadius: '10px',
                 border: '1px solid #bbf7d0',
                 background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
@@ -817,10 +813,75 @@ export const Sidebar = memo(function Sidebar({
               }}
               title="Quick add entry to any register"
             >
-              <PenLine size={14} />
+              <PenLine size={15} />
               <span>Entry</span>
             </button>
           </div>
+        ) : (
+          (isSystemAdmin || (authUser as any)?.role === 'sheet_admin' || (authUser as any)?.permissions?.canCreateSheets) && (
+            <div className="sidebar-add-section" style={{ padding: '8px', position: 'relative' }}>
+              <button
+                className="sidebar-add-btn"
+                onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+                title="Add new item"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '10px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #002d5d 0%, #0a3d73 100%)',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0, 45, 93, 0.22)'
+                }}
+              >
+                <Plus size={16} strokeWidth={2.5} />
+              </button>
+
+              {isAddMenuOpen && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                    onClick={() => setIsAddMenuOpen(false)}
+                  />
+                  <div
+                    className="sidebar-add-dropdown"
+                    style={{
+                      position: 'absolute',
+                      top: '0',
+                      left: 'calc(100% + 8px)',
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      boxShadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+                      zIndex: 1000,
+                      minWidth: '190px',
+                      whiteSpace: 'nowrap',
+                      padding: '4px'
+                    }}
+                  >
+                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { navigate('/templates'); setIsAddMenuOpen(false); }}>
+                      <PlusCircle size={16} color="var(--navy)" /><span>New Register</span>
+                    </button>
+                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { setIsCreatingFolder(true); setIsAddMenuOpen(false); }}>
+                      <FolderPlus size={16} color="var(--navy)" /><span>New File</span>
+                    </button>
+                    <label className="context-item" style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }}>
+                      <FileSpreadsheet size={16} color="#107c41" /><span>Input Excel</span>
+                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden-file-input" onChange={(e) => { onInputExcel?.(e); setIsAddMenuOpen(false); }} />
+                    </label>
+                    <button className="context-item" style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: '10px', width: '100%', fontSize: '13px', borderRadius: '6px', fontWeight: 600 }} onClick={() => { onInputFolder?.(); setIsAddMenuOpen(false); }}>
+                      <Folder size={16} fill="#fbbf24" color="#f59e0b" /><span>Input File</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )
         )}
 
         {/* Global Search Bar */}
