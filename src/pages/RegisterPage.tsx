@@ -16,7 +16,7 @@ import {
   generateShareLink, addSharedUser, removeSharedUser,
   subscribeToMutationStatus, updateEntriesOrder, flushAllPendingWrites,
   getPendingMutationsCount,
-  updateEntryCellStyles, unlinkColumn,
+  updateEntryCellStyles, unlinkColumn, resyncLinkedColumns,
   formatDateToDDMMYYYY, validatePhoneNumber, canUserSelectBackDates,
   listFolders,
   type Entry, type CellStyle, type HistoryEntry, type Folder,
@@ -29,7 +29,7 @@ import {
   Hash, FlaskConical, Pin, IndianRupee,
   Mail, Phone, Globe, Star, CheckSquare, Image as ImageIcon, ArrowLeft,
   Search, FileText, Download, ListOrdered, Maximize2, AlertCircle,
-  X, Link as LinkIcon, Info, AlertTriangle, Trash2, ZoomIn, ZoomOut, Bell, Clock, Lock, Check,
+  X, Link as LinkIcon, Info, AlertTriangle, Trash2, ZoomIn, ZoomOut, Bell, Clock, Lock, Check, RefreshCw,
   Home, Folder as FolderIcon, FileSpreadsheet
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -4258,26 +4258,63 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                 </div>
               </div>
             ) : (
-              <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', gap: '8px' }}>
-                <button 
-                  className="modal-cancel-btn" 
-                  style={{ 
-                    flex: 1, 
-                    borderColor: '#ef4444', 
-                    color: '#ef4444', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '6px',
-                    backgroundColor: 'transparent'
-                  }} 
-                  onClick={() => setShowUnlinkConfirm(true)}
-                >
-                  <Trash2 size={16} /> Unlink Column
-                </button>
-                <button className="modal-confirm-btn" style={{ flex: 1 }} onClick={() => setLinkInfoModal(null)}>
-                  Close
-                </button>
+              <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(linkInfoModal.role === 'source' || linkInfoModal.role === 'target') && (
+                  <button 
+                    className="modal-confirm-btn" 
+                    style={{ 
+                      width: '100%',
+                      background: '#16a34a', 
+                      borderColor: '#16a34a', 
+                      color: '#fff',
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '6px',
+                      fontSize: '13px',
+                      padding: '10px',
+                      fontWeight: 600
+                    }}
+                    onClick={async () => {
+                      try {
+                        toast.loading('Re-syncing linked data...', { id: 'resync' });
+                        const resyncRegId = linkInfoModal.role === 'source' ? registerId : (linkInfoModal.linkedRegisterId || registerId);
+                        const result = await resyncLinkedColumns(resyncRegId);
+                        if (linkInfoModal.linkedRegisterId) {
+                          queryClient.invalidateQueries({ queryKey: ['register', linkInfoModal.linkedRegisterId] });
+                        }
+                        queryClient.invalidateQueries({ queryKey: ['register', registerId] });
+                        toast.success(`Re-sync complete! ${result.synced} rows synced.`, { id: 'resync' });
+                        setLinkInfoModal(null);
+                      } catch (err: any) {
+                        toast.error(err?.message || 'Re-sync failed', { id: 'resync' });
+                      }
+                    }}
+                  >
+                    <RefreshCw size={16} /> Re-sync Data
+                  </button>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="modal-cancel-btn" 
+                    style={{ 
+                      flex: 1, 
+                      borderColor: '#ef4444', 
+                      color: '#ef4444', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '6px',
+                      backgroundColor: 'transparent'
+                    }} 
+                    onClick={() => setShowUnlinkConfirm(true)}
+                  >
+                    <Trash2 size={16} /> Unlink Column
+                  </button>
+                  <button className="modal-confirm-btn" style={{ flex: 1 }} onClick={() => setLinkInfoModal(null)}>
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>

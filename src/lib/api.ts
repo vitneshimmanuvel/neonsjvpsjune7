@@ -2263,13 +2263,11 @@ export async function linkColumn(
       sourceColType = col.type;
       sourceColDropdownOptions = col.dropdownOptions;
       sourceMaxRowNumber = reg.entries.length;
-      // Gather existing values
+      // Gather ALL entries (including those without values) so __sourceEntryId is always set
       const colIdStr = columnId.toString();
       reg.entries.forEach(e => {
         const val = e.cells?.[colIdStr];
-        if (val !== undefined) {
-          sourceEntriesData.push({ rowNumber: e.rowNumber, entryId: e.id, value: val });
-        }
+        sourceEntriesData.push({ rowNumber: e.rowNumber, entryId: e.id, value: val ?? '' });
       });
       await saveRegDocImmediate(reg);
     }
@@ -2303,7 +2301,9 @@ export async function linkColumn(
         if (targetEntry) {
           if (!targetEntry.cells) targetEntry.cells = {};
           targetEntry.cells["__sourceEntryId"] = entryId.toString();
-          targetEntry.cells[targetColIdStr] = value;
+          if (value) {
+            targetEntry.cells[targetColIdStr] = value;
+          }
         }
       });
       
@@ -2366,6 +2366,86 @@ export async function unlinkColumn(
   }
 }
 
+/**
+ * Re-syncs all linked source columns in a register by re-establishing
+ * __sourceEntryId mappings and re-copying values to the target register.
+ * Use this to repair broken linked data (e.g., rows showing empty in the target).
+ */
+export async function resyncLinkedColumns(registerId: number): Promise<{ synced: number }> {
+  let totalSynced = 0;
+
+  const reg = await getRegDoc(registerId);
+  const sourceColumns = reg.columns.filter(c => c.linkedTo && c.linkedTo.role === 'source');
+
+  if (sourceColumns.length === 0) {
+    const targetCols = reg.columns.filter(c => c.linkedTo && c.linkedTo.role === 'target');
+    const sourceRegIds = Array.from(new Set(targetCols.map(c => c.linkedTo!.registerId).filter(Boolean)));
+
+    if (sourceRegIds.length === 0) {
+      throw new Error('No linked columns found in this register.');
+    }
+
+    for (const srcId of sourceRegIds) {
+      const res = await resyncLinkedColumns(srcId);
+      totalSynced += res.synced;
+    }
+    return { synced: totalSynced };
+  }
+
+  // Group source columns by target register
+  const targetMap = new Map<number, { sourceColId: number; targetColId: number; targetRegId: number }[]>();
+  for (const col of sourceColumns) {
+    const targetRegId = col.linkedTo!.registerId;
+    if (!targetMap.has(targetRegId)) targetMap.set(targetRegId, []);
+    targetMap.get(targetRegId)!.push({
+      sourceColId: col.id,
+      targetColId: col.linkedTo!.columnId,
+      targetRegId,
+    });
+  }
+
+  for (const [targetRegId, linkedCols] of targetMap) {
+    // Gather all source data: for each source entry, collect the entry ID and all linked column values
+    const sourceEntries = reg.entries.map(e => {
+      const colValues: Record<string, string> = {};
+      for (const lc of linkedCols) {
+        const val = e.cells?.[lc.sourceColId.toString()];
+        if (val !== undefined && val !== null) {
+          colValues[lc.targetColId.toString()] = val;
+        }
+      }
+      return { rowNumber: e.rowNumber, entryId: e.id, colValues };
+    });
+
+    // Apply to target register
+    await runQueuedMutation(targetRegId, async () => {
+      const targetReg = await getRegDoc(targetRegId);
+
+      // Ensure target has enough rows
+      ensureTargetRows(targetReg, reg.entries.length);
+
+      for (const { rowNumber, entryId, colValues } of sourceEntries) {
+        const targetEntry = targetReg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        if (targetEntry) {
+          if (!targetEntry.cells) targetEntry.cells = {};
+          // Re-stamp the sourceEntryId mapping
+          targetEntry.cells["__sourceEntryId"] = entryId.toString();
+          // Re-copy all linked column values
+          for (const [colIdStr, value] of Object.entries(colValues)) {
+            targetEntry.cells[colIdStr] = value;
+          }
+          totalSynced++;
+        }
+      }
+
+      targetReg.updatedAt = new Date().toISOString();
+      targetReg.entryCount = targetReg.entries.length;
+      await saveRegDocImmediate(targetReg, true);
+    });
+  }
+
+  return { synced: totalSynced };
+}
 
 
 export async function updateEntryCellStyles(registerId: number, entryId: number, cellStyles: Record<string, CellStyle>): Promise<Entry> {
