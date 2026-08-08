@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { firebaseLogout } from '../../lib/firebaseAuth';
-import { LayoutDashboard, Users, Activity, LogOut, BarChart3, Menu, X, ShieldAlert, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Users, Activity, LogOut, BarChart3, Menu, X, ShieldAlert, FileSpreadsheet, Trash2, Cpu, Shield, Database, Sliders, Megaphone } from 'lucide-react';
 import AdminUsersPage from './AdminUsersPage';
 import AdminActivityPage from './AdminActivityPage';
 import AdminDownloadRequestsPage from './AdminDownloadRequestsPage';
@@ -10,21 +10,29 @@ import AdminAnalyticsPage from './AdminAnalyticsPage';
 import AdminActiveReportPage from './AdminActiveReportPage';
 import RecycleBinPage from '../../pages/RecycleBinPage';
 import AdminOverviewPage from './AdminOverviewPage';
+import AdminSystemHealthPage from './AdminSystemHealthPage';
+import AdminSecurityPage from './AdminSecurityPage';
+import AdminBackupPage from './AdminBackupPage';
+import AdminGlobalRulesPage from './AdminGlobalRulesPage';
+import AdminBroadcastPage from './AdminBroadcastPage';
 import { AdminNotificationBell } from '../components/AdminNotificationBell';
+
+type AdminTab = 'overview'|'users'|'activity'|'report'|'downloads'|'analytics'|'recycle'|'health'|'security'|'backup'|'rules'|'broadcast';
+const ALL_TABS: AdminTab[] = ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle', 'health', 'security', 'backup', 'rules', 'broadcast'];
 
 export default function AdminDashboard() {
   const { user, logout, token } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview'|'users'|'activity'|'report'|'downloads'|'analytics'|'recycle'>(() => {
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const tabParam = urlParams.get('tab');
-      if (tabParam && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(tabParam)) {
-        return tabParam as any;
+      const tabParam = urlParams.get('tab') as AdminTab;
+      if (tabParam && ALL_TABS.includes(tabParam)) {
+        return tabParam;
       }
-      const savedTab = sessionStorage.getItem('admin_active_tab');
-      if (savedTab && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(savedTab)) {
-        return savedTab as any;
+      const savedTab = sessionStorage.getItem('admin_active_tab') as AdminTab;
+      if (savedTab && ALL_TABS.includes(savedTab)) {
+        return savedTab;
       }
     } catch (e) {}
     return 'overview';
@@ -34,9 +42,9 @@ export default function AdminDashboard() {
   // Sync tab with URL search parameter if changed externally
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    if (tabParam && ['overview', 'users', 'activity', 'report', 'downloads', 'analytics', 'recycle'].includes(tabParam)) {
-      setActiveTab(tabParam as any);
+    const tabParam = urlParams.get('tab') as AdminTab;
+    if (tabParam && ALL_TABS.includes(tabParam)) {
+      setActiveTab(tabParam);
     }
   }, [window.location.search]);
 
@@ -65,6 +73,11 @@ export default function AdminDashboard() {
     { key: 'report', icon: <FileSpreadsheet size={18}/>, label: 'Active Report' },
     { key: 'downloads', icon: <ShieldAlert size={18}/>, label: 'Approval Requests' },
     { key: 'analytics', icon: <BarChart3 size={18}/>, label: 'Analytics' },
+    { key: 'health', icon: <Cpu size={18}/>, label: 'System Health' },
+    { key: 'security', icon: <Shield size={18}/>, label: 'Security & Sessions' },
+    { key: 'backup', icon: <Database size={18}/>, label: 'Data Backup Vault' },
+    { key: 'rules', icon: <Sliders size={18}/>, label: 'Global Rules' },
+    { key: 'broadcast', icon: <Megaphone size={18}/>, label: 'Broadcast Alerts' },
     { key: 'recycle', icon: <Trash2 size={18}/>, label: 'Recycle Bin' },
   ];
 
@@ -120,14 +133,14 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div style={{padding:'20px 12px',flex:1,display:'flex',flexDirection:'column',gap:'6px'}}>
+        <div style={{padding:'20px 12px',flex:1,display:'flex',flexDirection:'column',gap:'4px',overflowY:'auto'}}>
           {navItems.map(item => (
             <button key={item.key} onClick={() => handleTabClick(item.key)} className="admin-nav-button" style={{
-              display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',borderRadius:'10px',border:'none',
+              display:'flex',alignItems:'center',gap:'12px',padding:'10px 14px',borderRadius:'10px',border:'none',
               background:activeTab===item.key?'var(--brand-blue-light)':'transparent',
               color:activeTab===item.key?'var(--accent)':'var(--muted)',
               borderLeft:activeTab===item.key?'3px solid var(--accent)':'3px solid transparent',
-              cursor:'pointer',textAlign:'left',fontWeight:600,fontSize:'14px',transition:'all 0.2s',width:'100%'
+              cursor:'pointer',textAlign:'left',fontWeight:600,fontSize:'13.5px',transition:'all 0.2s',width:'100%'
             }}>
               <span style={{color:activeTab===item.key?'var(--accent)':'var(--placeholder)',display:'flex'}}>{item.icon}</span> {item.label}
             </button>
@@ -152,6 +165,11 @@ export default function AdminDashboard() {
         {activeTab === 'report' && <AdminActiveReportPage />}
         {activeTab === 'downloads' && <AdminDownloadRequestsPage />}
         {activeTab === 'analytics' && <AdminAnalyticsPage />}
+        {activeTab === 'health' && <AdminSystemHealthPage />}
+        {activeTab === 'security' && <AdminSecurityPage />}
+        {activeTab === 'backup' && <AdminBackupPage />}
+        {activeTab === 'rules' && <AdminGlobalRulesPage />}
+        {activeTab === 'broadcast' && <AdminBroadcastPage />}
         {activeTab === 'recycle' && <RecycleBinPage isAdminPanel={true} />}
       </div>
 
