@@ -52,8 +52,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return [
       {
         id: 'sys-welcome',
-        title: 'AG Trust Record Book v2.7 Active',
-        message: 'System initialization complete. Database indexes enabled for ultra-fast 50ms register queries.',
+        title: 'AG Trust Record Book v2.8 Active',
+        message: 'Multi-View Engine (Table, Kanban, List) enabled with real-time drag-and-drop workflow.',
         type: 'success',
         timestamp: new Date().toISOString(),
         isRead: false
