@@ -3,7 +3,7 @@ import {
   Type, Hash, Calendar, ChevronDown, FlaskConical, 
   IndianRupee, Mail, Phone, Globe, Star, 
   CheckSquare, Image as ImageIcon, ListOrdered,
-  Link as LinkIcon, CheckCircle2, Tag, PenTool
+  Link as LinkIcon, CheckCircle2, Tag, PenTool, Tags, User
 } from 'lucide-react';
 
 interface ColumnIconProps {
@@ -45,6 +45,10 @@ export const ColumnIcon: React.FC<ColumnIconProps> = ({ type, size = 16, classNa
       return <Star size={size} className={className} style={style} />;
     case 'auto_increment':
       return <ListOrdered size={size} className={className} style={style} />;
+    case 'multi_select':
+      return <Tags size={size} className={className} style={style} />;
+    case 'user':
+      return <User size={size} className={className} style={style} />;
     case 'link':
       return <LinkIcon size={size} className={className} style={style} />;
     default:

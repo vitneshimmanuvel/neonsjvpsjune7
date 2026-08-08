@@ -59,6 +59,9 @@ import { ReminderModal } from '../components/register/modals/ReminderModal';
 import { RemindersSummaryModal } from '../components/register/modals/RemindersSummaryModal';
 import { FloatingSelectionToolbar } from '../components/register/FloatingSelectionToolbar';
 import { CalcMenuPopover } from '../components/register/menus/CalcMenuPopover';
+import { ViewSwitcher, type ViewType } from '../components/register/ViewSwitcher';
+import { KanbanView } from '../components/register/views/KanbanView';
+import { ListView } from '../components/register/views/ListView';
 
 type CalcType = 'sum' | 'average' | 'count' | 'min' | 'max' | 'filled' | 'empty' | 'distinct' | 'none';
 
@@ -108,6 +111,8 @@ export default function RegisterPage({ overrideRegisterId, compact, onSplitView,
   }, [reminders, registerId]);
 
   const [showAddRecordModal, setShowAddRecordModal] = useState(false);
+  const [activeView, setActiveView] = useState<ViewType>('table');
+  const [kanbanGroupByColId, setKanbanGroupByColId] = useState<number | null>(null);
   const [detailViewEntry, setDetailViewEntry] = useState<Entry | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<number | null>(null);
 
@@ -3711,6 +3716,12 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             }}
           />
           
+          <ViewSwitcher
+            activeView={activeView}
+            onViewChange={setActiveView}
+            hasDropdownColumn={columns.some(c => ['dropdown', 'status', 'yes_no'].includes(c.type || 'text'))}
+          />
+
           <RegisterHeader 
             register={register} 
             setShareModal={setShareModal} 
@@ -3766,12 +3777,36 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         </div>
       )}
 
-      {/* ── Spreadsheet ── */}
-      <div 
-        ref={parentRef}
-        className="spreadsheet-wrapper" 
-        key={`grid-${columns.length}-${columns.map(c => c.id).join('-')}`}
-        onMouseDown={_canEditAny ? handleTableMouseDown : undefined}
+      {/* ── View Rendering ── */}
+      {activeView === 'kanban' && (
+        <KanbanView
+          entries={displayEntries}
+          columns={columns}
+          groupByColumnId={kanbanGroupByColId}
+          onGroupByChange={setKanbanGroupByColId}
+          onCellChange={handleCellChange}
+          onEntryClick={(e) => setDetailViewEntry(e)}
+          onAddEntry={_canEditAny ? () => setShowAddRecordModal(true) : undefined}
+          canEdit={_canEditAny}
+        />
+      )}
+
+      {activeView === 'list' && (
+        <ListView
+          entries={displayEntries}
+          columns={columns}
+          onEntryClick={(e) => setDetailViewEntry(e)}
+          onCellChange={handleCellChange}
+          canEdit={_canEditAny}
+        />
+      )}
+
+      {activeView === 'table' && (
+        <div 
+          ref={parentRef}
+          className="spreadsheet-wrapper" 
+          key={`grid-${columns.length}-${columns.map(c => c.id).join('-')}`}
+          onMouseDown={_canEditAny ? handleTableMouseDown : undefined}
         onScroll={(e) => {
           if (isRestoringScroll.current) return;
           const target = e.currentTarget;
@@ -4092,6 +4127,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             })()}
           </table>
         </div>
+      )}
 
 
       {/* ── Floating Selection Toolbar ── */}
