@@ -52,8 +52,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return [
       {
         id: 'sys-welcome',
-        title: 'AG Trust Record Book v2.8 Active',
-        message: 'Multi-View Engine (Table, Kanban, List) enabled with real-time drag-and-drop workflow.',
+        title: 'AG Trust Record Book v2.9 Active',
+        message: 'Modern Table UI, Pinned Column Engine, and All-New Filter Wizard enabled.',
         type: 'success',
         timestamp: new Date().toISOString(),
         isRead: false

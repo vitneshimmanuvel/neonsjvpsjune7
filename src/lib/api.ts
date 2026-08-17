@@ -2297,7 +2297,10 @@ export async function linkColumn(
       });
 
       sourceEntriesData.forEach(({ rowNumber, entryId, value }) => {
-        let targetEntry = reg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        let targetEntry = reg.entries.find(e => e.cells && e.cells["__sourceEntryId"] === entryId.toString());
+        if (!targetEntry) {
+          targetEntry = reg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        }
         if (targetEntry) {
           if (!targetEntry.cells) targetEntry.cells = {};
           targetEntry.cells["__sourceEntryId"] = entryId.toString();
@@ -2425,7 +2428,10 @@ export async function resyncLinkedColumns(registerId: number): Promise<{ synced:
       ensureTargetRows(targetReg, reg.entries.length);
 
       for (const { rowNumber, entryId, colValues } of sourceEntries) {
-        const targetEntry = targetReg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        let targetEntry = targetReg.entries.find(e => e.cells && e.cells["__sourceEntryId"] === entryId.toString());
+        if (!targetEntry) {
+          targetEntry = targetReg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        }
         if (targetEntry) {
           if (!targetEntry.cells) targetEntry.cells = {};
           // Re-stamp the sourceEntryId mapping

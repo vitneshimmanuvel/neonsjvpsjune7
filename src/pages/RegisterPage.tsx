@@ -3648,32 +3648,24 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             }}
             style={{ flexShrink: 0 }}
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </button>
-          <div className="register-single-file-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-            <FileSpreadsheet size={18} color="var(--navy)" style={{ flexShrink: 0 }} />
-            <h1 className="register-header-title" style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="register-single-file-title" style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+            <div style={{ width: '28px', height: '28px', minWidth: '28px', borderRadius: '7px', background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(37, 99, 235, 0.15)', flexShrink: 0 }}>
+              <FileSpreadsheet size={15} />
+            </div>
+            <h1 className="register-header-title">
               {register.name}
             </h1>
           </div>
           
           {_canEditAny && (
             <button 
-              className="pab-tab-action-btn primary header-add-btn" 
+              className="header-add-btn" 
               onClick={() => setShowAddRecordModal(true)}
               title="Add Row"
-              style={{
-                width: '30px',
-                height: '30px',
-                padding: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '6px',
-                minWidth: '30px'
-              }}
             >
-              <Plus size={18} />
+              <Plus size={16} strokeWidth={2.5} />
             </button>
           )}
         </div>
@@ -3823,7 +3815,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
         <table className={`spreadsheet ${_canEditAny ? '' : 'readonly-access'}`}>
           <thead>
             <tr>
-              <th className="serial">
+              <th className="serial" style={{ position: 'sticky', left: 0, top: 0, zIndex: 30, background: '#f8fafc', backgroundColor: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>
                 <div 
                   className="serial-inner" 
                   style={{ 
@@ -3884,12 +3876,12 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                   const IconComponent = <ColumnIcon type={col.type} size={12} />;
 
                   const isFrozen = frozenColumns.has(col.id);
-                  const stickyLeft = isFrozen ? frozenLeftOffsets[col.id] : undefined;
+                  const stickyLeft = isFrozen ? (frozenLeftOffsets[col.id] ?? 64) : undefined;
                   const colW = colWidths[col.id] || defaultColWidth;
 
                   const headerBg = col.bgColor 
-                    ? `linear-gradient(${col.bgColor}, ${col.bgColor}), ${isFrozen ? 'var(--border-light)' : 'var(--surface)'}`
-                    : (isFrozen ? 'var(--border-light)' : undefined);
+                    ? `linear-gradient(${col.bgColor}, ${col.bgColor}), #ffffff`
+                    : '#ffffff';
                   return (
                   <th
                     key={col.id}
@@ -3899,7 +3891,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                       else colHeaderRefs.current.delete(col.id);
                     }}
                     style={isFrozen
-                      ? { position: 'sticky', left: stickyLeft, zIndex: 13, background: headerBg, width: colW, minWidth: colW, maxWidth: colW }
+                      ? { position: 'sticky', left: stickyLeft, zIndex: 25, background: headerBg, backgroundColor: '#ffffff', width: colW, minWidth: colW, maxWidth: colW, boxShadow: '3px 0 8px -2px rgba(15, 23, 42, 0.08)' }
                       : { width: colW, minWidth: colW, maxWidth: colW, background: headerBg }
                     }
                   >
@@ -3937,7 +3929,9 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                         onMouseDown={(e) => e.stopPropagation()}
                         title="Select column"
                       />
-                      {IconComponent}
+                      <span className={`col-type-chip col-type-chip--${col.type || 'text'}`}>
+                        {IconComponent}
+                      </span>
                       <span className="col-header-name">
                         {col.name}
                         {(col as any).mandatory && (
@@ -3946,33 +3940,25 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                         {(col as any).unique && (
                           <span title="Unique field" style={{ color: 'var(--primary)', fontWeight: 900, marginLeft: 2, fontSize: '12px' }}>★</span>
                         )}
-                        {col.type === 'formula' && <span className="col-formula-badge" title={col.formula}>Fx</span>}
-                        {col.linkedTo && (
-                          <>
-                            <button 
-                              onClick={(e) => handleLinkIconClick(e, col)}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              title="Click to view link details"
-                              style={{ 
-                                background: 'none', 
-                                border: 'none', 
-                                padding: 0, 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                cursor: 'pointer',
-                                marginLeft: '4px'
-                              }}
-                            >
-                              <LinkIcon size={12} color="var(--primary)" />
-                            </button>
-                            {col.linkedTo.role === 'target' && (
-                              <span title="Read-only — data synced from source" style={{ marginLeft: '2px', display: 'inline-flex', alignItems: 'center', opacity: 0.6 }}>
-                                <Lock size={10} color="var(--muted)" />
-                              </span>
-                            )}
-                          </>
-                        )}
                       </span>
+                      {col.type === 'formula' && <span className="col-formula-badge" title={col.formula}>Fx</span>}
+                      {col.linkedTo && (
+                        <button
+                          className={`col-linked-badge ${col.linkedTo.role === 'target' ? 'col-linked-badge--target' : 'col-linked-badge--source'}`}
+                          onClick={(e) => handleLinkIconClick(e, col)}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          title={
+                            col.linkedTo.role === 'target'
+                              ? 'Synced Destination Column (Read-only) • Click to view link details & re-sync'
+                              : 'Source Linked Column • Click to view link details'
+                          }
+                        >
+                          <LinkIcon size={11} className="col-linked-badge-icon" />
+                          {col.linkedTo.role === 'target' && (
+                            <Lock size={10} className="col-linked-badge-lock" />
+                          )}
+                        </button>
+                      )}
                       {sortColId === col.id && sortDir && (
                         <span className="sort-indicator" title={sortDir === 'asc' ? 'Sorted A→Z' : 'Sorted Z→A'}>
                           {sortDir === 'asc' ? '▲' : '▼'}
@@ -3990,7 +3976,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                   </th>
                 )});
               })()}
-              <th className="actions" style={{ width: '50px', minWidth: '50px', padding: 0, position: 'sticky', right: 0, zIndex: 14, background: 'var(--table-bg)', borderLeft: '1px solid var(--border-light)' }}>
+              <th className="actions" style={{ width: '50px', minWidth: '50px', padding: 0, position: 'sticky', right: 0, zIndex: 14, background: '#ffffff', borderLeft: '1px solid var(--border-light)', borderBottom: '2px solid #e2e8f0' }}>
                 {_canEditAny && (
                   <button
                     onClick={(e) => {
@@ -3998,13 +3984,9 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                       setNewColumnModal(true);
                     }}
                     title="Add Column"
-                    style={{
-                      background: 'transparent', border: 'none', cursor: 'pointer',
-                      color: 'var(--muted)', width: '100%', height: '100%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}
+                    className="col-header-add-btn"
                   >
-                    <Plus size={16} strokeWidth={2.5} />
+                    <Plus size={15} strokeWidth={2.5} />
                   </button>
                 )}
               </th>

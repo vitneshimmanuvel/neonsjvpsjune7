@@ -247,14 +247,15 @@ export const RowDetailModal = React.memo(function RowDetailModal({
                       {col.type === 'formula' && <FlaskConical size={10} style={{ marginLeft: 4, opacity: 0.6 }} />}
                       {col.linkedTo && (
                         <span 
+                          className={`col-linked-badge ${isTargetLinked ? 'col-linked-badge--target' : 'col-linked-badge--source'}`}
                           title={isTargetLinked 
-                            ? "Linked column (To) — Read-only data synced from source register" 
-                            : "Linked column (From) — Sends data to destination register"}
-                          style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, gap: 2 }}
+                            ? "Synced column (Destination) — Read-only data synced from source register" 
+                            : "Linked column (Source) — Sends data to destination register"}
+                          style={{ marginLeft: 6 }}
                         >
-                          <LinkIcon size={12} color="var(--primary)" style={{ verticalAlign: 'middle' }} />
+                          <LinkIcon size={11} className="col-linked-badge-icon" />
                           {isTargetLinked && (
-                            <LockIcon size={10} color="#dc2626" style={{ verticalAlign: 'middle' }} />
+                            <LockIcon size={10} className="col-linked-badge-lock" />
                           )}
                         </span>
                       )}

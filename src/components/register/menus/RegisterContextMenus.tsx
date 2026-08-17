@@ -104,8 +104,11 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                 const col = columns.find((c) => c.id === colMenuId);
                 return (
                   <>
-                    <ColumnIcon type={col?.type} size={14} /> {col?.name || 'Column'}
-                    <span className="context-type-badge">{col?.type}</span>
+                    <span className={`col-type-chip col-type-chip--${col?.type || 'text'}`} style={{ width: '22px', height: '22px', minWidth: '22px' }}>
+                      <ColumnIcon type={col?.type} size={13} />
+                    </span>
+                    <span className="context-title-text">{col?.name || 'Column'}</span>
+                    <span className="context-type-badge">{col?.type || 'text'}</span>
                   </>
                 );
               })()}
@@ -119,7 +122,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setActiveModalColId(colMenuId);
                   setRenameColModal(true); setColMenuId(null);
                 }}>
-                  <Pencil size={16} /> Rename Column
+                  <span className="context-item-icon context-item-icon--blue"><Pencil size={14} /></span> Rename Column
                 </button>
                 <button className="context-item" onClick={() => {
                   const col = columns.find((c) => c.id === colMenuId);
@@ -133,14 +136,14 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setActiveModalColId(colMenuId);
                   setChangeTypeModal(true); setColMenuId(null);
                 }}>
-                  <ArrowLeftRight size={16} /> Change Column Type
+                  <span className="context-item-icon context-item-icon--indigo"><ArrowLeftRight size={14} /></span> Change Column Type
                 </button>
                 <button className="context-item" onClick={() => {
                   setActiveModalColId(colMenuId);
                   setLinkColumnModal(true);
                   setColMenuId(null);
                 }}>
-                  <LinkIcon size={16} /> Link
+                  <span className="context-item-icon context-item-icon--cyan"><LinkIcon size={14} /></span> Link Column
                 </button>
                 <button className="context-item" onClick={() => {
                   const col = columns.find((c) => c.id === colMenuId);
@@ -148,11 +151,14 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setColumnMandatoryMutation.mutate({ colId: colMenuId!, mandatory: !isMandatory });
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px', color: 'var(--primary)' }}>＊</span> Mandatory Field
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                      <span className="context-item-icon context-item-icon--amber">
+                        <span style={{ fontSize: '15px', fontWeight: 900, lineHeight: 1 }}>＊</span>
+                      </span>
+                      Mandatory Field
                     </span>
                     {!!(columns.find((c) => c.id === colMenuId) as any)?.mandatory && (
-                      <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '10px', fontWeight: 700 }}>ON</span>
+                      <span style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: 'white', borderRadius: '12px', padding: '2px 8px', fontSize: '9.5px', fontWeight: 750, letterSpacing: '0.4px', boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)' }}>ON</span>
                     )}
                   </span>
                 </button>
@@ -162,11 +168,14 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   setColumnUniqueMutation.mutate({ colId: colMenuId!, unique: !isUnique });
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'space-between' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '16px', color: 'var(--primary)' }}>★</span> Unique Field
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                      <span className="context-item-icon context-item-icon--purple">
+                        <span style={{ fontSize: '14px', lineHeight: 1 }}>★</span>
+                      </span>
+                      Unique Field
                     </span>
                     {!!(columns.find((c) => c.id === colMenuId) as any)?.unique && (
-                      <span style={{ background: 'var(--primary)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '10px', fontWeight: 700 }}>ON</span>
+                      <span style={{ background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: 'white', borderRadius: '12px', padding: '2px 8px', fontSize: '9.5px', fontWeight: 750, letterSpacing: '0.4px', boxShadow: '0 1px 3px rgba(37, 99, 235, 0.3)' }}>ON</span>
                     )}
                   </span>
                 </button>
@@ -178,7 +187,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                     setActiveModalColId(colMenuId);
                     setDropdownConfigModal(true); setColMenuId(null);
                   }}>
-                    <ChevronDown size={16} /> Edit Options
+                    <span className="context-item-icon context-item-icon--purple"><ChevronDown size={14} /></span> Edit Options
                   </button>
                 )}
               </>
@@ -189,21 +198,21 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                 <div className="context-divider" />
                 <div className="context-section-label">Insert & Copy</div>
                 <button className="context-item" onClick={() => duplicateColumnMutation.mutate(colMenuId)}>
-                  <Copy size={16} /> Duplicate Column
+                  <span className="context-item-icon context-item-icon--emerald"><Copy size={14} /></span> Duplicate Column
                 </button>
                 <button className="context-item" onClick={() => {
                   setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula('');
                   setActiveModalColId(colMenuId);
                   setInsertColModal('left'); setColMenuId(null);
                 }}>
-                  <ArrowLeft size={16} /> Insert Column Left
+                  <span className="context-item-icon context-item-icon--teal"><ArrowLeft size={14} /></span> Insert Column Left
                 </button>
                 <button className="context-item" onClick={() => {
                   setNewColName(''); setNewColType('text'); setNewColDropdownOpts(''); setNewColFormula('');
                   setActiveModalColId(colMenuId);
                   setInsertColModal('right'); setColMenuId(null);
                 }}>
-                  <ArrowRight size={16} /> Insert Column Right
+                  <span className="context-item-icon context-item-icon--teal"><ArrowRight size={14} /></span> Insert Column Right
                 </button>
 
                 <div className="context-divider" />
@@ -212,13 +221,13 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                   disabled={columns.findIndex((c) => c.id === colMenuId) === 0}
                   onClick={() => moveColumnMutation.mutate({ colId: colMenuId, dir: 'left' })}
                 >
-                  <ChevronsLeftRight size={16} /> Move Left
+                  <span className="context-item-icon context-item-icon--slate"><ChevronsLeftRight size={14} /></span> Move Left
                 </button>
                 <button className="context-item"
                   disabled={columns.findIndex((c) => c.id === colMenuId) === columns.length - 1}
                   onClick={() => moveColumnMutation.mutate({ colId: colMenuId, dir: 'right' })}
                 >
-                  <ChevronsLeftRight size={16} /> Move Right
+                  <span className="context-item-icon context-item-icon--slate"><ChevronsLeftRight size={14} /></span> Move Right
                 </button>
               </>
             )}
@@ -230,7 +239,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
               freezeColumn(registerId, colMenuId, !isFrozen);
               setColMenuId(null);
             }}>
-              <Pin size={16} /> {frozenColumns.has(colMenuId) ? 'Unfreeze Column' : 'Freeze / Pin Column'}
+              <span className="context-item-icon context-item-icon--blue"><Pin size={14} /></span> {frozenColumns.has(colMenuId) ? 'Unfreeze Column' : 'Freeze / Pin Column'}
             </button>
             <button className="context-item" onClick={() => {
               const newHidden = new Set(hiddenColumns);
@@ -239,7 +248,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
               hideColumn(registerId, colMenuId, true);
               setColMenuId(null);
             }}>
-              <EyeOff size={16} /> Hide Column
+              <span className="context-item-icon context-item-icon--slate"><EyeOff size={14} /></span> Hide Column
             </button>
 
             {canEdit && (
@@ -301,12 +310,12 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                       fontSize: '11px', 
                       borderRadius: '6px',
                       border: '1px solid var(--border)',
-                      background: isActive ? 'var(--primary-light)' : 'white',
-                      color: isActive ? 'var(--primary)' : 'inherit',
-                      borderColor: isActive ? 'var(--primary)' : 'var(--border)',
+                      background: isActive ? 'rgba(37, 99, 235, 0.1)' : 'white',
+                      color: isActive ? '#2563eb' : 'inherit',
+                      borderColor: isActive ? '#2563eb' : 'var(--border)',
                       cursor: 'pointer',
                       textTransform: 'capitalize',
-                      fontWeight: isActive ? 600 : 400,
+                      fontWeight: isActive ? 700 : 500,
                       transition: 'all 0.2s'
                     }}
                     onClick={() => {
@@ -324,11 +333,11 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
               <>
                 <div className="context-divider" />
                 <button className="context-item danger" onClick={() => { if (confirm('Clear all data?')) clearColumnDataMutation.mutate(colMenuId); }}>
-                  <Eraser size={16} /> Clear Column Data
+                  <span className="context-item-icon context-item-icon--rose"><Eraser size={14} /></span> Clear Column Data
                 </button>
                 {columns.find((c) => c.id === colMenuId)?.type !== 'formula' ? (
                   <button className="context-item danger" onClick={() => { if (confirm('Delete column?')) deleteColumnMutation.mutate(colMenuId); }}>
-                    <Trash2 size={16} /> Delete Column
+                    <span className="context-item-icon context-item-icon--rose"><Trash2 size={14} /></span> Delete Column
                   </button>
                 ) : (
                   <button 
@@ -338,7 +347,7 @@ export function RegisterContextMenus(props: RegisterContextMenusProps) {
                     title="Formula columns cannot be deleted"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <Trash2 size={16} /> Delete Column
+                    <span className="context-item-icon context-item-icon--rose"><Trash2 size={14} /></span> Delete Column
                   </button>
                 )}
               </>

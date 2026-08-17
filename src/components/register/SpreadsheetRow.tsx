@@ -1320,7 +1320,7 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
     <tr id={`row-${entry.id}`} data-entry-id={entry.id} className={rowClassName} style={rowHeight ? { height: rowHeight, maxHeight: rowHeight } : undefined}>
       <td 
         className="serial" 
-        style={{ cursor: 'pointer' }}
+        style={{ cursor: 'pointer', position: 'sticky', left: 0, zIndex: 16, background: '#ffffff', backgroundColor: '#ffffff', borderRight: '1px solid #e2e8f0' }}
         onClick={handleSerialClick}
         title="Click to view details"
       >
@@ -1389,11 +1389,19 @@ export const SpreadsheetRow = React.memo(function SpreadsheetRow(props: Spreadsh
         if (cs?.textAlign) cellStyle.textAlign = cs.textAlign;
         
         if (isFrozen) {
-          const left = frozenLeftOffsets?.[col.id] || 50;
+          const left = frozenLeftOffsets?.[col.id] ?? 64;
           const frozenBg = cs?.bgColor 
             ? cs.bgColor 
-            : (col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : 'var(--table-bg)');
-          cellStyle = { ...cellStyle, position: 'sticky', left, zIndex: 10, background: frozenBg };
+            : (col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), #ffffff` : '#ffffff');
+          cellStyle = { 
+            ...cellStyle, 
+            position: 'sticky', 
+            left, 
+            zIndex: 12, 
+            background: frozenBg,
+            backgroundColor: cs?.bgColor || (col.bgColor ? undefined : '#ffffff'),
+            boxShadow: '3px 0 8px -2px rgba(15, 23, 42, 0.08)'
+          };
         }
         
         const isEditable = !editableColumnIds || editableColumnIds.has(col.id);

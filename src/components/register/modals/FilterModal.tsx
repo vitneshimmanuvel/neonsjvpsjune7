@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, X, ChevronRight, Filter, Plus, ChevronDown } from 'lucide-react';
+import { Search, X, ChevronRight, Filter, Plus, ChevronDown, ArrowLeft } from 'lucide-react';
 import { type Column, evaluateFormula } from '../../../lib/api';
 import { ColumnIcon } from '../ColumnIcon';
 
@@ -314,6 +314,26 @@ export function FilterModal({
     return 'text';
   };
 
+const getColTypeTheme = (type?: string) => {
+  switch (type) {
+    case 'number':
+    case 'currency':
+    case 'auto_increment':
+      return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+    case 'date':
+      return { bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
+    case 'dropdown':
+    case 'status':
+    case 'yes_no':
+    case 'multi_select':
+      return { bg: '#f5f3ff', color: '#7c3aed', border: '#ddd6fe' };
+    case 'formula':
+      return { bg: '#eef2ff', color: '#4f46e5', border: '#c7d2fe' };
+    default:
+      return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+  }
+};
+
   if (!filterModal) return null;
 
   return (
@@ -322,12 +342,14 @@ export function FilterModal({
       {/* ── Header ── */}
       <div className="fdp-header">
         <div className="fdp-title">
-          <Filter size={14} />
+          <div className="fdp-title-icon-badge">
+            <Filter size={13} />
+          </div>
           <span>Filter Data</span>
         </div>
         <div className="fdp-header-actions">
           {filters.length > 0 && (
-            <button className="fdp-clear-btn" onClick={() => { setFilters([]); setActiveFilters([]); }}>CLEAR ALL</button>
+            <button className="fdp-clear-btn" onClick={() => { setFilters([]); setActiveFilters([]); }}>Clear All</button>
           )}
           <button className="fdp-close-btn" onClick={() => { setFilterModal(false); resetWizard(); }} aria-label="Close">
             <X size={14} />
@@ -340,9 +362,25 @@ export function FilterModal({
         <div className="fdp-active-list">
           {filters.map((f, idx) => {
             const col = columns.find(c => c.id === f.columnId);
+            const theme = getColTypeTheme(col?.type);
             return (
               <div key={idx} className="fdp-chip">
-                <ColumnIcon type={col?.type || 'text'} size={12} />
+                <div 
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '5px',
+                    background: theme.bg,
+                    color: theme.color,
+                    border: `1px solid ${theme.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}
+                >
+                  <ColumnIcon type={col?.type || 'text'} size={11} />
+                </div>
                 <span className="fdp-chip-col">{col?.name}</span>
                 <span className="fdp-chip-op">{getOpLabel(f.operator, col?.type || 'text')}</span>
                 {!NO_VALUE_OPS.includes(f.operator) && !MULTI_VALUE_OPS.includes(f.operator) && (
@@ -355,7 +393,7 @@ export function FilterModal({
                   <span className="fdp-chip-val">to "{f.value2}"</span>
                 )}
                 <button className="fdp-chip-remove" onClick={() => handleRemoveFilter(idx)} aria-label="Remove filter">
-                  <X size={11} />
+                  <X size={12} />
                 </button>
               </div>
             );
@@ -368,9 +406,9 @@ export function FilterModal({
         /* Direct Column List View */
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div className="fdp-col-search">
-            <Search size={14} color="#999" />
+            <Search size={14} className="fdp-search-icon" />
             <input
-              placeholder="SEARCH COLUMNS TO FILTER..."
+              placeholder="Search columns to filter..."
               value={colSearch}
               onChange={(e) => setColSearch(e.target.value)}
               autoFocus
@@ -378,40 +416,45 @@ export function FilterModal({
             {colSearch && (
               <button 
                 onClick={() => setColSearch('')} 
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '50%' }}
+                className="fdp-col-search-clear"
+                title="Clear"
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             )}
           </div>
           <div className="fdp-col-list" style={{ maxHeight: '280px', overflowY: 'auto' }}>
             {filteredCols.map(c => {
               const hasFilter = filters.some(f => f.columnId === c.id);
+              const theme = getColTypeTheme(c.type);
               return (
                 <button 
                   key={c.id} 
                   className={`fdp-col-item ${hasFilter ? 'active' : ''}`} 
                   onClick={() => setSelectedColId(c.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    width: '100%',
-                    padding: '12px 16px',
-                    background: hasFilter ? '#f0f7ff' : 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    border: 'none',
-                    borderBottom: '1px solid #f9f9f9',
-                    transition: 'background 0.2s'
-                  }}
                 >
-                  <ColumnIcon type={c.type} size={15} />
-                  <span className="fdp-col-name" style={{ marginLeft: '10px', fontSize: '12px', fontWeight: 700, color: 'var(--primary)', flex: 1 }}>
+                  <div 
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: theme.bg,
+                      color: theme.color,
+                      border: `1px solid ${theme.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <ColumnIcon type={c.type} size={13} />
+                  </div>
+                  <span className="fdp-col-name">
                     {c.name}
                   </span>
                   {hasFilter && (
-                    <span style={{ fontSize: '10px', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '12px', fontWeight: 700, marginRight: '8px' }}>
-                      ACTIVE
+                    <span className="fdp-col-active-badge">
+                      Active
                     </span>
                   )}
                   <ChevronRight size={14} className="fdp-col-arrow" />
@@ -427,15 +470,41 @@ export function FilterModal({
         /* Configuration Wizard (Step 2/3) */
         <div className="fdp-wizard">
           <div className="fdp-wizard-header">
-            <span>SELECT VALUE OR CONDITION</span>
-            <button className="fdp-wizard-close" onClick={resetWizard}><X size={13} /></button>
+            <span>Select value or condition</span>
+            <button className="fdp-wizard-close" onClick={resetWizard} aria-label="Close">
+              <X size={13} />
+            </button>
           </div>
 
           <div className="fdp-wizard-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <div className="fdp-op-selection">
               {/* Back to Column Selection */}
-              <div className="fdp-selection-header" onClick={() => { setSelectedColId(null); setSelectedOp(null); }}>
-                <ChevronDown size={14} className="fdp-back-arrow" style={{ transform: 'rotate(90deg)' }} />
+              <div 
+                className="fdp-selection-header" 
+                onClick={() => { setSelectedColId(null); setSelectedOp(null); }}
+                title="Click to select another column"
+              >
+                <div className="fdp-back-icon-circle">
+                  <ArrowLeft size={12} />
+                </div>
+                {selectedCol && (
+                  <div 
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '5px',
+                      background: getColTypeTheme(selectedCol.type).bg,
+                      color: getColTypeTheme(selectedCol.type).color,
+                      border: `1px solid ${getColTypeTheme(selectedCol.type).border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}
+                  >
+                    <ColumnIcon type={selectedCol.type} size={11} />
+                  </div>
+                )}
                 <span className="fdp-selected-col-name">{selectedCol?.name}</span>
               </div>
 
@@ -449,20 +518,20 @@ export function FilterModal({
                         <input 
                           type="text" 
                           className="fdp-search-input" 
-                          placeholder="SEARCH VALUES..."
+                          placeholder="Search values..."
                           value={filterSearch}
                           onChange={e => setFilterSearch(e.target.value)}
                         />
                         {filterSearch && (
                           <button className="fdp-search-clear" onClick={() => setFilterSearch('')}>
-                            <X size={14} />
+                            <X size={12} />
                           </button>
                         )}
                       </div>
 
                       <div className="fdp-multi-actions">
                         <button 
-                          className="fdp-multi-action-btn"
+                          className="fdp-multi-action-btn select-all"
                           onClick={() => {
                             const all = uniqueValues.filter(v => v.toLowerCase().includes((filterSearch || '').toLowerCase()));
                             if (!filterSearch || '(blanks)'.includes(filterSearch.toLowerCase())) {
@@ -471,19 +540,19 @@ export function FilterModal({
                             setSelectedValues(Array.from(new Set([...selectedValues, ...all])));
                           }}
                         >
-                          SELECT ALL
+                          Select All
                         </button>
                         <button 
-                          className="fdp-multi-action-btn"
+                          className="fdp-multi-action-btn clear-all"
                           onClick={() => setSelectedValues([])}
                         >
-                          CLEAR ALL
+                          Clear All
                         </button>
                       </div>
 
                       <div className="fdp-multi-list">
                         {(!filterSearch || '(blanks)'.includes(filterSearch.toLowerCase())) && (
-                          <label className="fdp-multi-item">
+                          <label className={`fdp-multi-item ${selectedValues.includes('(Blanks)') ? 'checked' : ''}`}>
                             <input
                               type="checkbox"
                               checked={selectedValues.includes('(Blanks)')}
@@ -492,13 +561,13 @@ export function FilterModal({
                                 else setSelectedValues(selectedValues.filter(v => v !== '(Blanks)'));
                               }}
                             />
-                            <span>(BLANKS)</span>
+                            <span>(Blanks)</span>
                           </label>
                         )}
                         {(selectedCol?.type === 'dropdown' ? sortedDropdownOptions : uniqueValues)
                           .filter(opt => !filterSearch || opt.toLowerCase().includes(filterSearch.toLowerCase()))
                           .map(opt => (
-                          <label key={opt} className="fdp-multi-item">
+                          <label key={opt} className={`fdp-multi-item ${selectedValues.includes(opt) ? 'checked' : ''}`}>
                             <input
                               type="checkbox"
                               checked={selectedValues.includes(opt)}
@@ -507,14 +576,14 @@ export function FilterModal({
                                 else setSelectedValues(selectedValues.filter(v => v !== opt));
                               }}
                             />
-                            <span>{opt.toUpperCase()}</span>
+                            <span>{opt}</span>
                           </label>
                         ))}
                       </div>
                     </div>
 
-                    <div className="fdp-section-label" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--muted)', padding: '0 8px 8px' }}>
-                      FILTER BY CONDITION
+                    <div className="fdp-section-label">
+                      <span>Filter by condition</span>
                     </div>
                     {/* List Operators */}
                     <div className="fdp-op-list">
@@ -527,8 +596,10 @@ export function FilterModal({
                     </div>
                   </div>
 
-                  <div className="fdp-wizard-actions" style={{ padding: '12px 16px', borderTop: '1px solid #f1f5f9', marginTop: 0, flexShrink: 0, backgroundColor: 'white' }}>
-                    <button className="fdp-cancel-btn" onClick={() => { setSelectedColId(null); setSelectedValues([]); setFilterSearch(''); }}>BACK</button>
+                  <div className="fdp-wizard-actions">
+                    <button className="fdp-cancel-btn" onClick={() => { setSelectedColId(null); setSelectedValues([]); setFilterSearch(''); }}>
+                      Back
+                    </button>
                     <button
                       className="fdp-confirm-btn"
                       disabled={selectedValues.length === 0}
@@ -546,7 +617,7 @@ export function FilterModal({
                         setFilterModal(false);
                       }}
                     >
-                      APPLY FILTER
+                      Apply Filter {selectedValues.length > 0 ? `(${selectedValues.length})` : ''}
                     </button>
                   </div>
                 </div>
@@ -644,10 +715,12 @@ export function FilterModal({
 
       {/* ── Footer ── */}
       {selectedColId === null && (
-        <div className="fdp-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', padding: '12px 16px', borderTop: '1px solid #f0f0f0', background: '#fdfdfd', marginTop: 'auto' }}>
-          <button className="fdp-cancel-btn" style={{ border: 'none', background: 'none', padding: '8px 16px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#64748b' }} onClick={handleClearClose}>CANCEL</button>
+        <div className="fdp-footer">
+          <button className="fdp-cancel-btn" onClick={handleClearClose}>
+            Cancel
+          </button>
           <button className="fdp-apply-btn" onClick={handleApply}>
-            DONE {filters.length > 0 && `(${filters.length})`}
+            Done {filters.length > 0 ? `(${filters.length})` : ''}
           </button>
         </div>
       )}

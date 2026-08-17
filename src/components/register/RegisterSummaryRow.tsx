@@ -75,12 +75,12 @@ export const RegisterSummaryRow: React.FC<RegisterSummaryRowProps> = ({
       const calcValue = columnStats[col.id] ?? '-';
       
       const isFrozen = frozenColumns.has(col.id);
-      const leftOffset = isFrozen ? (frozenLeftOffsets[col.id] || 0) : 0;
+      const leftOffset = isFrozen ? (frozenLeftOffsets[col.id] ?? 64) : 0;
       const colW = colWidths[col.id] || defaultColWidth;
 
       const cellStyle: React.CSSProperties = isFrozen 
-        ? { position: 'sticky', left: leftOffset, zIndex: 11, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : 'var(--table-bg)', width: colW, minWidth: colW, maxWidth: colW }
-        : { width: colW, minWidth: colW, maxWidth: colW, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), var(--table-bg)` : undefined };
+        ? { position: 'sticky', left: leftOffset, zIndex: 20, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), #f8fafc` : '#f8fafc', backgroundColor: '#f8fafc', width: colW, minWidth: colW, maxWidth: colW, boxShadow: '3px 0 8px -2px rgba(15, 23, 42, 0.08)' }
+        : { width: colW, minWidth: colW, maxWidth: colW, background: col.bgColor ? `linear-gradient(${col.bgColor}, ${col.bgColor}), #f8fafc` : undefined };
 
       return (
         <td
