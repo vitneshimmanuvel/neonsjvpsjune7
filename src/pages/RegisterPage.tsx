@@ -16,7 +16,7 @@ import {
   generateShareLink, addSharedUser, removeSharedUser,
   subscribeToMutationStatus, updateEntriesOrder, flushAllPendingWrites,
   getPendingMutationsCount,
-  updateEntryCellStyles, unlinkColumn, resyncLinkedColumns,
+  updateEntryCellStyles, unlinkColumn, resyncLinkedColumns, getColumnLinks,
   formatDateToDDMMYYYY, validatePhoneNumber, canUserSelectBackDates,
   listFolders,
   type Entry, type CellStyle, type HistoryEntry, type Folder,
@@ -381,11 +381,23 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
   const [linkColumnModal, setLinkColumnModal] = useState(false);
   const [insertColModal, setInsertColModal] = useState<'left' | 'right' | null>(null);
   const [linkInfoModal, setLinkInfoModal] = useState<{
-    registerName: string;
-    columnName: string;
-    role: 'source' | 'target' | 'unknown';
     columnId: number;
-    linkedRegisterId?: number;
+    columnName: string;
+    links: Array<{
+      index: number;
+      registerId: number;
+      registerName: string;
+      columnId: number;
+      columnName: string;
+      role: 'source' | 'target' | 'unknown';
+    }>;
+  } | null>(null);
+  const [unlinkTargetInfo, setUnlinkTargetInfo] = useState<{
+    registerId?: number;
+    columnId?: number;
+    registerName?: string;
+    columnName?: string;
+    role?: string;
   } | null>(null);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
   
@@ -1382,15 +1394,22 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
   });
 
   const unlinkColumnMutation = useMutation({
-    mutationFn: ({ colId, clearData }: { colId: number; clearData: boolean }) => unlinkColumn(registerId, colId, clearData),
-    onSuccess: (_, { clearData }) => {
+    mutationFn: ({ colId, clearData, targetRegId, targetColId }: { colId: number; clearData: boolean; targetRegId?: number; targetColId?: number }) =>
+      unlinkColumn(registerId, colId, clearData, targetRegId, targetColId),
+    onSuccess: (_, { clearData, targetRegId }) => {
       queryClient.invalidateQueries({ queryKey: ['register', registerId] });
-      if (linkInfoModal?.linkedRegisterId) {
-        queryClient.invalidateQueries({ queryKey: ['register', linkInfoModal.linkedRegisterId] });
+      if (targetRegId) {
+        queryClient.invalidateQueries({ queryKey: ['register', targetRegId] });
+      }
+      if (linkInfoModal?.links) {
+        linkInfoModal.links.forEach(l => {
+          queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+        });
       }
       toast.success(clearData ? 'Column link removed & data cleared' : 'Column link successfully removed');
       setLinkInfoModal(null);
       setShowUnlinkConfirm(false);
+      setUnlinkTargetInfo(null);
       _logWork('update_permissions', `Removed link on column: ${linkInfoModal?.columnName || 'Unknown'} (${clearData ? 'without data' : 'with data'})`);
     },
     onError: () => {
@@ -1907,8 +1926,10 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       // setQueryData above already sets the authoritative state.
 
       const col = columnsRef.current.find(c => c.id === activeModalColId);
-      if (col?.linkedTo) {
-        queryClient.invalidateQueries({ queryKey: ['register', col.linkedTo.registerId] });
+      if (col) {
+        getColumnLinks(col).forEach(l => {
+          queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+        });
       }
       
       setChangeTypeModal(false); 
@@ -2187,8 +2208,10 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       if (_vars) {
         Object.keys(_vars).forEach(colId => {
           const col = columnsRef.current.find(c => c.id.toString() === colId);
-          if (col?.linkedTo) {
-            queryClient.invalidateQueries({ queryKey: ['register', col.linkedTo.registerId] });
+          if (col) {
+            getColumnLinks(col).forEach(l => {
+              queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+            });
           }
         });
       }
@@ -2500,8 +2523,8 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
     }
 
     // ── Linked Target Column Read-only ──
-    if ((col as any).linkedTo && (col as any).linkedTo.role === 'target') {
-      toast.error(`"${col.name}" is a linked column (To). Data comes from the source register automatically.`);
+    if (getColumnLinks(col).some(l => l.role === 'target')) {
+      toast.error(`"${col.name}" is a linked column (Destination). Data comes from the source register automatically.`);
       return false;
     }
 
@@ -2833,8 +2856,10 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
           }
           
           const col = columnsRef.current.find(c => c.id.toString() === columnId);
-          if (col?.linkedTo) {
-            queryClient.invalidateQueries({ queryKey: ['register', col.linkedTo.registerId] });
+          if (col) {
+            getColumnLinks(col).forEach(l => {
+              queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+            });
           }
           _logWork('edit_cells', `Updated photo in cell [Row #${entryIdx + 1}, Column: ${col?.name || columnId}]`);
         } catch (err: any) {
@@ -2924,8 +2949,10 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             DataPersistenceModule.updateLedgerStatus(ledgerId, 'success');
 
             const col = columnsRef.current.find(c => c.id.toString() === columnId);
-            if (col?.linkedTo) {
-              queryClient.invalidateQueries({ queryKey: ['register', col.linkedTo.registerId] });
+            if (col) {
+              getColumnLinks(col).forEach(l => {
+                queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+              });
             }
             const rowIdx = localEntriesRef.current.findIndex(e => e.id === entryId);
             const displayVal = value.length > 50 ? value.substring(0, 50) + '...' : value;
@@ -3595,21 +3622,45 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
 
   const handleLinkIconClick = useCallback(async (e: React.MouseEvent, col: any) => {
     e.stopPropagation();
-    if (!col.linkedTo) return;
+    const links = getColumnLinks(col);
+    if (links.length === 0) return;
     
     const loadingToastId = toast.loading('Fetching link details...');
     try {
-      const reg = await getRegister(col.linkedTo.registerId);
-      const targetCol = reg.columns?.find((c: any) => c.id === col.linkedTo.columnId);
+      const detailsList = await Promise.all(
+        links.map(async (l, idx) => {
+          try {
+            const reg = await getRegister(l.registerId);
+            const targetCol = reg.columns?.find((c: any) => c.id === l.columnId);
+            return {
+              index: idx + 1,
+              registerId: l.registerId,
+              registerName: reg.name,
+              columnId: l.columnId,
+              columnName: targetCol ? targetCol.name : `Column #${l.columnId}`,
+              role: (l.role || 'unknown') as 'source' | 'target' | 'unknown'
+            };
+          } catch {
+            return {
+              index: idx + 1,
+              registerId: l.registerId,
+              registerName: `Register #${l.registerId}`,
+              columnId: l.columnId,
+              columnName: `Column #${l.columnId}`,
+              role: (l.role || 'unknown') as 'source' | 'target' | 'unknown'
+            };
+          }
+        })
+      );
       
       toast.dismiss(loadingToastId);
       setLinkInfoModal({
-        registerName: reg.name,
-        columnName: targetCol ? targetCol.name : 'Unknown Column',
-        role: col.linkedTo.role || 'unknown',
         columnId: col.id,
-        linkedRegisterId: col.linkedTo.registerId
+        columnName: col.name,
+        links: detailsList
       });
+      setShowUnlinkConfirm(false);
+      setUnlinkTargetInfo(null);
     } catch (err) {
       console.error(err);
       toast.dismiss(loadingToastId);
@@ -3942,23 +3993,35 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                         )}
                       </span>
                       {col.type === 'formula' && <span className="col-formula-badge" title={col.formula}>Fx</span>}
-                      {col.linkedTo && (
-                        <button
-                          className={`col-linked-badge ${col.linkedTo.role === 'target' ? 'col-linked-badge--target' : 'col-linked-badge--source'}`}
-                          onClick={(e) => handleLinkIconClick(e, col)}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          title={
-                            col.linkedTo.role === 'target'
-                              ? 'Synced Destination Column (Read-only) • Click to view link details & re-sync'
-                              : 'Source Linked Column • Click to view link details'
-                          }
-                        >
-                          <LinkIcon size={11} className="col-linked-badge-icon" />
-                          {col.linkedTo.role === 'target' && (
-                            <Lock size={10} className="col-linked-badge-lock" />
-                          )}
-                        </button>
-                      )}
+                      {(() => {
+                        const links = getColumnLinks(col);
+                        if (links.length === 0) return null;
+                        const isTarget = links.some(l => l.role === 'target');
+                        const linkCount = links.length;
+
+                        return (
+                          <button
+                            className={`col-linked-badge ${isTarget ? 'col-linked-badge--target' : 'col-linked-badge--source'}`}
+                            onClick={(e) => handleLinkIconClick(e, col)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            title={
+                              isTarget
+                                ? 'Synced Destination Column (Read-only) • Click to view link details & re-sync'
+                                : `Source Linked Column (${linkCount} destination${linkCount > 1 ? 's' : ''}) • Click to view link details`
+                            }
+                          >
+                            <LinkIcon size={11} className="col-linked-badge-icon" />
+                            {linkCount > 1 && (
+                              <span style={{ fontSize: '10px', fontWeight: 800, marginLeft: '2px' }}>
+                                {linkCount}
+                              </span>
+                            )}
+                            {isTarget && (
+                              <Lock size={10} className="col-linked-badge-lock" />
+                            )}
+                          </button>
+                        );
+                      })()}
                       {sortColId === col.id && sortDir && (
                         <span className="sort-indicator" title={sortDir === 'asc' ? 'Sorted A→Z' : 'Sorted Z→A'}>
                           {sortDir === 'asc' ? '▲' : '▼'}
@@ -4193,74 +4256,82 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       />
 
       {linkInfoModal && (
-        <div className="modal-overlay" onClick={() => { setLinkInfoModal(null); setShowUnlinkConfirm(false); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <LinkIcon size={18} color="var(--primary)" /> Link Connection Details
-            </h3>
-            
-            <div style={{ margin: '16px 0', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ background: 'var(--bg-light)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Connection Role</span>
-                <span style={{ 
-                  fontSize: '14px', 
-                  fontWeight: 700, 
-                  color: linkInfoModal.role === 'source' ? '#16a34a' : linkInfoModal.role === 'target' ? '#2563eb' : 'var(--text-main)',
+        <div className="modal-overlay" onClick={() => { setLinkInfoModal(null); setShowUnlinkConfirm(false); setUnlinkTargetInfo(null); }}>
+          <div 
+            className="modal-content" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ maxWidth: '520px', width: '92%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: '24px' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(79, 70, 229, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '4px'
+                  justifyContent: 'center',
+                  color: '#4f46e5'
                 }}>
-                  {linkInfoModal.role === 'source' ? 'From Column (Source Column)' : linkInfoModal.role === 'target' ? 'To Column (Destination Column)' : 'Linked Column'}
-                </span>
+                  <LinkIcon size={18} />
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>Link Connections</h3>
+                  <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 500 }}>
+                    Column: <strong>{linkInfoModal.columnName}</strong> ({linkInfoModal.links.length} connection{linkInfoModal.links.length > 1 ? 's' : ''})
+                  </span>
+                </div>
               </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Linked Register</span>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--navy)', display: 'block', marginTop: '2px' }}>
-                  📂 {linkInfoModal.registerName}
-                </span>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', textTransform: 'uppercase', fontWeight: 700 }}>Linked Column</span>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--navy)', display: 'block', marginTop: '2px' }}>
-                  📊 {linkInfoModal.columnName}
-                </span>
-              </div>
+              <button 
+                onClick={() => { setLinkInfoModal(null); setShowUnlinkConfirm(false); setUnlinkTargetInfo(null); }}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {showUnlinkConfirm ? (
               <div style={{ 
-                margin: '16px 0 0 0', 
-                padding: '14px', 
+                margin: '12px 0 0 0', 
+                padding: '16px', 
                 background: 'rgba(239, 68, 68, 0.06)', 
                 border: '1px solid rgba(239, 68, 68, 0.2)', 
-                borderRadius: '8px'
+                borderRadius: '10px'
               }}>
-                <h4 style={{ color: '#dc2626', fontSize: '13px', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
+                <h4 style={{ color: '#dc2626', fontSize: '13px', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}>
                   <AlertTriangle size={16} /> Choose how to Unlink:
                 </h4>
-                <p style={{ fontSize: '12px', color: 'var(--text-main)', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                  {linkInfoModal.role === 'target'
-                    ? "Unlinking will disconnect the live data sync. The columns will stop mirroring each other. Choose whether to keep or clear the mirrored values in this column."
-                    : "Unlinking will disconnect the live data sync. The columns will stop mirroring each other. Choose whether to keep or clear the mirrored values in the target destination column (the source column data will be preserved)."
+                <p style={{ fontSize: '12px', color: 'var(--text-main)', margin: '0 0 14px 0', lineHeight: '1.4' }}>
+                  {unlinkTargetInfo?.registerName
+                    ? `Unlinking will disconnect sync with "${unlinkTargetInfo.registerName}". Choose whether to keep or clear mirrored values in the target column.`
+                    : "Unlinking will disconnect live data sync across all linked registers. Choose whether to keep or clear mirrored values in destination registers."
                   }
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
                       className="modal-confirm-btn" 
-                      style={{ flex: 1, background: 'var(--navy)', borderColor: 'var(--navy)', color: '#fff', fontSize: '11px', padding: '8px', fontWeight: 600 }}
-                      onClick={() => unlinkColumnMutation.mutate({ colId: linkInfoModal.columnId, clearData: false })}
+                      style={{ flex: 1, background: 'var(--navy)', borderColor: 'var(--navy)', color: '#fff', fontSize: '12px', padding: '9px', fontWeight: 600 }}
+                      onClick={() => unlinkColumnMutation.mutate({ 
+                        colId: linkInfoModal.columnId, 
+                        clearData: false,
+                        targetRegId: unlinkTargetInfo?.registerId,
+                        targetColId: unlinkTargetInfo?.columnId
+                      })}
                       disabled={unlinkColumnMutation.isPending}
                     >
                       {unlinkColumnMutation.isPending ? 'Unlinking...' : 'Keep Data'}
                     </button>
                     <button 
                       className="modal-confirm-btn" 
-                      style={{ flex: 1, background: '#dc2626', borderColor: '#dc2626', color: '#fff', fontSize: '11px', padding: '8px', fontWeight: 600 }}
-                      onClick={() => unlinkColumnMutation.mutate({ colId: linkInfoModal.columnId, clearData: true })}
+                      style={{ flex: 1, background: '#dc2626', borderColor: '#dc2626', color: '#fff', fontSize: '12px', padding: '9px', fontWeight: 600 }}
+                      onClick={() => unlinkColumnMutation.mutate({ 
+                        colId: linkInfoModal.columnId, 
+                        clearData: true,
+                        targetRegId: unlinkTargetInfo?.registerId,
+                        targetColId: unlinkTargetInfo?.columnId
+                      })}
                       disabled={unlinkColumnMutation.isPending}
                     >
                       {unlinkColumnMutation.isPending ? 'Unlinking...' : 'Clear Data'}
@@ -4268,16 +4339,124 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                   </div>
                   <button 
                     className="modal-cancel-btn" 
-                    style={{ width: '100%', fontSize: '11px', padding: '6px' }}
-                    onClick={() => setShowUnlinkConfirm(false)}
+                    style={{ width: '100%', fontSize: '12px', padding: '8px' }}
+                    onClick={() => { setShowUnlinkConfirm(false); setUnlinkTargetInfo(null); }}
                   >
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="modal-actions" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(linkInfoModal.role === 'source' || linkInfoModal.role === 'target') && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {linkInfoModal.links.map((link) => (
+                    <div 
+                      key={`${link.registerId}-${link.columnId}`}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            background: link.role === 'source' ? '#eff6ff' : '#ecfdf5',
+                            color: link.role === 'source' ? '#2563eb' : '#059669',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '6px'
+                          }}>
+                            Link {link.index}
+                          </span>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: link.role === 'source' ? '#16a34a' : '#2563eb',
+                            textTransform: 'uppercase'
+                          }}>
+                            {link.role === 'source' ? 'From (Source)' : 'To (Destination)'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUnlinkTargetInfo(link);
+                            setShowUnlinkConfirm(true);
+                          }}
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            color: '#dc2626',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Unlink this target"
+                        >
+                          <Trash2 size={12} /> Unlink
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div>
+                          <span style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Connected Register</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', display: 'block', marginTop: '2px' }}>
+                            📂 {link.registerName}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block' }}>Connected Column</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', display: 'block', marginTop: '2px' }}>
+                            📊 {link.columnName}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Quick Add Link Action */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const colId = linkInfoModal.columnId;
+                    setLinkInfoModal(null);
+                    setActiveModalColId(colId);
+                    setLinkColumnModal(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1.5px dashed #4f46e5',
+                    background: 'rgba(79, 70, 229, 0.04)',
+                    color: '#4f46e5',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Plus size={15} /> + Add More Links to this Column
+                </button>
+
+                {/* Modal Footer Action Buttons */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
                   <button 
                     className="modal-confirm-btn" 
                     style={{ 
@@ -4290,17 +4469,16 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                       justifyContent: 'center', 
                       gap: '6px',
                       fontSize: '13px',
-                      padding: '10px',
+                      padding: '9px',
                       fontWeight: 600
                     }}
                     onClick={async () => {
                       try {
                         toast.loading('Re-syncing linked data...', { id: 'resync' });
-                        const resyncRegId = linkInfoModal.role === 'source' ? registerId : (linkInfoModal.linkedRegisterId || registerId);
-                        const result = await resyncLinkedColumns(resyncRegId);
-                        if (linkInfoModal.linkedRegisterId) {
-                          queryClient.invalidateQueries({ queryKey: ['register', linkInfoModal.linkedRegisterId] });
-                        }
+                        const result = await resyncLinkedColumns(registerId);
+                        linkInfoModal.links.forEach(l => {
+                          queryClient.invalidateQueries({ queryKey: ['register', l.registerId] });
+                        });
                         queryClient.invalidateQueries({ queryKey: ['register', registerId] });
                         toast.success(`Re-sync complete! ${result.synced} rows synced.`, { id: 'resync' });
                         setLinkInfoModal(null);
@@ -4309,29 +4487,38 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                       }
                     }}
                   >
-                    <RefreshCw size={16} /> Re-sync Data
+                    <RefreshCw size={15} /> Re-sync All Links
                   </button>
-                )}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    className="modal-cancel-btn" 
-                    style={{ 
-                      flex: 1, 
-                      borderColor: '#ef4444', 
-                      color: '#ef4444', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '6px',
-                      backgroundColor: 'transparent'
-                    }} 
-                    onClick={() => setShowUnlinkConfirm(true)}
-                  >
-                    <Trash2 size={16} /> Unlink Column
-                  </button>
-                  <button className="modal-confirm-btn" style={{ flex: 1 }} onClick={() => setLinkInfoModal(null)}>
-                    Close
-                  </button>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="modal-cancel-btn" 
+                      style={{ 
+                        flex: 1, 
+                        borderColor: '#ef4444', 
+                        color: '#ef4444', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '6px',
+                        backgroundColor: 'transparent',
+                        fontSize: '12px'
+                      }} 
+                      onClick={() => {
+                        setUnlinkTargetInfo(null);
+                        setShowUnlinkConfirm(true);
+                      }}
+                    >
+                      <Trash2 size={14} /> Unlink All
+                    </button>
+                    <button 
+                      className="modal-confirm-btn" 
+                      style={{ flex: 1, fontSize: '12px' }} 
+                      onClick={() => setLinkInfoModal(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

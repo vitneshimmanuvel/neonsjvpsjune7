@@ -132,10 +132,19 @@ export interface RegisterSummary {
   deletedById?: string | number;
 }
 
+export interface LinkedTarget {
+  registerId: number;
+  columnId: number;
+  role?: 'source' | 'target';
+  registerName?: string;
+  columnName?: string;
+}
+
 export interface Column {
   id: number; registerId: number; name: string; type: string; position: number;
   dropdownOptions?: string[]; formula?: string; width?: number; summary?: string;
-  linkedTo?: { registerId: number; columnId: number; role?: 'source' | 'target' };
+  linkedTo?: LinkedTarget;
+  linkedTargets?: LinkedTarget[];
   mandatory?: boolean;
   unique?: boolean;
   doubleEntryWarning?: boolean;
@@ -143,6 +152,17 @@ export interface Column {
   minVal?: number;
   maxVal?: number;
   optionColors?: Record<string, string>;
+}
+
+export function getColumnLinks(col: Column | any): LinkedTarget[] {
+  if (!col) return [];
+  if (Array.isArray(col.linkedTargets) && col.linkedTargets.length > 0) {
+    return col.linkedTargets;
+  }
+  if (col.linkedTo && typeof col.linkedTo === 'object' && col.linkedTo.registerId) {
+    return [col.linkedTo];
+  }
+  return [];
 }
 
 export function getOptionBadgeStyle(col: Column | any, val: string) {
@@ -1370,7 +1390,7 @@ export async function deleteColumn(registerId: number, columnId: number): Promis
       throw new Error('Formula columns cannot be deleted');
     }
     const colName = col.name;
-    const linkedTo = col.linkedTo;
+    const colLinks = getColumnLinks(col);
 
     // Collect cell data for this column before removing
     const columnCellData: Record<string, string> = {};
@@ -1407,21 +1427,29 @@ export async function deleteColumn(registerId: number, columnId: number): Promis
     reg.entries.forEach((e) => { if (e.cells) delete e.cells[columnId.toString()]; });
     await saveRegDocImmediate(reg);
     await logAction(reg.businessId, 'Delete Column', `Deleted column "${colName}" from "${reg.name}"`, { registerId, registerName: reg.name });
-    return { reg, linkedTo };
+    return { reg, colLinks };
   });
 
-  const { reg, linkedTo } = result;
+  const { reg, colLinks } = result;
 
-  if (linkedTo) {
-    // Run queued mutation on counterpart register to clear the reference
-    await runQueuedMutation(linkedTo.registerId, async () => {
-      const targetReg = await getRegDoc(linkedTo.registerId);
-      const targetCol = targetReg.columns.find(c => c.id === linkedTo.columnId);
-      if (targetCol) {
-        delete targetCol.linkedTo;
-        await saveRegDocImmediate(targetReg);
-      }
-    }).catch(e => console.error("Failed to clean up counterpart linkedTo on column delete:", e));
+  if (colLinks && colLinks.length > 0) {
+    for (const link of colLinks) {
+      await runQueuedMutation(link.registerId, async () => {
+        const targetReg = await getRegDoc(link.registerId);
+        const targetCol = targetReg.columns.find(c => c.id === link.columnId);
+        if (targetCol) {
+          const remaining = getColumnLinks(targetCol).filter(l => !(l.registerId === registerId && l.columnId === columnId));
+          if (remaining.length > 0) {
+            targetCol.linkedTargets = remaining;
+            targetCol.linkedTo = remaining[0];
+          } else {
+            delete targetCol.linkedTargets;
+            delete targetCol.linkedTo;
+          }
+          await saveRegDocImmediate(targetReg);
+        }
+      }).catch(e => console.error("Failed to clean up counterpart link on column delete:", e));
+    }
   }
 
   return reg;
@@ -1496,9 +1524,12 @@ export async function renameColumn(
 
   const { reg, col, finalNewName } = result;
 
-  if (!preventSync && col.linkedTo) {
-    await renameColumn(col.linkedTo.registerId, col.linkedTo.columnId, finalNewName, true)
-      .catch(e => console.error("Failed to sync column rename change:", e));
+  if (!preventSync && col) {
+    const links = getColumnLinks(col).filter(l => l.role === 'source');
+    for (const link of links) {
+      await renameColumn(link.registerId, link.columnId, finalNewName, true)
+        .catch(e => console.error("Failed to sync column rename change:", e));
+    }
   }
 
   return reg;
@@ -1525,9 +1556,12 @@ export async function updateColumnDropdownOptions(
 
   const { reg, col } = result;
 
-  if (!preventSync && col.linkedTo) {
-    await updateColumnDropdownOptions(col.linkedTo.registerId, col.linkedTo.columnId, options, optionColors, true)
-      .catch(e => console.error("Failed to sync column dropdown options change:", e));
+  if (!preventSync && col) {
+    const links = getColumnLinks(col).filter(l => l.role === 'source');
+    for (const link of links) {
+      await updateColumnDropdownOptions(link.registerId, link.columnId, options, optionColors, true)
+        .catch(e => console.error("Failed to sync column dropdown options change:", e));
+    }
   }
 
   return reg;
@@ -1718,9 +1752,12 @@ export async function changeColumnType(
 
   const { reg, col } = result;
 
-  if (!preventSync && col.linkedTo) {
-    await changeColumnType(col.linkedTo.registerId, col.linkedTo.columnId, newType, options, true)
-      .catch(e => console.error("Failed to sync column type change:", e));
+  if (!preventSync && col) {
+    const links = getColumnLinks(col).filter(l => l.role === 'source');
+    for (const link of links) {
+      await changeColumnType(link.registerId, link.columnId, newType, options, true)
+        .catch(e => console.error("Failed to sync column type change:", e));
+    }
   }
 
   return reg;
@@ -1892,8 +1929,9 @@ export async function addEntry(registerId: number, cells: Record<string, string>
 
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     for (const targetRegId of targetRegIds) {
@@ -1903,8 +1941,11 @@ export async function addEntry(registerId: number, cells: Record<string, string>
     for (const [colIdStr, value] of Object.entries(cells)) {
       if (value === undefined || value === null) continue;
       const col = reg.columns.find(c => c.id.toString() === colIdStr);
-      if (col?.linkedTo && col.linkedTo.role === 'source') {
-        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.id, entry.rowNumber, value);
+      if (col) {
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+        }
       }
     }
 
@@ -1961,8 +2002,9 @@ export async function insertEntry(registerId: number, cells: Record<string, stri
 
     const insertTargetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        insertTargetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        insertTargetRegIds.add(link.registerId);
       }
     }
     for (const targetRegId of insertTargetRegIds) {
@@ -1972,8 +2014,11 @@ export async function insertEntry(registerId: number, cells: Record<string, stri
     for (const [colIdStr, value] of Object.entries(cells)) {
       if (value === undefined || value === null) continue;
       const col = reg.columns.find(c => c.id.toString() === colIdStr);
-      if (col?.linkedTo && col.linkedTo.role === 'source') {
-        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.id, entry.rowNumber, value);
+      if (col) {
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+        }
       }
     }
 
@@ -2023,8 +2068,11 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
 
   for (const [colIdStr, value] of Object.entries(cells)) {
     const col = reg.columns.find(c => c.id.toString() === colIdStr);
-    if (col?.linkedTo && col.linkedTo.role === 'source') {
-      await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.id, entry.rowNumber, value);
+    if (col) {
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+      }
     }
   }
 
@@ -2257,7 +2305,14 @@ export async function linkColumn(
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find(c => c.id === columnId);
     if (col) {
-      col.linkedTo = { registerId: targetRegisterId, columnId: targetColumnId, role: 'source' };
+      const existingTargets = getColumnLinks(col).filter(l => l.role === 'source');
+      // Add or update target link
+      const filtered = existingTargets.filter(l => !(l.registerId === targetRegisterId && l.columnId === targetColumnId));
+      filtered.push({ registerId: targetRegisterId, columnId: targetColumnId, role: 'source' });
+
+      col.linkedTargets = filtered;
+      col.linkedTo = filtered[0]; // backward compatibility
+
       // Capture source column metadata
       sourceColName = col.name;
       sourceColType = col.type;
@@ -2279,6 +2334,7 @@ export async function linkColumn(
     const col = reg.columns.find(c => c.id === targetColumnId);
     if (col) {
       col.linkedTo = { registerId, columnId, role: 'target' };
+      col.linkedTargets = [{ registerId, columnId, role: 'target' }];
       // Sync column name and type from source
       if (sourceColName) col.name = sourceColName;
       if (sourceColType) col.type = sourceColType;
@@ -2317,72 +2373,132 @@ export async function linkColumn(
   });
 }
 
+export async function linkMultipleColumns(
+  registerId: number,
+  columnId: number,
+  targets: Array<{ targetRegisterId: number; targetColumnId: number }>
+): Promise<void> {
+  for (const t of targets) {
+    if (t.targetRegisterId && t.targetColumnId) {
+      await linkColumn(registerId, columnId, t.targetRegisterId, t.targetColumnId);
+    }
+  }
+}
 
 export async function unlinkColumn(
   registerId: number,
   columnId: number,
-  clearData?: boolean
+  clearData?: boolean,
+  specificTargetRegisterId?: number,
+  specificTargetColumnId?: number
 ): Promise<void> {
-  let targetRegisterId: number | undefined;
-  let targetColumnId: number | undefined;
+  const targetsToClear: { targetRegisterId: number; targetColumnId: number; role?: 'source' | 'target' }[] = [];
 
-  // 1. Clear linkedTo on current column and optionally clear data
+  // 1. Clear link on current column and optionally clear data
   await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find(c => c.id === columnId);
-    if (col && col.linkedTo) {
-      targetRegisterId = col.linkedTo.registerId;
-      targetColumnId = col.linkedTo.columnId;
-      const role = col.linkedTo.role;
-      delete col.linkedTo;
-      const shouldSaveEntries = !!(clearData && role === 'target');
-      if (shouldSaveEntries) {
-        const colIdStr = columnId.toString();
-        reg.entries.forEach(entry => {
-          if (entry.cells) delete entry.cells[colIdStr];
-        });
-      }
-      await saveRegDocImmediate(reg, shouldSaveEntries);
-    }
-  });
+    if (col) {
+      const allLinks = getColumnLinks(col);
+      if (allLinks.length === 0) return;
 
-  // 2. Clear linkedTo on target/other column if found
-  if (targetRegisterId !== undefined && targetColumnId !== undefined) {
-    const finalTargetRegisterId: number = targetRegisterId;
-    const finalTargetColumnId: number = targetColumnId;
-    await runQueuedMutation(finalTargetRegisterId, async () => {
-      const reg = await getRegDoc(finalTargetRegisterId);
-      const col = reg.columns.find(c => c.id === finalTargetColumnId);
-      if (col) {
-        const role = col.linkedTo?.role;
+      const isTargetCol = allLinks.some(l => l.role === 'target');
+
+      if (specificTargetRegisterId !== undefined) {
+        // Unlink a specific target from source
+        const remaining = allLinks.filter(l => !(l.registerId === specificTargetRegisterId && (specificTargetColumnId === undefined || l.columnId === specificTargetColumnId)));
+        targetsToClear.push({
+          targetRegisterId: specificTargetRegisterId,
+          targetColumnId: specificTargetColumnId ?? (allLinks.find(l => l.registerId === specificTargetRegisterId)?.columnId || 0),
+          role: 'target'
+        });
+
+        if (remaining.length > 0) {
+          col.linkedTargets = remaining;
+          col.linkedTo = remaining[0];
+        } else {
+          delete col.linkedTargets;
+          delete col.linkedTo;
+        }
+      } else {
+        // Unlink all targets
+        for (const l of allLinks) {
+          targetsToClear.push({
+            targetRegisterId: l.registerId,
+            targetColumnId: l.columnId,
+            role: l.role === 'source' ? 'target' : 'source'
+          });
+        }
+        delete col.linkedTargets;
         delete col.linkedTo;
-        const shouldSaveEntries = !!(clearData && role === 'target');
+
+        const shouldSaveEntries = !!(clearData && isTargetCol);
         if (shouldSaveEntries) {
-          const colIdStr = finalTargetColumnId.toString();
+          const colIdStr = columnId.toString();
           reg.entries.forEach(entry => {
             if (entry.cells) delete entry.cells[colIdStr];
           });
         }
-        await saveRegDocImmediate(reg, shouldSaveEntries);
       }
-    });
+
+      await saveRegDocImmediate(reg, !!(clearData && isTargetCol));
+    }
+  });
+
+  // 2. Clear counterpart links on target registers
+  for (const t of targetsToClear) {
+    if (t.targetRegisterId && t.targetColumnId) {
+      await runQueuedMutation(t.targetRegisterId, async () => {
+        const targetReg = await getRegDoc(t.targetRegisterId);
+        const col = targetReg.columns.find(c => c.id === t.targetColumnId);
+        if (col) {
+          const allLinks = getColumnLinks(col);
+          const remaining = allLinks.filter(l => !(l.registerId === registerId && l.columnId === columnId));
+          if (remaining.length > 0) {
+            col.linkedTargets = remaining;
+            col.linkedTo = remaining[0];
+          } else {
+            delete col.linkedTargets;
+            delete col.linkedTo;
+          }
+
+          const shouldSaveEntries = !!(clearData && t.role === 'target');
+          if (shouldSaveEntries) {
+            const colIdStr = t.targetColumnId.toString();
+            targetReg.entries.forEach(entry => {
+              if (entry.cells) delete entry.cells[colIdStr];
+            });
+          }
+          await saveRegDocImmediate(targetReg, shouldSaveEntries);
+        }
+      }).catch(e => console.error("Failed to clean up counterpart link on target:", e));
+    }
   }
 }
 
 /**
  * Re-syncs all linked source columns in a register by re-establishing
- * __sourceEntryId mappings and re-copying values to the target register.
- * Use this to repair broken linked data (e.g., rows showing empty in the target).
+ * __sourceEntryId mappings and re-copying values to the target registers.
  */
 export async function resyncLinkedColumns(registerId: number): Promise<{ synced: number }> {
   let totalSynced = 0;
 
   const reg = await getRegDoc(registerId);
-  const sourceColumns = reg.columns.filter(c => c.linkedTo && c.linkedTo.role === 'source');
+  const sourceColumnLinks: { sourceCol: Column; link: LinkedTarget }[] = [];
+  for (const col of reg.columns) {
+    const links = getColumnLinks(col);
+    for (const link of links) {
+      if (link.role === 'source') {
+        sourceColumnLinks.push({ sourceCol: col, link });
+      }
+    }
+  }
 
-  if (sourceColumns.length === 0) {
-    const targetCols = reg.columns.filter(c => c.linkedTo && c.linkedTo.role === 'target');
-    const sourceRegIds = Array.from(new Set(targetCols.map(c => c.linkedTo!.registerId).filter(Boolean)));
+  if (sourceColumnLinks.length === 0) {
+    const targetCols = reg.columns.filter(c => getColumnLinks(c).some(l => l.role === 'target'));
+    const sourceRegIds = Array.from(new Set(
+      targetCols.flatMap(c => getColumnLinks(c).filter(l => l.role === 'target').map(l => l.registerId)).filter(Boolean)
+    ));
 
     if (sourceRegIds.length === 0) {
       throw new Error('No linked columns found in this register.');
@@ -2397,12 +2513,12 @@ export async function resyncLinkedColumns(registerId: number): Promise<{ synced:
 
   // Group source columns by target register
   const targetMap = new Map<number, { sourceColId: number; targetColId: number; targetRegId: number }[]>();
-  for (const col of sourceColumns) {
-    const targetRegId = col.linkedTo!.registerId;
+  for (const { sourceCol, link } of sourceColumnLinks) {
+    const targetRegId = link.registerId;
     if (!targetMap.has(targetRegId)) targetMap.set(targetRegId, []);
     targetMap.get(targetRegId)!.push({
-      sourceColId: col.id,
-      targetColId: col.linkedTo!.columnId,
+      sourceColId: sourceCol.id,
+      targetColId: link.columnId,
       targetRegId,
     });
   }
@@ -2485,8 +2601,9 @@ export async function updateEntriesOrder(registerId: number, sortedEntries: Entr
     // Sync to target registers
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     const sortedEntryIds = sortedEntries.map(e => e.id);
@@ -2529,8 +2646,9 @@ export async function deleteEntry(registerId: number, entryId: number): Promise<
     // Sync to target registers BEFORE we mutate the source entries array
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     for (const targetRegId of targetRegIds) {
@@ -2560,8 +2678,9 @@ export async function restoreEntry(registerId: number, entry: Entry, originalInd
     // Sync to target registers first
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     for (const targetRegId of targetRegIds) {
@@ -2586,8 +2705,11 @@ export async function restoreEntry(registerId: number, entry: Entry, originalInd
     for (const [colIdStr, value] of Object.entries(entry.cells)) {
       if (value === undefined || value === null) continue;
       const col = reg.columns.find(c => c.id.toString() === colIdStr);
-      if (col?.linkedTo && col.linkedTo.role === 'source') {
-        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.id, entry.rowNumber, value);
+      if (col) {
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+        }
       }
     }
 
@@ -2607,8 +2729,9 @@ export async function bulkRestoreEntries(registerId: number, entries: { entry: E
     for (const { entry, index } of sorted) {
       const targetRegIds = new Set<number>();
       for (const col of reg.columns) {
-        if (col.linkedTo && col.linkedTo.role === 'source') {
-          targetRegIds.add(col.linkedTo.registerId);
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          targetRegIds.add(link.registerId);
         }
       }
       for (const targetRegId of targetRegIds) {
@@ -2630,8 +2753,11 @@ export async function bulkRestoreEntries(registerId: number, entries: { entry: E
       for (const [colIdStr, value] of Object.entries(entry.cells)) {
         if (value === undefined || value === null) continue;
         const col = reg.columns.find(c => c.id.toString() === colIdStr);
-        if (col?.linkedTo && col.linkedTo.role === 'source') {
-          await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, entry.id, entry.rowNumber, value);
+        if (col) {
+          const links = getColumnLinks(col).filter(l => l.role === 'source');
+          for (const link of links) {
+            await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+          }
         }
       }
     }
@@ -2659,8 +2785,9 @@ export async function duplicateEntry(registerId: number, entryId: number): Promi
     // Sync new row and cell values to target registers
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     for (const targetRegId of targetRegIds) {
@@ -2670,8 +2797,11 @@ export async function duplicateEntry(registerId: number, entryId: number): Promi
     for (const [colIdStr, value] of Object.entries(duplicate.cells)) {
       if (value === undefined || value === null) continue;
       const col = reg.columns.find(c => c.id.toString() === colIdStr);
-      if (col?.linkedTo && col.linkedTo.role === 'source') {
-        await _syncLinkedColumn(col.linkedTo.registerId, col.linkedTo.columnId, duplicate.id, duplicate.rowNumber, value);
+      if (col) {
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          await _syncLinkedColumn(link.registerId, link.columnId, duplicate.id, duplicate.rowNumber, value);
+        }
       }
     }
 
@@ -2703,8 +2833,9 @@ export async function bulkDeleteEntries(registerId: number, entryIds: number[]):
     // Sync to target registers BEFORE we mutate the source entries array
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
-      if (col.linkedTo && col.linkedTo.role === 'source') {
-        targetRegIds.add(col.linkedTo.registerId);
+      const links = getColumnLinks(col).filter(l => l.role === 'source');
+      for (const link of links) {
+        targetRegIds.add(link.registerId);
       }
     }
     const deletedRowNumbers = reg.entries.filter(e => idsSet.has(e.id)).map(e => e.rowNumber);

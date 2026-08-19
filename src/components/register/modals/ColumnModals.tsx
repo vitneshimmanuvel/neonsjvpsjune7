@@ -1,12 +1,13 @@
-import { AlertCircle, X, Plus, AlertTriangle, Check, ChevronRight, ChevronDown, FolderClosed, FolderOpen, Database, Save, BookMarked } from 'lucide-react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { AlertCircle, X, Plus, AlertTriangle, Check, ChevronRight, ChevronDown, FolderClosed, FolderOpen, Database, Save, BookMarked, Link as LinkIcon, Paperclip, RefreshCw, Layers } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Calculator, PlusCircle, MinusCircle, XCircle, DivideCircle, 
   Percent, Settings2, Trash2 
 } from 'lucide-react';
-import { evaluateFormula, getRegister, linkColumn, listSavedFormulas, createSavedFormula, deleteSavedFormula, listSavedDropdowns, createSavedDropdown, deleteSavedDropdown } from '../../../lib/api';
+import { evaluateFormula, getRegister, linkColumn, linkMultipleColumns, unlinkColumn, getColumnLinks, listSavedFormulas, createSavedFormula, deleteSavedFormula, listSavedDropdowns, createSavedDropdown, deleteSavedDropdown } from '../../../lib/api';
 import type { RegisterSummary, Column as ApiColumn, Folder, SavedFormula, SavedDropdown } from '../../../lib/api';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 
 // ── Saved Formula Column Remapping Helpers ──
 function normalizeColName(name: string): string {
@@ -1926,7 +1927,7 @@ export function ColumnModals(props: ColumnModalsProps) {
   );
 }
 
-/** Self-contained Link Column modal — fetches target register columns on selection */
+/** Self-contained Multi-Register Link Column modal — allows linking a column across multiple registers */
 function LinkColumnModal({ onClose, allRegisters, allFolders, currentRegisterId, sourceColumn }: {
   onClose: () => void;
   allRegisters: RegisterSummary[];
@@ -1934,284 +1935,612 @@ function LinkColumnModal({ onClose, allRegisters, allFolders, currentRegisterId,
   currentRegisterId?: number;
   sourceColumn?: any;
 }) {
-  const [selectedRegisterId, setSelectedRegisterId] = useState<string>('');
-  const [selectedColumnId, setSelectedColumnId] = useState<string>('');
-  const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
-
-  const toggleFolder = (folderId: number) => {
-    setExpandedFolders(prev => ({ ...prev, [folderId]: !prev[folderId] }));
-  };
-
-  const [targetColumns, setTargetColumns] = useState<ApiColumn[]>([]);
-  const [loadingColumns, setLoadingColumns] = useState(false);
   const queryClient = useQueryClient();
-
-  // Filter out the current register so you can't link to yourself
   const availableRegisters = allRegisters.filter(r => r.id !== currentRegisterId);
 
-  const linkMutation = useMutation({
-    mutationFn: () => linkColumn(
-      currentRegisterId!,
-      sourceColumn.id,
-      Number(selectedRegisterId),
-      Number(selectedColumnId)
-    ),
-    onSuccess: () => {
+  // Existing active links for this column
+  const existingLinks = useMemo(() => {
+    return getColumnLinks(sourceColumn);
+  }, [sourceColumn]);
+
+  const [existingLinkDetails, setExistingLinkDetails] = useState<Array<{
+    registerId: number;
+    columnId: number;
+    registerName: string;
+    columnName: string;
+    role: string;
+  }>>([]);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  useEffect(() => {
+    if (!existingLinks || existingLinks.length === 0) {
+      setExistingLinkDetails([]);
+      return;
+    }
+    let isMounted = true;
+    setLoadingExisting(true);
+    Promise.all(
+      existingLinks.map(async (link) => {
+        try {
+          const reg = await getRegister(link.registerId);
+          const col = reg.columns?.find((c: any) => c.id === link.columnId);
+          return {
+            registerId: link.registerId,
+            columnId: link.columnId,
+            registerName: reg.name,
+            columnName: col ? col.name : `Column #${link.columnId}`,
+            role: link.role || 'source'
+          };
+        } catch {
+          return {
+            registerId: link.registerId,
+            columnId: link.columnId,
+            registerName: `Register #${link.registerId}`,
+            columnName: `Column #${link.columnId}`,
+            role: link.role || 'source'
+          };
+        }
+      })
+    ).then(res => {
+      if (isMounted) {
+        setExistingLinkDetails(res);
+        setLoadingExisting(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, [existingLinks]);
+
+  // Unlink a specific existing link
+  const unlinkSpecificMutation = useMutation({
+    mutationFn: async (target: { registerId: number; columnId: number }) => {
+      await unlinkColumn(currentRegisterId!, sourceColumn.id, false, target.registerId, target.columnId);
+    },
+    onSuccess: (_, target) => {
       queryClient.invalidateQueries({ queryKey: ['register', currentRegisterId] });
-      queryClient.invalidateQueries({ queryKey: ['register', Number(selectedRegisterId)] });
-      onClose();
+      queryClient.invalidateQueries({ queryKey: ['register', target.registerId] });
+      setExistingLinkDetails(prev => prev.filter(l => !(l.registerId === target.registerId && l.columnId === target.columnId)));
+      toast.success('Link removed successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to remove link');
     }
   });
 
-  // When register selection changes, fetch that register's columns
-  const handleRegisterChange = async (regIdStr: string) => {
-    setSelectedRegisterId(regIdStr);
-    setSelectedColumnId('');
-    setTargetColumns([]);
+  // Dynamic Link Slots
+  const [linkSlots, setLinkSlots] = useState<Array<{
+    id: string;
+    selectedRegisterId: string;
+    selectedColumnId: string;
+    targetColumns: ApiColumn[];
+    loadingColumns: boolean;
+    expandedFolders: Record<number, boolean>;
+  }>>(() => [
+    {
+      id: 'slot-1',
+      selectedRegisterId: '',
+      selectedColumnId: '',
+      targetColumns: [],
+      loadingColumns: false,
+      expandedFolders: {}
+    }
+  ]);
+
+  const addSlot = () => {
+    setLinkSlots(prev => [
+      ...prev,
+      {
+        id: 'slot-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        selectedRegisterId: '',
+        selectedColumnId: '',
+        targetColumns: [],
+        loadingColumns: false,
+        expandedFolders: {}
+      }
+    ]);
+  };
+
+  const removeSlot = (slotId: string) => {
+    setLinkSlots(prev => prev.filter(s => s.id !== slotId));
+  };
+
+  const handleRegisterChange = async (slotId: string, regIdStr: string) => {
+    setLinkSlots(prev => prev.map(s => {
+      if (s.id !== slotId) return s;
+      return {
+        ...s,
+        selectedRegisterId: regIdStr,
+        selectedColumnId: '',
+        targetColumns: [],
+        loadingColumns: !!regIdStr
+      };
+    }));
 
     if (!regIdStr) return;
 
-    setLoadingColumns(true);
     try {
       const reg = await getRegister(Number(regIdStr));
-      setTargetColumns(reg.columns || []);
+      setLinkSlots(prev => prev.map(s => {
+        if (s.id !== slotId) return s;
+        return {
+          ...s,
+          targetColumns: reg.columns || [],
+          loadingColumns: false
+        };
+      }));
     } catch (err) {
       console.error('Failed to load register columns:', err);
-      setTargetColumns([]);
-    } finally {
-      setLoadingColumns(false);
+      setLinkSlots(prev => prev.map(s => {
+        if (s.id !== slotId) return s;
+        return { ...s, targetColumns: [], loadingColumns: false };
+      }));
     }
   };
 
+  const handleColumnChange = (slotId: string, colIdStr: string) => {
+    setLinkSlots(prev => prev.map(s => s.id === slotId ? { ...s, selectedColumnId: colIdStr } : s));
+  };
+
+  const toggleFolderInSlot = (slotId: string, folderId: number) => {
+    setLinkSlots(prev => prev.map(s => {
+      if (s.id !== slotId) return s;
+      return {
+        ...s,
+        expandedFolders: {
+          ...s.expandedFolders,
+          [folderId]: !s.expandedFolders[folderId]
+        }
+      };
+    }));
+  };
+
+  const validSlots = linkSlots.filter(s => s.selectedRegisterId && s.selectedColumnId);
+
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      const targets = validSlots.map(s => ({
+        targetRegisterId: Number(s.selectedRegisterId),
+        targetColumnId: Number(s.selectedColumnId)
+      }));
+      await linkMultipleColumns(currentRegisterId!, sourceColumn.id, targets);
+      return targets;
+    },
+    onSuccess: (targets) => {
+      queryClient.invalidateQueries({ queryKey: ['register', currentRegisterId] });
+      targets.forEach(t => {
+        queryClient.invalidateQueries({ queryKey: ['register', t.targetRegisterId] });
+      });
+      toast.success(`Successfully linked to ${targets.length} register${targets.length > 1 ? 's' : ''}!`);
+      onClose();
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to link columns');
+    }
+  });
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">Link Column</h3>
-        <p className="modal-p-text">
-          Link <strong>{sourceColumn?.name || 'this column'}</strong> to a column in another register. Changes here will reflect there, and new entries will be synced.
-        </p>
-
-        <label className="modal-label">Select Register</label>
-        <div className="custom-folder-tree-container" style={{
-          maxHeight: '280px',
-          overflowY: 'auto',
-          border: '1px solid var(--border)',
-          borderRadius: '12px',
-          background: 'var(--bg-light)',
-          padding: '12px',
-          marginBottom: '16px',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px'
-        }}>
-          {allFolders.map(folder => {
-            const folderRegisters = availableRegisters.filter(r => r.folderId === folder.id);
-            if (folderRegisters.length === 0) return null;
-            const isExpanded = expandedFolders[folder.id];
-
-            return (
-              <div key={folder.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {/* Folder Header */}
-                <div 
-                  onClick={() => toggleFolder(folder.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    background: 'white',
-                    border: '1px solid var(--border)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    color: 'var(--navy)',
-                    userSelect: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
-                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', color: '#f59e0b' }}>
-                    {isExpanded ? <FolderOpen size={16} /> : <FolderClosed size={16} />}
-                  </span>
-                  <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{folder.name}</span>
-                  <span style={{ fontSize: '10px', color: 'var(--muted)', background: 'var(--bg-light)', padding: '2px 6px', borderRadius: '12px', fontWeight: 600 }}>
-                    {folderRegisters.length}
-                  </span>
-                </div>
-
-                {/* Folder Content (Registers) */}
-                {isExpanded && (
-                  <div style={{ marginLeft: '22px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: '2px dashed rgba(0,0,0,0.06)', paddingLeft: '8px', marginTop: '2px' }}>
-                    {folderRegisters.map(reg => {
-                      const isSelected = selectedRegisterId === reg.id.toString();
-                      return (
-                        <div
-                          key={reg.id}
-                          onClick={() => handleRegisterChange(reg.id.toString())}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
-                            fontWeight: 600,
-                            transition: 'all 0.2s',
-                            background: isSelected ? 'rgba(26, 35, 126, 0.08)' : 'transparent',
-                            color: isSelected ? 'var(--primary)' : 'var(--text-main)',
-                            border: isSelected ? '1px solid rgba(26, 35, 126, 0.18)' : '1px solid transparent'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSelected) e.currentTarget.style.background = 'rgba(0,0,0,0.02)';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSelected) e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? 'var(--primary)' : 'var(--muted)' }}>
-                            <Database size={13} />
-                          </span>
-                          <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{reg.name}</span>
-                          <span style={{ fontSize: '10.5px', opacity: 0.6 }}>({reg.entryCount} rows)</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* General/Unassigned group */}
-          {availableRegisters.filter(r => !r.folderId).length > 0 && (() => {
-            const unassignedRegs = availableRegisters.filter(r => !r.folderId);
-            const isExpanded = expandedFolders[-1] ?? true; // Default open for general
-
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div 
-                  onClick={() => toggleFolder(-1)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    background: 'white',
-                    border: '1px solid var(--border)',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    color: 'var(--navy)',
-                    userSelect: 'none',
-                    transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
-                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
-                    {isExpanded ? <FolderOpen size={16} /> : <FolderClosed size={16} />}
-                  </span>
-                  <span style={{ flex: 1 }}>General / Unassigned</span>
-                  <span style={{ fontSize: '10px', color: 'var(--muted)', background: 'var(--bg-light)', padding: '2px 6px', borderRadius: '12px', fontWeight: 600 }}>
-                    {unassignedRegs.length}
-                  </span>
-                </div>
-
-                {isExpanded && (
-                  <div style={{ marginLeft: '22px', display: 'flex', flexDirection: 'column', gap: '4px', borderLeft: '2px dashed rgba(0,0,0,0.06)', paddingLeft: '8px', marginTop: '2px' }}>
-                    {unassignedRegs.map(reg => {
-                      const isSelected = selectedRegisterId === reg.id.toString();
-                      return (
-                        <div
-                          key={reg.id}
-                          onClick={() => handleRegisterChange(reg.id.toString())}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12.5px',
-                            fontWeight: 600,
-                            transition: 'all 0.2s',
-                            background: isSelected ? 'rgba(26, 35, 126, 0.08)' : 'transparent',
-                            color: isSelected ? 'var(--primary)' : 'var(--text-main)',
-                            border: isSelected ? '1px solid rgba(26, 35, 126, 0.18)' : '1px solid transparent'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSelected) e.currentTarget.style.background = 'rgba(0,0,0,0.02)';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSelected) e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <span style={{ display: 'flex', alignItems: 'center', color: isSelected ? 'var(--primary)' : 'var(--muted)' }}>
-                            <Database size={13} />
-                          </span>
-                          <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{reg.name}</span>
-                          <span style={{ fontSize: '10.5px', opacity: 0.6 }}>({reg.entryCount} rows)</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+      <div 
+        className="modal-content" 
+        onClick={(e) => e.stopPropagation()} 
+        style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', padding: '24px' }}
+      >
+        {/* Modal Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              background: 'rgba(79, 70, 229, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#4f46e5'
+            }}>
+              <LinkIcon size={20} />
+            </div>
+            <div>
+              <h3 className="modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>Link Column</h3>
+              <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 500 }}>Multi-Register Live Data Sync</span>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px', borderRadius: '6px' }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
-        {selectedRegisterId && (
-          <>
-            <label className="modal-label">Select Column</label>
-            {loadingColumns ? (
-              <div style={{ padding: '12px', fontSize: '13px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }}></span>
-                Loading columns...
-              </div>
-            ) : targetColumns.length > 0 ? (
-              <select
-                className="modal-input"
-                value={selectedColumnId}
-                onChange={(e) => setSelectedColumnId(e.target.value)}
-                style={{ marginBottom: '8px' }}
-              >
-                <option value="" disabled>Select a column...</option>
-                {targetColumns.map(col => (
-                  <option key={col.id} value={col.id.toString()}>
-                    {col.name} ({col.type})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div style={{ padding: '12px', fontSize: '13px', color: 'var(--muted)', background: 'var(--bg-light)', borderRadius: '8px', textAlign: 'center' }}>
-                No columns found in this register.
-              </div>
-            )}
-          </>
-        )}
+        <p className="modal-p-text" style={{ fontSize: '13px', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+          Link <strong>"{sourceColumn?.name || 'this column'}"</strong> across multiple registers. Entries and cell updates will automatically synchronize in real-time.
+        </p>
 
-        <div className="modal-actions" style={{ marginTop: '24px' }}>
+        {/* Scrollable Body */}
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* 1. Existing Active Links Section */}
+          {existingLinkDetails.length > 0 && (
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Active Links ({existingLinkDetails.length})
+                </span>
+                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ● Live Syncing
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {existingLinkDetails.map((l, idx) => (
+                  <div 
+                    key={`${l.registerId}-${l.columnId}`} 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      background: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                      <span style={{
+                        background: '#eff6ff',
+                        color: '#2563eb',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        flexShrink: 0
+                      }}>
+                        Link {idx + 1}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          📂 {l.registerName}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                          Target Column: <strong style={{ color: '#334155' }}>{l.columnName}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => unlinkSpecificMutation.mutate({ registerId: l.registerId, columnId: l.columnId })}
+                      disabled={unlinkSpecificMutation.isPending}
+                      style={{
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        color: '#dc2626',
+                        borderRadius: '6px',
+                        padding: '5px 10px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flexShrink: 0
+                      }}
+                      title="Unlink this register"
+                    >
+                      <Trash2 size={13} /> Unlink
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 2. New Link Slots Builder */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a' }}>
+                Add New Register Link(s)
+              </span>
+              <span style={{ fontSize: '11.5px', color: 'var(--muted)' }}>
+                Select target register and destination column
+              </span>
+            </div>
+
+            {linkSlots.map((slot, index) => {
+              const linkNum = existingLinkDetails.length + index + 1;
+              return (
+                <div 
+                  key={slot.id}
+                  style={{
+                    background: 'white',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Slot Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        padding: '2px 9px',
+                        borderRadius: '12px'
+                      }}>
+                        Link {linkNum}
+                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
+                        Destination Configuration
+                      </span>
+                    </div>
+
+                    {linkSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSlot(slot.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#94a3b8',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '2px 4px',
+                          borderRadius: '4px'
+                        }}
+                        title="Remove this link slot"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Register Selection Folder Tree */}
+                  <label className="modal-label" style={{ fontSize: '11.5px', marginBottom: '6px' }}>Select Target Register</label>
+                  <div className="custom-folder-tree-container" style={{
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    background: '#f8fafc',
+                    padding: '8px',
+                    marginBottom: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    {allFolders.map(folder => {
+                      const folderRegisters = availableRegisters.filter(r => r.folderId === folder.id);
+                      if (folderRegisters.length === 0) return null;
+                      const isExpanded = slot.expandedFolders[folder.id];
+
+                      return (
+                        <div key={folder.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div 
+                            onClick={() => toggleFolderInSlot(slot.id, folder.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              background: 'white',
+                              border: '1px solid #e2e8f0',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              color: 'var(--navy)',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
+                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', color: '#f59e0b' }}>
+                              {isExpanded ? <FolderOpen size={15} /> : <FolderClosed size={15} />}
+                            </span>
+                            <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{folder.name}</span>
+                            <span style={{ fontSize: '10px', color: 'var(--muted)', background: '#f1f5f9', padding: '1px 5px', borderRadius: '10px', fontWeight: 600 }}>
+                              {folderRegisters.length}
+                            </span>
+                          </div>
+
+                          {isExpanded && (
+                            <div style={{ marginLeft: '18px', display: 'flex', flexDirection: 'column', gap: '3px', borderLeft: '2px dashed #cbd5e1', paddingLeft: '6px' }}>
+                              {folderRegisters.map(reg => {
+                                const isSelected = slot.selectedRegisterId === reg.id.toString();
+                                return (
+                                  <div
+                                    key={reg.id}
+                                    onClick={() => handleRegisterChange(slot.id, reg.id.toString())}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      background: isSelected ? 'rgba(79, 70, 229, 0.1)' : 'transparent',
+                                      color: isSelected ? '#4338ca' : '#1e293b',
+                                      border: isSelected ? '1px solid rgba(79, 70, 229, 0.25)' : '1px solid transparent'
+                                    }}
+                                  >
+                                    <Database size={12} style={{ color: isSelected ? '#4338ca' : '#94a3b8' }} />
+                                    <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{reg.name}</span>
+                                    <span style={{ fontSize: '10px', opacity: 0.6 }}>({reg.entryCount} rows)</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Unassigned registers */}
+                    {availableRegisters.filter(r => !r.folderId).length > 0 && (() => {
+                      const unassignedRegs = availableRegisters.filter(r => !r.folderId);
+                      const isExpanded = slot.expandedFolders[-1] ?? true;
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div 
+                            onClick={() => toggleFolderInSlot(slot.id, -1)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              background: 'white',
+                              border: '1px solid #e2e8f0',
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              color: 'var(--navy)',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
+                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            </span>
+                            <span style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}>
+                              {isExpanded ? <FolderOpen size={15} /> : <FolderClosed size={15} />}
+                            </span>
+                            <span style={{ flex: 1 }}>General / Unassigned</span>
+                            <span style={{ fontSize: '10px', color: 'var(--muted)', background: '#f1f5f9', padding: '1px 5px', borderRadius: '10px', fontWeight: 600 }}>
+                              {unassignedRegs.length}
+                            </span>
+                          </div>
+
+                          {isExpanded && (
+                            <div style={{ marginLeft: '18px', display: 'flex', flexDirection: 'column', gap: '3px', borderLeft: '2px dashed #cbd5e1', paddingLeft: '6px' }}>
+                              {unassignedRegs.map(reg => {
+                                const isSelected = slot.selectedRegisterId === reg.id.toString();
+                                return (
+                                  <div
+                                    key={reg.id}
+                                    onClick={() => handleRegisterChange(slot.id, reg.id.toString())}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      padding: '6px 10px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      background: isSelected ? 'rgba(79, 70, 229, 0.1)' : 'transparent',
+                                      color: isSelected ? '#4338ca' : '#1e293b',
+                                      border: isSelected ? '1px solid rgba(79, 70, 229, 0.25)' : '1px solid transparent'
+                                    }}
+                                  >
+                                    <Database size={12} style={{ color: isSelected ? '#4338ca' : '#94a3b8' }} />
+                                    <span style={{ flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{reg.name}</span>
+                                    <span style={{ fontSize: '10px', opacity: 0.6 }}>({reg.entryCount} rows)</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Target Column Selection */}
+                  {slot.selectedRegisterId && (
+                    <div>
+                      <label className="modal-label" style={{ fontSize: '11.5px', marginBottom: '4px' }}>Select Target Column</label>
+                      {slot.loadingColumns ? (
+                        <div style={{ padding: '8px', fontSize: '12px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }}></span>
+                          Loading columns...
+                        </div>
+                      ) : slot.targetColumns.length > 0 ? (
+                        <select
+                          className="modal-input"
+                          value={slot.selectedColumnId}
+                          onChange={(e) => handleColumnChange(slot.id, e.target.value)}
+                          style={{ fontSize: '12.5px', padding: '8px 10px', height: '38px', borderRadius: '8px' }}
+                        >
+                          <option value="" disabled>Select a column in target register...</option>
+                          {slot.targetColumns.map(col => (
+                            <option key={col.id} value={col.id.toString()}>
+                              {col.name} ({col.type})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{ padding: '8px', fontSize: '12px', color: '#94a3b8', background: '#f8fafc', borderRadius: '6px', textAlign: 'center' }}>
+                          No columns found in this register.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* + Add Another Register Link Button */}
+            <button
+              type="button"
+              onClick={addSlot}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: '1.5px dashed #6366f1',
+                background: 'rgba(99, 102, 241, 0.04)',
+                color: '#4f46e5',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                marginTop: '4px'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(99, 102, 241, 0.04)'; }}
+            >
+              <Plus size={16} /> Add Another Register Link ({`Link ${existingLinkDetails.length + linkSlots.length + 1}`})
+            </button>
+          </div>
+        </div>
+
+        {/* Modal Action Buttons */}
+        <div className="modal-actions" style={{ marginTop: '20px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
           <button className="modal-cancel-btn" onClick={onClose}>Cancel</button>
           <button
             className="modal-confirm-btn"
-            disabled={!selectedRegisterId || !selectedColumnId || linkMutation.isPending}
+            disabled={validSlots.length === 0 || linkMutation.isPending}
             onClick={() => linkMutation.mutate()}
+            style={{
+              background: validSlots.length > 0 ? 'linear-gradient(135deg, #1e3a8a, #3b82f6)' : undefined,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
           >
-            {linkMutation.isPending ? 'Linking...' : 'Link Column'}
+            <LinkIcon size={14} />
+            {linkMutation.isPending ? 'Linking...' : validSlots.length > 0 ? `Link ${validSlots.length} Register${validSlots.length > 1 ? 's' : ''}` : 'Link Column'}
           </button>
         </div>
       </div>
