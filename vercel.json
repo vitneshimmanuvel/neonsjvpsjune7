@@ -2,12 +2,22 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "crons": [
+    {
+      "path": "/api/cron/daily-backup",
+      "schedule": "30 13 * * *"
+    }
+  ],
   "functions": {
     "api/index.js": {
+      "maxDuration": 60
+    },
+    "api/cron/daily-backup.js": {
       "maxDuration": 60
     }
   },
   "rewrites": [
+    { "source": "/api/cron/daily-backup", "destination": "/api/cron/daily-backup.js" },
     { "source": "/api/(.*)", "destination": "/api/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],

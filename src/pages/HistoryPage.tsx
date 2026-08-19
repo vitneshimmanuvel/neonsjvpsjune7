@@ -1,11 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ArrowLeft, ArrowRight, Calendar, Download, FileText, Link as LinkIcon, Loader2, Pencil, Plus, RotateCcw, Settings, Trash2, User } from 'lucide-react';
+import { 
+  Activity, ArrowLeft, ArrowRight, Calendar, Download, FileText, 
+  Link as LinkIcon, Loader2, Pencil, Plus, RotateCcw, Settings, 
+  Trash2, User, Filter, X, Search, ChevronDown, ChevronUp, Check, RefreshCw
+} from 'lucide-react';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { listBusinesses, listHistory, getRegister, getStudentIdentityInfo, type HistoryEntry, type RegisterDetail } from '../lib/api';
+import { listBusinesses, listHistory, listRegisters, getRegister, getStudentIdentityInfo, type HistoryEntry, type RegisterDetail, type RegisterSummary } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { firebaseGetUsers } from '../lib/firebaseAuth';
 import { cleanActivityLogs } from '../lib/activityHelper';
+
+const ACTION_OPTIONS = [
+  { value: 'all', label: 'All Action Types' },
+  { value: 'edit_cells', label: 'Cell Edit / Edit Row' },
+  { value: 'add_row', label: 'Add / Insert Row' },
+  { value: 'delete_row', label: 'Delete Row' },
+  { value: 'add_column', label: 'Add Column' },
+  { value: 'delete_column', label: 'Delete Column' },
+  { value: 'Create Register', label: 'Create Register' },
+  { value: 'Restore Register', label: 'Restore Register' },
+  { value: 'Trash Register', label: 'Trash Register' },
+  { value: 'Change Column Type', label: 'Change Column Type' },
+];
 
 export default function HistoryPage() {
   const navigate = useNavigate();
@@ -20,6 +38,8 @@ export default function HistoryPage() {
                   user?.role === 'sheet_admin';
 
   const [history, setHistory] = React.useState<HistoryEntry[]>([]);
+  const [userList, setUserList] = React.useState<Array<{ id: string; name: string; email?: string }>>([]);
+  const [registerList, setRegisterList] = React.useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isError, setIsError] = React.useState(false);
   const [error, setError] = React.useState<any>(null);
@@ -28,15 +48,57 @@ export default function HistoryPage() {
   const [hasMore, setHasMore] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
 
+  // Filter States
+  const [filterUser, setFilterUser] = React.useState<string>('all');
+  const [filterRegister, setFilterRegister] = React.useState<string>('all');
+  const [filterAction, setFilterAction] = React.useState<string>('all');
+  const [filterSingleDate, setFilterSingleDate] = React.useState<string>('');
+  const [filterDateFrom, setFilterDateFrom] = React.useState<string>('');
+  const [filterDateTo, setFilterDateTo] = React.useState<string>('');
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [showFilters, setShowFilters] = React.useState<boolean>(false);
+
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const fetchHistory = async () => {
+  // Fetch users & registers for filter dropdowns
+  React.useEffect(() => {
+    async function loadFilterOptions() {
+      try {
+        if (isAdmin) {
+          const uRes = await firebaseGetUsers();
+          if (uRes?.users) {
+            setUserList(uRes.users.map((u: any) => ({ id: String(u.id), name: u.name, email: u.email })));
+          }
+        }
+        if (businessId) {
+          const rList = await listRegisters(businessId);
+          if (rList) {
+            setRegisterList(rList.map((r: any) => ({ id: String(r.id), name: r.name })));
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load extra filter options:', err);
+      }
+    }
+    loadFilterOptions();
+  }, [isAdmin, businessId]);
+
+  const fetchHistory = async (overrideParams?: { date?: string; userId?: string; registerId?: string; startDate?: string; endDate?: string }) => {
     setIsLoading(true);
     setIsError(false);
 
     try {
       if (!businessId) return;
-      const newItems = await listHistory(businessId);
+      const params = {
+        date: overrideParams ? overrideParams.date : (filterSingleDate || undefined),
+        startDate: overrideParams ? overrideParams.startDate : (filterDateFrom || undefined),
+        endDate: overrideParams ? overrideParams.endDate : (filterDateTo || undefined),
+        userId: overrideParams ? overrideParams.userId : (filterUser !== 'all' ? filterUser : undefined),
+        registerId: overrideParams ? overrideParams.registerId : (filterRegister !== 'all' ? filterRegister : undefined),
+        limit: 3000
+      };
+
+      const newItems = await listHistory(businessId, params);
       setHistory(newItems || []);
       setHasMore(false);
 
@@ -96,35 +158,131 @@ export default function HistoryPage() {
     if (businessId) {
       fetchHistory();
     }
-  }, [businessId]);
+  }, [businessId, filterSingleDate, filterDateFrom, filterDateTo, filterUser, filterRegister]);
 
-  const handleScroll = () => {
-    // No-op scroll handler as listHistory loads all/limited records at once
+  // Derive unique users and registers from history items as well
+  const availableUsers = React.useMemo(() => {
+    const map = new Map<string, string>();
+    userList.forEach(u => map.set(u.id, u.name));
+    history.forEach(h => {
+      if (h.userId && h.userName) map.set(String(h.userId), h.userName);
+      else if (h.userName) map.set(h.userName, h.userName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [userList, history]);
+
+  const availableRegisters = React.useMemo(() => {
+    const map = new Map<string, string>();
+    registerList.forEach(r => map.set(r.id, r.name));
+    history.forEach(h => {
+      if (h.registerId && h.registerName) map.set(String(h.registerId), h.registerName);
+      else if (h.registerName) map.set(h.registerName, h.registerName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [registerList, history]);
+
+  // Active filter count
+  const activeFilterCount = React.useMemo(() => {
+    let count = 0;
+    if (filterUser !== 'all') count++;
+    if (filterRegister !== 'all') count++;
+    if (filterAction !== 'all') count++;
+    if (filterSingleDate) count++;
+    if (filterDateFrom || filterDateTo) count++;
+    if (searchQuery.trim()) count++;
+    return count;
+  }, [filterUser, filterRegister, filterAction, filterSingleDate, filterDateFrom, filterDateTo, searchQuery]);
+
+  const clearAllFilters = () => {
+    setFilterUser('all');
+    setFilterRegister('all');
+    setFilterAction('all');
+    setFilterSingleDate('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setSearchQuery('');
   };
 
   const filteredHistory = React.useMemo(() => {
     if (!history) return [];
     const cleaned = cleanActivityLogs(history);
-    if (isAdmin) return cleaned;
 
-    // Filter history for current user
     return cleaned.filter(entry => {
-      // Match by userId or userEmail first
-      if (entry.userId && user?.id && String(entry.userId) === String(user.id)) return true;
-      if (entry.userEmail && user?.email && entry.userEmail.toLowerCase() === user.email.toLowerCase()) return true;
-      
-      // Fallback to userName matching if neither ID nor Email is present in log entry (for older logs)
-      if (!entry.userId && !entry.userEmail && entry.userName && user?.name && entry.userName.toLowerCase() === user.name.toLowerCase()) return true;
-      
-      return false;
+      // 1. Non-admin scoping: only own changes
+      if (!isAdmin) {
+        const isMine = (entry.userId && user?.id && String(entry.userId) === String(user.id)) ||
+          (entry.userEmail && user?.email && entry.userEmail.toLowerCase() === user.email.toLowerCase()) ||
+          (!entry.userId && !entry.userEmail && entry.userName && user?.name && entry.userName.toLowerCase() === user.name.toLowerCase());
+        if (!isMine) return false;
+      }
+
+      // 2. User/Staff Filter
+      if (filterUser !== 'all') {
+        const matchUserId = entry.userId && String(entry.userId) === String(filterUser);
+        const matchUserName = entry.userName && entry.userName.toLowerCase() === filterUser.toLowerCase();
+        const matchUserEmail = entry.userEmail && entry.userEmail.toLowerCase() === filterUser.toLowerCase();
+        if (!matchUserId && !matchUserName && !matchUserEmail) return false;
+      }
+
+      // 3. Register Filter
+      if (filterRegister !== 'all') {
+        const matchRegId = entry.registerId && String(entry.registerId) === String(filterRegister);
+        const matchRegName = entry.registerName && entry.registerName.toLowerCase() === filterRegister.toLowerCase();
+        if (!matchRegId && !matchRegName) return false;
+      }
+
+      // 4. Action Type Filter
+      if (filterAction !== 'all') {
+        const act = (entry.action || '').toLowerCase();
+        const target = filterAction.toLowerCase();
+        if (target === 'edit_cells') {
+          if (act !== 'edit_cells' && act !== 'edit row') return false;
+        } else if (target === 'add_row') {
+          if (act !== 'add_row' && act !== 'add row' && act !== 'insert row') return false;
+        } else if (target === 'delete_row') {
+          if (act !== 'delete_row' && act !== 'delete row' && act !== 'delete rows' && act !== 'bulk_delete_rows') return false;
+        } else {
+          if (!act.includes(target)) return false;
+        }
+      }
+
+      // 5. Specific Date Filter (Timezone-safe for IST & Local)
+      if (filterSingleDate) {
+        const d = new Date(entry.timestamp);
+        const istDateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (istDateStr !== filterSingleDate && localDateStr !== filterSingleDate) return false;
+      }
+
+      // 6. Date Range: From
+      if (filterDateFrom) {
+        const from = new Date(filterDateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (new Date(entry.timestamp) < from) return false;
+      }
+
+      // 7. Date Range: To
+      if (filterDateTo) {
+        const to = new Date(filterDateTo);
+        to.setHours(23, 59, 59, 999);
+        if (new Date(entry.timestamp) > to) return false;
+      }
+
+      // 8. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const nameMatch = entry.userName?.toLowerCase().includes(q);
+        const emailMatch = entry.userEmail?.toLowerCase().includes(q);
+        const regMatch = entry.registerName?.toLowerCase().includes(q);
+        const actMatch = entry.action?.toLowerCase().includes(q);
+        const detailsMatch = entry.details?.toLowerCase().includes(q);
+        const studentMatch = (entry as any).studentInfo?.toLowerCase().includes(q);
+        if (!nameMatch && !emailMatch && !regMatch && !actMatch && !detailsMatch && !studentMatch) return false;
+      }
+
+      return true;
     });
-  }, [history, isAdmin, user]);
-
-  const hasActiveFilters = !isAdmin;
-
-  React.useEffect(() => {
-    // No-op effect for infinite pagination checks
-  }, [filteredHistory.length, isLoading, loadingMore, hasActiveFilters, hasMore, history.length]);
+  }, [history, isAdmin, user, filterUser, filterRegister, filterAction, filterSingleDate, filterDateFrom, filterDateTo, searchQuery]);
 
   const handleExportExcel = async () => {
     if (!isAdmin) {
@@ -186,34 +344,132 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="history-page" ref={containerRef} onScroll={handleScroll}>
+    <div className="history-page" ref={containerRef}>
       <div className="history-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button className="back-button" onClick={() => navigate('/')}>
-            <ArrowLeft size={20} />
+        <div className="history-header-left">
+          <button className="back-button" onClick={() => navigate('/')} title="Back to Home">
+            <ArrowLeft size={18} />
           </button>
           <div className="header-title-group">
             <h1 className="header-title">History</h1>
             <p className="header-subtitle">
               {isAdmin 
-                ? 'All changes and actions made across registers by all users' 
+                ? 'All changes and actions made across registers' 
                 : 'Your personal changes and actions made across registers'}
             </p>
           </div>
         </div>
 
-        {isAdmin && (
-          <button
-            className="history-download-btn"
-            onClick={handleExportExcel}
-            disabled={isExporting || isLoading || filteredHistory.length === 0}
-            title="Download activity history report (Admin only)"
+        {/* ── Sleek Compact Header Filter Controls ── */}
+        <div className="history-header-filters">
+          {/* 1. Live Search Input */}
+          <div className="history-search-pill">
+            <Search size={14} className="search-pill-icon" />
+            <input 
+              type="text" 
+              placeholder="Search history, student..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="search-clear-btn" onClick={() => setSearchQuery('')} title="Clear search">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* 2. Staff Member Filter (Admin only) */}
+          {isAdmin && availableUsers.length > 0 && (
+            <div className="history-select-pill">
+              <User size={13} className="select-pill-icon" />
+              <select 
+                value={filterUser} 
+                onChange={(e) => setFilterUser(e.target.value)}
+                title="Filter by User / Staff"
+              >
+                <option value="all">All Users</option>
+                {availableUsers.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 3. Target Register Filter */}
+          <div className="history-select-pill">
+            <FileText size={13} className="select-pill-icon" />
+            <select 
+              value={filterRegister} 
+              onChange={(e) => setFilterRegister(e.target.value)}
+              title="Filter by Register"
+            >
+              <option value="all">All Registers</option>
+              {availableRegisters.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Date Picker */}
+          <div className="history-date-pill">
+            <Calendar size={13} className="select-pill-icon" />
+            <input 
+              type="date" 
+              value={filterSingleDate} 
+              onChange={(e) => setFilterSingleDate(e.target.value)}
+              title="Filter by Date"
+            />
+            {filterSingleDate && (
+              <button className="date-clear-btn" onClick={() => setFilterSingleDate('')} title="Clear date">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* 5. Reset Button (Appears only when filter is applied) */}
+          {activeFilterCount > 0 && (
+            <button className="history-reset-pill-btn" onClick={clearAllFilters} title="Reset all filters">
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
+
+          {/* 6. Refresh Button */}
+          <button 
+            className="history-refresh-pill-btn"
+            onClick={() => fetchHistory()}
+            disabled={isLoading}
+            title="Refresh history logs"
           >
-            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            <span>{isExporting ? 'Exporting...' : 'Download History'}</span>
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
           </button>
-        )}
+
+          {/* 7. Download Button */}
+          {isAdmin && (
+            <button
+              className="history-download-btn"
+              onClick={handleExportExcel}
+              disabled={isExporting || isLoading || filteredHistory.length === 0}
+              title="Download activity history report (Admin only)"
+            >
+              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>Download</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── Active Results Count Indicator (Subtle bar if filters are on) ── */}
+      {activeFilterCount > 0 && (
+        <div className="history-active-filter-strip">
+          <span>
+            Showing <strong>{filteredHistory.length}</strong> of <strong>{history.length}</strong> records
+          </span>
+          <button onClick={clearAllFilters} className="strip-clear-link">
+            Clear Filters
+          </button>
+        </div>
+      )}
 
       <div className="history-content">
         {isLoading ? (
@@ -232,8 +488,32 @@ export default function HistoryPage() {
         ) : !filteredHistory || filteredHistory.length === 0 ? (
           <div className="empty-state">
             <Activity size={48} className="empty-icon" />
-            <p>No history recorded yet.</p>
-            <p style={{ fontSize: 13, marginTop: 4 }}>Actions like adding rows, creating registers, and editing data will appear here.</p>
+            <p style={{ fontWeight: 600, fontSize: '15px' }}>
+              {activeFilterCount > 0 ? 'No matching history records' : 'No history recorded yet.'}
+            </p>
+            <p style={{ fontSize: 13, marginTop: 4 }}>
+              {activeFilterCount > 0 
+                ? 'Try adjusting your filters or search query to find records.' 
+                : 'Actions like adding rows, creating registers, and editing data will appear here.'}
+            </p>
+            {activeFilterCount > 0 && (
+              <button 
+                onClick={clearAllFilters}
+                style={{
+                  marginTop: '16px',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: 'white',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         ) : (
           <div className="history-timeline">
@@ -281,26 +561,180 @@ export default function HistoryPage() {
 
       .history-header {
         background: white;
-        padding: 24px 32px;
+        padding: 16px 28px;
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 20px;
+        gap: 16px;
         position: sticky;
         top: 0;
         z-index: 10;
+        flex-wrap: wrap;
+      }
+
+      .history-header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .history-header-filters {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      /* ── Inline Search Pill ── */
+      .history-search-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #f8fafc;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0 10px;
+        height: 36px;
+        transition: all 0.2s;
+      }
+
+      .history-search-pill:focus-within {
+        border-color: #6366f1;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      }
+
+      .search-pill-icon {
+        color: #94a3b8;
+        flex-shrink: 0;
+      }
+
+      .history-search-pill input {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: 12.5px;
+        color: #1e293b;
+        width: 170px;
+        transition: width 0.2s;
+      }
+
+      .history-search-pill input:focus {
+        width: 210px;
+      }
+
+      .search-clear-btn, .date-clear-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .search-clear-btn:hover, .date-clear-btn:hover {
+        color: #475569;
+      }
+
+      /* ── Inline Dropdown & Date Pills ── */
+      .history-select-pill, .history-date-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #f8fafc;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0 10px;
+        height: 36px;
+        transition: all 0.15s;
+      }
+
+      .history-select-pill:hover, .history-date-pill:hover {
+        border-color: #cbd5e1;
+        background: white;
+      }
+
+      .select-pill-icon {
+        color: #64748b;
+        flex-shrink: 0;
+      }
+
+      .history-select-pill select {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        max-width: 140px;
+      }
+
+      .history-date-pill input {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+      }
+
+      /* ── Reset & Refresh Buttons ── */
+      .history-reset-pill-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 36px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #dc2626;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+
+      .history-reset-pill-btn:hover {
+        background: #fee2e2;
+        border-color: #f87171;
+      }
+
+      .history-refresh-pill-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: 1.5px solid #e2e8f0;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s;
+        color: #64748b;
+      }
+
+      .history-refresh-pill-btn:hover:not(:disabled) {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #cbd5e1;
       }
 
       .history-download-btn {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 9px 18px;
+        gap: 6px;
+        height: 36px;
+        padding: 0 14px;
         border-radius: 8px;
         background: linear-gradient(135deg, var(--navy) 0%, #1e3a8a 100%);
         color: white;
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
         border: none;
         cursor: pointer;
@@ -320,6 +754,32 @@ export default function HistoryPage() {
         cursor: not-allowed;
         transform: none;
         box-shadow: none;
+      }
+
+      /* ── Active Filter Strip ── */
+      .history-active-filter-strip {
+        background: #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 8px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12.5px;
+        color: #475569;
+      }
+
+      .strip-clear-link {
+        background: none;
+        border: none;
+        color: #4f46e5;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .strip-clear-link:hover {
+        text-decoration: underline;
       }
 
       .back-button {

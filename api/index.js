@@ -806,14 +806,18 @@ export default async function handler(req, res) {
     if (pathname === '/api/activity' && method === 'GET') {
       const registerId = url.searchParams.get('registerId');
       const entryId = url.searchParams.get('entryId');
-      const limitVal = parseInt(url.searchParams.get('limit') || '200', 10);
+      const userId = url.searchParams.get('userId');
+      const date = url.searchParams.get('date');
+      const startDate = url.searchParams.get('startDate');
+      const endDate = url.searchParams.get('endDate');
+      const limitVal = parseInt(url.searchParams.get('limit') || '2000', 10);
       const offsetVal = parseInt(url.searchParams.get('offset') || '0', 10);
 
       let queryText = 'SELECT * FROM activity_logs';
       const params = [];
       const conditions = [];
 
-      if (registerId) {
+      if (registerId && registerId !== 'all') {
         params.push(String(registerId));
         conditions.push(`register_id = $${params.length}`);
       }
@@ -821,12 +825,28 @@ export default async function handler(req, res) {
         params.push(String(entryId));
         conditions.push(`entry_id = $${params.length}`);
       }
+      if (userId && userId !== 'all') {
+        params.push(String(userId));
+        conditions.push(`(user_id = $${params.length} OR user_name = $${params.length})`);
+      }
+      if (date) {
+        params.push(String(date));
+        conditions.push(`(timestamp::timestamptz AT TIME ZONE 'Asia/Kolkata')::date = $${params.length}::date`);
+      }
+      if (startDate) {
+        params.push(String(startDate));
+        conditions.push(`(timestamp::timestamptz AT TIME ZONE 'Asia/Kolkata')::date >= $${params.length}::date`);
+      }
+      if (endDate) {
+        params.push(String(endDate));
+        conditions.push(`(timestamp::timestamptz AT TIME ZONE 'Asia/Kolkata')::date <= $${params.length}::date`);
+      }
 
       if (conditions.length > 0) {
         queryText += ' WHERE ' + conditions.join(' AND ');
       }
 
-      const safeLimit = isNaN(limitVal) ? 200 : limitVal;
+      const safeLimit = isNaN(limitVal) ? 2000 : limitVal;
       const safeOffset = isNaN(offsetVal) ? 0 : offsetVal;
       queryText += ` ORDER BY timestamp DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 

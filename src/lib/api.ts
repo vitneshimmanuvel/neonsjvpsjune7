@@ -349,7 +349,7 @@ function updateMutationCount(delta: number) {
 
 async function runQueuedMutation<T>(registerId: number | string, op: () => Promise<T>): Promise<T> {
   const key = registerId.toString();
-  const currentQueue = (registerMutationQueues.get(key) || Promise.resolve()).catch(() => {});
+  const currentQueue = (registerMutationQueues.get(key) || Promise.resolve()).catch(() => { });
   updateMutationCount(1);
   const currentActive = activeMutationsPerRegister.get(key) || 0;
   activeMutationsPerRegister.set(key, currentActive + 1);
@@ -544,7 +544,7 @@ export async function createRegister(data: {
     width: c.width,
     summary: c.summary,
   }));
-  
+
   const res = await fetch(apiUrl('/api/registers'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -559,12 +559,12 @@ export async function createRegister(data: {
       columns
     })
   });
-  
+
   if (!res.ok) throw new Error('Failed to create register');
   const summary = await res.json();
-  
+
   await getRegister(summary.id);
-  
+
   await logAction(data.businessId, 'Create Register', `Created register: ${data.name}`, { registerId: summary.id, registerName: data.name });
   return summary;
 }
@@ -575,7 +575,7 @@ export async function deleteRegister(registerId: number): Promise<void> {
     sessionStorage.getItem('recordbook_user') ||
     'null'
   );
-  
+
   const res = await fetch(apiUrl(`/api/registers/${registerId}`), {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
@@ -586,7 +586,7 @@ export async function deleteRegister(registerId: number): Promise<void> {
     })
   });
   if (!res.ok) throw new Error('Failed to delete register');
-  
+
   firestoreRegisterCache.delete(registerId);
   await logAction(reg.businessId, 'Trash Register', `Moved register to recycle bin: ${reg.name}`, { registerId, registerName: reg.name });
 }
@@ -597,7 +597,7 @@ export async function permanentlyDeleteRegister(registerId: number): Promise<voi
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to permanently delete register');
-  
+
   firestoreRegisterCache.delete(registerId);
   await logAction(reg.businessId, 'Delete Register', `Permanently deleted register: ${reg.name}`, { registerId, registerName: reg.name });
 }
@@ -608,7 +608,7 @@ export async function restoreRegister(registerId: number): Promise<void> {
     method: 'POST'
   });
   if (!res.ok) throw new Error('Failed to restore register');
-  
+
   await logAction(reg.businessId, 'Restore Register', `Restored register: ${reg.name}`, { registerId, registerName: reg.name });
 }
 
@@ -1084,10 +1084,10 @@ export const importExcelData = async (
         const sVal = String(val).trim();
         const dateMatch = sVal.replace(/[\/.]/g, '-').match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
         const dateMatchYMD = sVal.replace(/[\/.]/g, '-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-        
+
         let is1900Date = false;
         let day = 1, month = 1, year = 1900;
-        
+
         if (dateMatch) {
           day = parseInt(dateMatch[1]);
           month = parseInt(dateMatch[2]);
@@ -1099,7 +1099,7 @@ export const importExcelData = async (
           day = parseInt(dateMatchYMD[3]);
           if (year === 1900) is1900Date = true;
         }
-        
+
         if (is1900Date) {
           const monthDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
           let serial = day;
@@ -1706,7 +1706,7 @@ export async function changeColumnType(
     // updateEntryDirect, fixing the race condition that causes cell edits to
     // be lost.
     const entryDataModified = (newType === 'currency') ||
-                               (newType === 'auto_increment' && oldType !== 'auto_increment');
+      (newType === 'auto_increment' && oldType !== 'auto_increment');
     if (entryDataModified) {
       await saveRegDocImmediate(reg, true);
     } else {
@@ -1870,7 +1870,7 @@ export async function addEntry(registerId: number, cells: Record<string, string>
       id: generateId(), registerId, rowNumber: reg.entries.length + 1,
       cells, createdAt: new Date().toISOString(), pageIndex,
     };
-    
+
     const res = await fetch(apiUrl(`/api/registers/${registerId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1888,7 +1888,7 @@ export async function addEntry(registerId: number, cells: Record<string, string>
       return `${c?.name || id}: ${val}`;
     }).join(', ');
     const identityTag = getStudentIdentityInfo(reg.columns, cells);
-    logAction(reg.businessId, 'Add Row', `Added new row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => {});
+    logAction(reg.businessId, 'Add Row', `Added new row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} to "${reg.name}"${preview ? ` (${preview}...)` : ''}`, { registerId, registerName: reg.name, entryId: entry.id }).catch(() => { });
 
     const targetRegIds = new Set<number>();
     for (const col of reg.columns) {
@@ -2058,7 +2058,7 @@ function ensureTargetRows(targetReg: RegisterDetail, maxRowNumber: number) {
         createdAt: new Date().toISOString(),
         pageIndex: 0
       };
-      
+
       const insertIdx = targetReg.entries.findIndex(e => Number(e.rowNumber) > Number(r));
       if (insertIdx === -1) {
         targetReg.entries.push(newEntry);
@@ -2103,7 +2103,7 @@ async function _syncAddRow(targetRegisterId: number, sourceEntryId: number) {
 async function _syncInsertRow(targetRegisterId: number, atIndex: number, sourceEntryId: number) {
   return runQueuedMutation(targetRegisterId, async () => {
     const reg = await getRegDoc(targetRegisterId);
-    
+
     ensureTargetRows(reg, atIndex);
 
     const newEntry: Entry = {
@@ -2158,7 +2158,7 @@ async function _syncBulkDeleteRows(targetRegisterId: number, sourceEntryIds: num
     const reg = await getRegDoc(targetRegisterId);
     const idSet = new Set(sourceEntryIds.map(id => id.toString()));
     const rowSet = new Set(rowNumbers.map(Number));
-    
+
     const entriesToDelete = reg.entries.filter(e => {
       const sId = e.cells?.["__sourceEntryId"];
       if (sId && idSet.has(sId)) return true;
@@ -2183,7 +2183,7 @@ async function _syncBulkDeleteRows(targetRegisterId: number, sourceEntryIds: num
 async function _syncReorderRows(targetRegisterId: number, sortedSourceEntryIds: number[]) {
   return runQueuedMutation(targetRegisterId, async () => {
     const reg = await getRegDoc(targetRegisterId);
-    
+
     const entryMap = new Map<string, Entry>();
     reg.entries.forEach(e => {
       const sId = e.cells?.["__sourceEntryId"];
@@ -2219,7 +2219,7 @@ async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: numbe
   return runQueuedMutation(targetRegisterId, async () => {
     const targetReg = await getRegDoc(targetRegisterId);
     let targetEntry = targetReg.entries.find(e => e.cells && e.cells["__sourceEntryId"] === sourceEntryId.toString());
-    
+
     // Fallback: match by rowNumber for legacy entries linked before ID sync patch
     if (!targetEntry) {
       ensureTargetRows(targetReg, rowNumber);
@@ -2252,7 +2252,7 @@ export async function linkColumn(
   let sourceColType = '';
   let sourceColDropdownOptions: string[] | undefined;
   let sourceMaxRowNumber = 0;
-  
+
   await runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
     const col = reg.columns.find(c => c.id === columnId);
@@ -2283,7 +2283,7 @@ export async function linkColumn(
       if (sourceColName) col.name = sourceColName;
       if (sourceColType) col.type = sourceColType;
       if (sourceColDropdownOptions) col.dropdownOptions = sourceColDropdownOptions;
-      
+
       // Ensure target register has contiguous rows up to sourceMaxRowNumber
       ensureTargetRows(reg, sourceMaxRowNumber);
 
@@ -2309,7 +2309,7 @@ export async function linkColumn(
           }
         }
       });
-      
+
       // Update target register entry count
       reg.entryCount = reg.entries.length;
       await saveRegDocImmediate(reg, true);
@@ -2475,7 +2475,7 @@ export async function updateEntryCellStyles(registerId: number, entryId: number,
 export async function updateEntriesOrder(registerId: number, sortedEntries: Entry[]): Promise<void> {
   return runQueuedMutation(registerId, async () => {
     const reg = await getRegDoc(registerId);
-    
+
     // Overwrite the entire entries array with the new sorted array
     reg.entries = sortedEntries;
     renumberRows(reg); // Update row numbers to match the new order
@@ -2862,8 +2862,25 @@ export async function logAction(
   }
 }
 
-export async function listHistory(businessId: number): Promise<HistoryEntry[]> {
-  const res = await fetch(apiUrl('/api/activity'));
+export async function listHistory(
+  businessId: number,
+  params?: { limit?: number; userId?: string; registerId?: string | number; date?: string; startDate?: string; endDate?: string } | number
+): Promise<HistoryEntry[]> {
+  const query = new URLSearchParams();
+  if (typeof params === 'number') {
+    query.set('limit', String(params));
+  } else if (params && typeof params === 'object') {
+    query.set('limit', String(params.limit || 3000));
+    if (params.userId && params.userId !== 'all') query.set('userId', String(params.userId));
+    if (params.registerId && params.registerId !== 'all') query.set('registerId', String(params.registerId));
+    if (params.date) query.set('date', params.date);
+    if (params.startDate) query.set('startDate', params.startDate);
+    if (params.endDate) query.set('endDate', params.endDate);
+  } else {
+    query.set('limit', '3000');
+  }
+
+  const res = await fetch(apiUrl(`/api/activity?${query.toString()}`));
   if (!res.ok) throw new Error('Failed to fetch activity logs');
   const data = await res.json();
   return data.activities;

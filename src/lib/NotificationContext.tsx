@@ -52,8 +52,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return [
       {
         id: 'sys-welcome',
-        title: 'AG Trust Record Book v2.9 Active',
-        message: 'Modern Table UI, Pinned Column Engine, and All-New Filter Wizard enabled.',
+        title: 'AG Trust Record Book v2.9.3 Active',
+        message: 'Advanced History Filters, Automated Daily Backup Cron, and Immutable Link Sync enabled.',
         type: 'success',
         timestamp: new Date().toISOString(),
         isRead: false
