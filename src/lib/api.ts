@@ -36,14 +36,14 @@ export interface LiveSyncChange {
 
 export async function fetchRegisterLiveSync(
   registerId: number,
-  since: number
-): Promise<{ timestamp: number; changes: LiveSyncChange[] }> {
+  sinceId: number
+): Promise<{ lastId: number; changes: LiveSyncChange[] }> {
   try {
-    const res = await fetch(apiUrl(`/api/registers/${registerId}/live-sync?since=${since}&clientSessionId=${encodeURIComponent(CLIENT_SESSION_ID)}`));
-    if (!res.ok) return { timestamp: Date.now(), changes: [] };
+    const res = await fetch(apiUrl(`/api/registers/${registerId}/live-sync?sinceId=${sinceId}&clientSessionId=${encodeURIComponent(CLIENT_SESSION_ID)}`));
+    if (!res.ok) return { lastId: sinceId, changes: [] };
     return res.json();
   } catch (e) {
-    return { timestamp: Date.now(), changes: [] };
+    return { lastId: sinceId, changes: [] };
   }
 }
 

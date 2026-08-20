@@ -153,28 +153,35 @@ function formatRegister(row) {
 }
 
 // ─── REAL-TIME MULTI-USER SYNC BUFFER ──────────────────────────────────────────
-if (!globalThis._registerChanges) {
-  globalThis._registerChanges = new Map(); // registerId -> Array<ChangeEvent>
-}
-
 function recordRegisterChange(registerId, change) {
   const regKey = String(registerId);
-  let list = globalThis._registerChanges.get(regKey);
-  if (!list) {
-    list = [];
-    globalThis._registerChanges.set(regKey, list);
-  }
   const changeEvent = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     registerId: regKey,
-    timestamp: Date.now(),
-    ...change
+    type: change.type,
+    entryId: change.entryId ? String(change.entryId) : null,
+    rowNumber: change.rowNumber !== undefined ? Number(change.rowNumber) : null,
+    columnId: change.columnId ? String(change.columnId) : null,
+    value: change.value !== undefined ? String(change.value) : null,
+    cells: change.cells || null,
+    clientSessionId: change.clientSessionId || null,
+    timestamp: Date.now()
   };
-  list.push(changeEvent);
-  // Keep the latest 300 changes per register
-  if (list.length > 300) {
-    list.splice(0, list.length - 300);
-  }
+
+  // Asynchronously persist to Postgres for cross-lambda real-time distribution
+  query(`
+    INSERT INTO live_changes (register_id, change_type, entry_id, row_number, column_id, value, cells, client_session_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  `, [
+    regKey,
+    changeEvent.type,
+    changeEvent.entryId,
+    changeEvent.rowNumber,
+    changeEvent.columnId,
+    changeEvent.value,
+    changeEvent.cells ? JSON.stringify(changeEvent.cells) : null,
+    changeEvent.clientSessionId
+  ]).catch(err => console.error('[LiveChanges] Write error:', err));
+
   return changeEvent;
 }
 
@@ -195,7 +202,7 @@ export default async function handler(req, res) {
   const method = req.method;
 
   try {
-    // Auto-create database indexes if needed (runs once per cold start)
+    // Auto-create database indexes and live_changes table if needed (runs once per cold start)
     if (!globalThis._dbIndexesCreated) {
       globalThis._dbIndexesCreated = true;
       (async () => {
@@ -205,6 +212,21 @@ export default async function handler(req, res) {
           await query('CREATE INDEX IF NOT EXISTS idx_registers_business_deleted ON registers (business_id, deleted_at)');
           await query('CREATE INDEX IF NOT EXISTS idx_folders_business ON folders (business_id)');
           await query('CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON activity_logs (user_id, timestamp DESC)');
+          await query(`
+            CREATE TABLE IF NOT EXISTS live_changes (
+              id BIGSERIAL PRIMARY KEY,
+              register_id BIGINT NOT NULL,
+              change_type VARCHAR(50) NOT NULL,
+              entry_id BIGINT,
+              row_number INT,
+              column_id VARCHAR(100),
+              value TEXT,
+              cells JSONB,
+              client_session_id VARCHAR(100),
+              created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_live_changes_reg_id ON live_changes (register_id, id);
+          `);
         } catch (e) {
           console.error('[DB] Index initialization warning:', e);
         }
@@ -777,25 +799,29 @@ export default async function handler(req, res) {
       }
     }
 
-    // GET /api/registers/:id/live-sync (Real-time delta polling for multi-user sync)
+    // GET /api/registers/:id/live-sync (Persistent PostgreSQL Real-time delta polling for multi-user sync)
     const liveSyncMatch = pathname.match(/^\/api\/registers\/(\d+)\/live-sync$/);
     if (liveSyncMatch && method === 'GET') {
       const regId = String(liveSyncMatch[1]);
-      const since = parseInt(url.searchParams.get('since') || '0', 10);
+      const sinceId = parseInt(url.searchParams.get('sinceId') || '0', 10);
       const clientSessionId = url.searchParams.get('clientSessionId') || '';
 
-      const now = Date.now();
-      const list = globalThis._registerChanges.get(regId) || [];
-
-      // If since <= 0, return current anchor timestamp with empty changes
-      if (since <= 0) {
-        return sendJson(res, 200, { timestamp: now, changes: [] });
+      if (sinceId <= 0) {
+        const initRes = await query('SELECT COALESCE(MAX(id), 0) as last_id FROM live_changes WHERE register_id = $1', [regId]);
+        const lastId = Number(initRes.rows[0]?.last_id || 0);
+        return sendJson(res, 200, { lastId, changes: [] });
       }
 
-      // Return changes since timestamp, excluding events triggered by the same client tab
-      const changes = list.filter(c => c.timestamp > since && (!clientSessionId || c.clientSessionId !== clientSessionId));
+      const pollRes = await query(`
+        SELECT id, change_type as "type", entry_id as "entryId", row_number as "rowNumber", column_id as "columnId", value, cells, client_session_id as "clientSessionId"
+        FROM live_changes 
+        WHERE register_id = $1 AND id > $2 AND (client_session_id IS NULL OR client_session_id != $3)
+        ORDER BY id ASC 
+        LIMIT 50
+      `, [regId, sinceId, clientSessionId]);
 
-      return sendJson(res, 200, { timestamp: now, changes });
+      const lastId = pollRes.rows.length > 0 ? Number(pollRes.rows[pollRes.rows.length - 1].id) : sinceId;
+      return sendJson(res, 200, { lastId, changes: pollRes.rows });
     }
 
     // POST /api/registers/:id/entries (Add entry row)

@@ -634,14 +634,14 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
   // ── Real-Time Multi-User Synchronization ──
-  const lastLiveSyncTimeRef = useRef<number>(Date.now());
+  const lastLiveSyncIdRef = useRef<number>(0);
   const isSyncingLiveRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!registerId || isNaN(Number(registerId))) return;
 
-    // Reset sync anchor timestamp when opening/switching registers
-    lastLiveSyncTimeRef.current = Date.now();
+    // Reset sync anchor ID when opening/switching registers
+    lastLiveSyncIdRef.current = 0;
 
     const intervalId = setInterval(async () => {
       // Skip if previous poll in flight, or if user is currently typing/debouncing local edits
@@ -650,9 +650,9 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
 
       try {
         isSyncingLiveRef.current = true;
-        const res = await fetchRegisterLiveSync(Number(registerId), lastLiveSyncTimeRef.current);
-        if (res.timestamp) {
-          lastLiveSyncTimeRef.current = res.timestamp;
+        const res = await fetchRegisterLiveSync(Number(registerId), lastLiveSyncIdRef.current);
+        if (res.lastId !== undefined) {
+          lastLiveSyncIdRef.current = res.lastId;
         }
 
         if (res.changes && res.changes.length > 0) {
@@ -662,10 +662,17 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             if (change.type === 'cell_update') {
               const cellUpdates = change.cells || (change.columnId ? { [change.columnId]: change.value || '' } : {});
 
+              const isMatch = (e: any) => {
+                if (change.entryId && (e.id === Number(change.entryId) || String(e.id) === String(change.entryId))) return true;
+                if (change.sourceEntryId && e.cells?.["__sourceEntryId"] === String(change.sourceEntryId)) return true;
+                if (change.rowNumber && Number(e.rowNumber) === Number(change.rowNumber)) return true;
+                return false;
+              };
+
               setLocalEntries(prev => {
                 let matched = false;
                 const next = prev.map(e => {
-                  if ((change.entryId && e.id === change.entryId) || (change.rowNumber && e.rowNumber === change.rowNumber)) {
+                  if (isMatch(e)) {
                     matched = true;
                     return { ...e, cells: { ...e.cells, ...cellUpdates } };
                   }
@@ -680,7 +687,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
                 return {
                   ...old,
                   entries: old.entries.map((e: any) => {
-                    if ((change.entryId && e.id === change.entryId) || (change.rowNumber && e.rowNumber === change.rowNumber)) {
+                    if (isMatch(e)) {
                       return { ...e, cells: { ...e.cells, ...cellUpdates } };
                     }
                     return e;
@@ -690,21 +697,21 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
             } else if (change.type === 'add_row' && change.entry) {
               const newEntry = change.entry;
               setLocalEntries(prev => {
-                if (prev.some(e => e.id === newEntry.id)) return prev;
+                if (prev.some(e => e.id === newEntry.id || String(e.id) === String(newEntry.id))) return prev;
                 return [...prev, newEntry];
               });
               queryClient.setQueryData(['register', registerId], (old: any) => {
                 if (!old || !old.entries) return old;
-                if (old.entries.some((e: any) => e.id === newEntry.id)) return old;
+                if (old.entries.some((e: any) => e.id === newEntry.id || String(e.id) === String(newEntry.id))) return old;
                 return { ...old, entries: [...old.entries, newEntry], entryCount: (old.entryCount || 0) + 1 };
               });
             } else if (change.type === 'delete_row' && change.entryId) {
-              setLocalEntries(prev => prev.filter(e => e.id !== change.entryId));
+              setLocalEntries(prev => prev.filter(e => e.id !== change.entryId && String(e.id) !== String(change.entryId)));
               queryClient.setQueryData(['register', registerId], (old: any) => {
                 if (!old || !old.entries) return old;
                 return {
                   ...old,
-                  entries: old.entries.filter((e: any) => e.id !== change.entryId),
+                  entries: old.entries.filter((e: any) => e.id !== change.entryId && String(e.id) !== String(change.entryId)),
                   entryCount: Math.max(0, (old.entryCount || 1) - 1)
                 };
               });
