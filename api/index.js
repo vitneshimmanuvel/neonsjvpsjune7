@@ -5,6 +5,12 @@ import nodemailer from 'nodemailer';
 // Helper to send login notification email to user
 async function sendLoginNotificationEmail(userEmail, userName, role) {
   try {
+    if (!userEmail || !userEmail.includes('@') || userEmail.endsWith('@sjvps.com')) {
+      // Skip dummy/placeholder domains to prevent bounced Delivery Status Failure emails
+      console.log(`[Email Alert Skipped] Skipping login email for non-routable address: ${userEmail}`);
+      return;
+    }
+
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
     const smtpUser = process.env.SMTP_USER;
@@ -1236,6 +1242,17 @@ export default async function handler(req, res) {
       return sendJson(res, 200, { message: 'Backup deleted successfully' });
     }
 
+    // GET or POST /api/cron/daily-backup (Cron route fallback in index.js)
+    if (pathname === '/api/cron/daily-backup') {
+      try {
+        const cronHandler = (await import('./cron/daily-backup.js')).default;
+        return await cronHandler(req, res);
+      } catch (cronErr) {
+        console.error('[CRON fallback error]:', cronErr);
+        return sendError(res, 500, 'Cron execution failed: ' + cronErr.message);
+      }
+    }
+
     // POST /api/backups/send-email
     // Server-side ZIP generation to avoid 413 payload limits
     if (pathname === '/api/backups/send-email' && method === 'POST') {
@@ -1247,38 +1264,34 @@ export default async function handler(req, res) {
           return sendError(res, 400, 'businessId is required');
         }
 
-        // 1. Fetch folders
-        const foldersRes = await query('SELECT * FROM folders WHERE business_id = $1 ORDER BY name ASC', [mailBizId]);
+        // 1. Fetch folders, registers, and all entries concurrently using JOIN
+        const [foldersRes, regsRes, entriesRes] = await Promise.all([
+          query('SELECT id, name FROM folders WHERE business_id = $1 ORDER BY name ASC', [mailBizId]),
+          query('SELECT id, name, folder_id, columns FROM registers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY name ASC', [mailBizId]),
+          query(`
+            SELECT e.id, e.register_id, e.row_number, e.cells 
+            FROM entries e
+            INNER JOIN registers r ON r.id = e.register_id
+            WHERE r.business_id = $1 AND r.deleted_at IS NULL
+            ORDER BY e.register_id, e.row_number ASC
+          `, [mailBizId])
+        ]);
+
         const folderMap = new Map();
         foldersRes.rows.forEach(r => folderMap.set(Number(r.id), r.name));
 
-        // 2. Fetch all active registers
-        const regsRes = await query('SELECT * FROM registers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY name ASC', [mailBizId]);
-        const regIds = regsRes.rows.map(r => Number(r.id));
-
-        // 3. Fetch ALL entries in ONE bulk query (instead of 271 individual queries)
-        let allEntries = [];
-        if (regIds.length > 0) {
-          const placeholders = regIds.map((_, i) => `$${i + 1}`).join(',');
-          const entriesRes = await query(
-            `SELECT * FROM entries WHERE register_id IN (${placeholders}) ORDER BY register_id, row_number ASC`,
-            regIds
-          );
-          allEntries = entriesRes.rows;
-        }
-
         // Group entries by register_id in memory
         const entriesByRegId = new Map();
-        allEntries.forEach(e => {
+        entriesRes.rows.forEach(e => {
           const rid = Number(e.register_id);
           if (!entriesByRegId.has(rid)) entriesByRegId.set(rid, []);
           entriesByRegId.get(rid).push(e);
         });
 
-        // 4. Build CSV files per register and add to ZIP
+        // 2. Build CSV files per register and add to ZIP
         const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
-        let totalEntries = allEntries.length;
+        const totalEntries = entriesRes.rows.length;
 
         const escCsv = (val) => {
           const s = String(val ?? '');
@@ -1326,12 +1339,16 @@ export default async function handler(req, res) {
           zip.file(`${folderName}/${safeRegName}.csv`, csvContent);
         }
 
-        // 4. Generate ZIP buffer
-        const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+        // 3. Generate ZIP buffer (fast compression)
+        const zipBuffer = await zip.generateAsync({
+          type: 'nodebuffer',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 2 }
+        });
 
-        // 5. Prepare email
+        // 4. Prepare email
         const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-        const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+        const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
         const smtpUser = process.env.SMTP_USER;
         const smtpPass = process.env.SMTP_PASS;
 
@@ -1390,18 +1407,14 @@ export default async function handler(req, res) {
         }
 
         const cleanPass = smtpPass.replace(/\s+/g, '');
-        const transporter = (smtpHost.includes('gmail.com') || !process.env.SMTP_HOST)
-          ? nodemailer.createTransport({
-              service: 'gmail',
-              auth: { user: smtpUser, pass: cleanPass }
-            })
-          : nodemailer.createTransport({
-              host: smtpHost,
-              port: smtpPort,
-              secure: smtpPort === 465,
-              auth: { user: smtpUser, pass: cleanPass },
-              tls: { rejectUnauthorized: false }
-            });
+        const isGmail = smtpHost.includes('gmail.com') || !process.env.SMTP_HOST;
+        const transporter = nodemailer.createTransport({
+          host: isGmail ? 'smtp.gmail.com' : smtpHost,
+          port: isGmail ? 465 : smtpPort,
+          secure: isGmail ? true : (smtpPort === 465),
+          auth: { user: smtpUser, pass: cleanPass },
+          tls: { rejectUnauthorized: false }
+        });
 
         await transporter.sendMail(mailOptions);
         return sendJson(res, 200, { message: `Backup email sent successfully to ${targetEmail}`, registerCount, totalEntries });

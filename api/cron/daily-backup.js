@@ -1,4 +1,4 @@
-import { query } from '../db-lib/db.js';
+import { query } from '../../db-lib/db.js';
 import nodemailer from 'nodemailer';
 
 /**
@@ -20,15 +20,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Security: Verify the request is from Vercel Cron (or manual trigger with secret)
+  // Security: Optional secret verification (Vercel Cron headers or manual trigger)
   const authHeader = req.headers['authorization'];
   const cronSecret = process.env.CRON_SECRET;
-  
-  // Allow if: Vercel Cron (no auth needed on Vercel), or manual trigger with correct secret
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    // On Vercel, cron jobs are authenticated automatically
-    // This check is for extra security if CRON_SECRET is set
-    // If no CRON_SECRET env var, allow all (Vercel handles security)
+  if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
+    return sendJson(res, 401, { error: 'Unauthorized' });
   }
 
   const targetEmail = process.env.BACKUP_EMAIL || 'jackyme1291@gmail.com';
@@ -36,67 +32,65 @@ export default async function handler(req, res) {
   try {
     console.log('[CRON] Daily backup started at', new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
 
-    // 1. Get all businesses (backup each one)
-    const bizRes = await query('SELECT id, name FROM businesses ORDER BY id');
+    // 1. Get active businesses that have registers
+    const bizRes = await query(`
+      SELECT b.id, b.name, COUNT(r.id) as reg_count 
+      FROM businesses b 
+      INNER JOIN registers r ON r.business_id = b.id AND r.deleted_at IS NULL 
+      GROUP BY b.id, b.name 
+      ORDER BY b.id ASC
+    `);
     const businesses = bizRes.rows;
     
     if (businesses.length === 0) {
-      return sendJson(res, 200, { message: 'No businesses found to backup' });
+      return sendJson(res, 200, { message: 'No businesses with active registers found to backup' });
     }
 
     const results = [];
+    const JSZip = (await import('jszip')).default;
+
+    const escCsv = (val) => {
+      const s = String(val ?? '');
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    };
 
     for (const biz of businesses) {
       const mailBizId = biz.id;
 
-      // Check if this business has any registers
-      const regCheckRes = await query('SELECT COUNT(*) as cnt FROM registers WHERE business_id = $1 AND deleted_at IS NULL', [mailBizId]);
-      const regCount = parseInt(regCheckRes.rows[0].cnt);
-      if (regCount === 0) {
-        console.log(`[CRON] Skipping business ${biz.name} (ID: ${mailBizId}) — no active registers`);
+      // 2. Fetch folders, registers, and all entries concurrently
+      const [foldersRes, regsRes, entriesRes] = await Promise.all([
+        query('SELECT id, name FROM folders WHERE business_id = $1 ORDER BY name ASC', [mailBizId]),
+        query('SELECT id, name, folder_id, columns FROM registers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY name ASC', [mailBizId]),
+        query(`
+          SELECT e.id, e.register_id, e.row_number, e.cells 
+          FROM entries e
+          INNER JOIN registers r ON r.id = e.register_id
+          WHERE r.business_id = $1 AND r.deleted_at IS NULL
+          ORDER BY e.register_id, e.row_number ASC
+        `, [mailBizId])
+      ]);
+
+      if (regsRes.rows.length === 0) {
         continue;
       }
 
-      // 2. Fetch folders
-      const foldersRes = await query('SELECT * FROM folders WHERE business_id = $1 ORDER BY name ASC', [mailBizId]);
       const folderMap = new Map();
       foldersRes.rows.forEach(r => folderMap.set(Number(r.id), r.name));
 
-      // 3. Fetch all active registers
-      const regsRes = await query('SELECT * FROM registers WHERE business_id = $1 AND deleted_at IS NULL ORDER BY name ASC', [mailBizId]);
-      const regIds = regsRes.rows.map(r => Number(r.id));
-
-      // 4. Fetch ALL entries in ONE bulk query
-      let allEntries = [];
-      if (regIds.length > 0) {
-        const placeholders = regIds.map((_, i) => `$${i + 1}`).join(',');
-        const entriesRes = await query(
-          `SELECT * FROM entries WHERE register_id IN (${placeholders}) ORDER BY register_id, row_number ASC`,
-          regIds
-        );
-        allEntries = entriesRes.rows;
-      }
-
       // Group entries by register_id
       const entriesByRegId = new Map();
-      allEntries.forEach(e => {
+      entriesRes.rows.forEach(e => {
         const rid = Number(e.register_id);
         if (!entriesByRegId.has(rid)) entriesByRegId.set(rid, []);
         entriesByRegId.get(rid).push(e);
       });
 
-      // 5. Build CSV files per register and add to ZIP
-      const JSZip = (await import('jszip')).default;
+      // 3. Build CSV files per register and add to ZIP
       const zip = new JSZip();
-      let totalEntries = allEntries.length;
-
-      const escCsv = (val) => {
-        const s = String(val ?? '');
-        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-          return '"' + s.replace(/"/g, '""') + '"';
-        }
-        return s;
-      };
+      const totalEntries = entriesRes.rows.length;
 
       for (const row of regsRes.rows) {
         const regId = Number(row.id);
@@ -136,12 +130,16 @@ export default async function handler(req, res) {
         zip.file(`${folderName}/${safeRegName}.csv`, csvContent);
       }
 
-      // 6. Generate ZIP buffer
-      const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+      // 4. Generate ZIP buffer (fast compression)
+      const zipBuffer = await zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 2 }
+      });
 
-      // 7. Prepare email
+      // 5. Prepare email
       const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-      const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+      const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
       const smtpUser = process.env.SMTP_USER;
       const smtpPass = process.env.SMTP_PASS;
 
@@ -206,18 +204,14 @@ export default async function handler(req, res) {
       }
 
       const cleanPass = smtpPass.replace(/\s+/g, '');
-      const transporter = (smtpHost.includes('gmail.com') || !process.env.SMTP_HOST)
-        ? nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user: smtpUser, pass: cleanPass }
-          })
-        : nodemailer.createTransport({
-            host: smtpHost,
-            port: smtpPort,
-            secure: smtpPort === 465,
-            auth: { user: smtpUser, pass: cleanPass },
-            tls: { rejectUnauthorized: false }
-          });
+      const isGmail = smtpHost.includes('gmail.com') || !process.env.SMTP_HOST;
+      const transporter = nodemailer.createTransport({
+        host: isGmail ? 'smtp.gmail.com' : smtpHost,
+        port: isGmail ? 465 : smtpPort,
+        secure: isGmail ? true : (smtpPort === 465),
+        auth: { user: smtpUser, pass: cleanPass },
+        tls: { rejectUnauthorized: false }
+      });
 
       await transporter.sendMail(mailOptions);
 
