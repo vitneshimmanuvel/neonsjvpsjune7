@@ -375,10 +375,6 @@ async function runQueuedMutation<T>(registerId: number | string, op: () => Promi
   activeMutationsPerRegister.set(key, currentActive + 1);
 
   const next = currentQueue.then(async () => {
-    const regId = Number(registerId);
-    if (!isNaN(regId)) {
-      clearRegisterCache(regId);
-    }
     return op();
   }).finally(() => {
     updateMutationCount(-1);
@@ -2271,40 +2267,35 @@ async function _syncReorderRows(targetRegisterId: number, sortedSourceEntryIds: 
 
 // Internal helper to sync
 async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: number, sourceEntryId: number, rowNumber: number, value: string) {
-  return runQueuedMutation(targetRegisterId, async () => {
-    const targetReg = await getRegDoc(targetRegisterId);
-    let targetEntry = targetReg.entries.find(e => e.cells && e.cells["__sourceEntryId"] === sourceEntryId.toString());
+  try {
+    const res = await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries/sync-cell`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        columnId: targetColumnId,
+        sourceEntryId,
+        rowNumber,
+        value
+      })
+    });
 
-    // Fallback: match by rowNumber for legacy entries linked before ID sync patch
-    if (!targetEntry) {
-      ensureTargetRows(targetReg, rowNumber);
-      targetEntry = targetReg.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
-      if (targetEntry) {
-        if (!targetEntry.cells) targetEntry.cells = {};
-        // Link this legacy row to the source ID permanently
-        targetEntry.cells["__sourceEntryId"] = sourceEntryId.toString();
+    if (res.ok) {
+      // Patch memory cache if target register happens to be loaded in client
+      const cached = firestoreRegisterCache.get(targetRegisterId);
+      if (cached) {
+        let targetEntry = cached.entries.find(e => e.cells && e.cells["__sourceEntryId"] === sourceEntryId.toString());
+        if (!targetEntry) {
+          targetEntry = cached.entries.find(e => Number(e.rowNumber) === Number(rowNumber));
+        }
+        if (targetEntry) {
+          if (!targetEntry.cells) targetEntry.cells = {};
+          targetEntry.cells[targetColumnId.toString()] = value;
+        }
       }
     }
-
-    if (targetEntry) {
-      if (!targetEntry.cells) targetEntry.cells = {};
-      targetEntry.cells[targetColumnId.toString()] = value;
-      targetReg.updatedAt = new Date().toISOString();
-
-      // Fast single-row update to target register in Postgres (no full register rewrite!)
-      await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries/${targetEntry.id}`), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cells: targetEntry.cells,
-          cellStyles: targetEntry.cellStyles,
-          pageIndex: targetEntry.pageIndex,
-          rowNumber: targetEntry.rowNumber
-        })
-      });
-      firestoreRegisterCache.set(targetReg.id, targetReg);
-    }
-  }).catch(e => console.error('Failed to sync linked column:', e));
+  } catch (e) {
+    console.error('Failed to sync linked column:', e);
+  }
 }
 
 export async function linkColumn(

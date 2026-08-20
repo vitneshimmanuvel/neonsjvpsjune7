@@ -773,6 +773,38 @@ export default async function handler(req, res) {
       return sendJson(res, 201, { message: 'Entry added', id: entryId });
     }
 
+    // POST /api/registers/:id/entries/sync-cell (Ultra-fast server-side linked column sync)
+    const syncCellMatch = pathname.match(/^\/api\/registers\/(\d+)\/entries\/sync-cell$/);
+    if (syncCellMatch && method === 'POST') {
+      const targetRegId = parseBigInt(syncCellMatch[1]);
+      const { columnId, sourceEntryId, rowNumber, value } = await getRequestBody(req);
+
+      const colKey = String(columnId);
+      const valStr = JSON.stringify(value ?? '');
+
+      // 1. Try updating entry by __sourceEntryId
+      let resUpdate = await query(`
+        UPDATE entries 
+        SET cells = jsonb_set(COALESCE(cells, '{}'::jsonb), ARRAY[$1], $2::jsonb)
+        WHERE register_id = $3 AND cells->>'__sourceEntryId' = $4
+      `, [colKey, valStr, targetRegId, String(sourceEntryId)]);
+
+      // 2. Fallback to row_number if not matched by sourceEntryId
+      if (resUpdate.rowCount === 0 && rowNumber) {
+        resUpdate = await query(`
+          UPDATE entries 
+          SET cells = jsonb_set(
+            jsonb_set(COALESCE(cells, '{}'::jsonb), ARRAY[$1], $2::jsonb),
+            ARRAY['__sourceEntryId'],
+            $4::jsonb
+          )
+          WHERE register_id = $3 AND row_number = $5
+        `, [colKey, valStr, targetRegId, JSON.stringify(String(sourceEntryId)), Number(rowNumber)]);
+      }
+
+      return sendJson(res, 200, { success: true, updated: resUpdate.rowCount > 0 });
+    }
+
     // PUT / DELETE entries: /api/registers/:id/entries/:entryId
     const entryMatch = pathname.match(/^\/api\/registers\/(\d+)\/entries\/(\d+)$/);
     if (entryMatch) {
