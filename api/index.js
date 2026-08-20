@@ -815,15 +815,15 @@ export default async function handler(req, res) {
         const { cells, cellStyles, pageIndex, rowNumber } = await getRequestBody(req);
         await query(`
           UPDATE entries SET 
-            cells = $1, 
-            cell_styles = $2, 
-            page_index = $3, 
+            cells = COALESCE(cells, '{}'::jsonb) || $1::jsonb, 
+            cell_styles = COALESCE($2, cell_styles), 
+            page_index = COALESCE($3, page_index), 
             row_number = COALESCE($4, row_number)
           WHERE id = $5 AND register_id = $6
         `, [
           JSON.stringify(cells || {}),
           cellStyles ? JSON.stringify(cellStyles) : null,
-          pageIndex !== undefined ? Number(pageIndex) : 0,
+          pageIndex !== undefined ? Number(pageIndex) : null,
           rowNumber !== undefined ? Number(rowNumber) : null,
           entryId,
           regId

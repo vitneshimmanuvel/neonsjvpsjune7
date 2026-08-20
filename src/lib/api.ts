@@ -526,7 +526,7 @@ export async function getRegisterColumnsOnly(registerId: number): Promise<Regist
   return res.json();
 }
 
-export async function getRegister(registerId: number, bypassCache = true): Promise<RegisterDetail> {
+export async function getRegister(registerId: number, bypassCache = false): Promise<RegisterDetail> {
   if (bypassCache) {
     clearRegisterCache(registerId);
   }
@@ -2084,7 +2084,7 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
 
 /**
  * Lightweight cell update: patches the in-memory cache and writes ONLY the
- * affected chunk to Firestore — instead of rewriting every chunk.
+ * affected cells directly to PostgreSQL — instead of rewriting whole registers.
  * Used by the debounced cell-edit handler for maximum speed during rapid data entry.
  */
 export async function updateEntryDirect(
@@ -2092,7 +2092,36 @@ export async function updateEntryDirect(
   entryId: number,
   cells: Record<string, string>
 ): Promise<Entry | null> {
-  return updateEntry(registerId, entryId, cells);
+  // 1. Direct single-row update to PostgreSQL without full document fetching
+  const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cells })
+  });
+  if (!res.ok) throw new Error('Failed to update entry');
+
+  // 2. Patch in-memory cache if register is cached
+  const cached = firestoreRegisterCache.get(registerId);
+  if (cached) {
+    const entry = cached.entries.find(e => e.id === entryId);
+    if (entry) {
+      if (!entry.cells) entry.cells = {};
+      entry.cells = { ...entry.cells, ...cells };
+    }
+
+    // 3. Fast linked column sync in background
+    for (const [colIdStr, value] of Object.entries(cells)) {
+      const col = cached.columns?.find(c => c.id.toString() === colIdStr);
+      if (col) {
+        const links = getColumnLinks(col).filter(l => l.role === 'source');
+        for (const link of links) {
+          _syncLinkedColumn(link.registerId, link.columnId, entryId, entry?.rowNumber || 1, value);
+        }
+      }
+    }
+  }
+
+  return { id: entryId, registerId, cells } as any;
 }
 
 function ensureTargetRows(targetReg: RegisterDetail, maxRowNumber: number) {
