@@ -149,13 +149,11 @@ export default function RegisterPage({ overrideRegisterId, compact, onSplitView,
     queryKey: ['register', registerId],
     queryFn: () => getRegister(Number(registerId)),
     enabled: !!registerId && !isNaN(Number(registerId)),
-    staleTime: 10 * 1000,
-    // Re-enabled: the sync guard (hasPendingDebounce + hasPendingRowMutations at
-    // the merge block below) already blocks localEntries overwrites when writes are
-    // in-flight, so window-focus refetch is safe and ensures users see fresh data
-    // when switching back to the tab.
-    refetchOnWindowFocus: true,
-    refetchInterval: (detailViewEntry || showAddRecordModal) ? false : 15 * 1000,  // Background sync every 15 seconds to prevent multi-user overwrites
+    staleTime: 60 * 1000,
+    // Window-focus and interval full refetches disabled — real-time live delta sync
+    // runs every 1.5s to prevent background full snapshots from wiping newly entered cells.
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
     placeholderData: keepPreviousData,
   });
 
@@ -903,9 +901,20 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       // Preserve local optimistic/temporary entries (those with floating point IDs)
       // during query cache synchronization
       const tempEntries = localEntries.filter((e) => !Number.isInteger(e.id));
+      const localMap = new Map(localEntries.map(e => [e.id, e]));
       const incomingEntries = dataToSync.entries || [];
       const incomingIdSet = new Set(incomingEntries.map((e: any) => e.id));
-      const merged = [...incomingEntries];
+      const merged = incomingEntries.map((inc: any) => {
+        const local = localMap.get(inc.id);
+        if (!local) return inc;
+        return {
+          ...inc,
+          cells: {
+            ...(inc.cells || {}),
+            ...(local.cells || {})
+          }
+        };
+      });
 
       // Preserve temp (float ID) entries not yet in server snapshot
       tempEntries.forEach((temp) => {
@@ -928,7 +937,7 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
       //    identical to the current localEntries. This prevents unnecessary re-renders
       //    from background refetches (every 30s or on window focus) that would cause
       //    the virtualizer to recalculate and briefly display rows in wrong positions.
-      const isSameData = merged.length === localEntries.length && merged.every((m, i) => {
+      const isSameData = merged.length === localEntries.length && merged.every((m: any, i: number) => {
         const l = localEntries[i];
         if (!l || m.id !== l.id || m.rowNumber !== l.rowNumber || m.pageIndex !== l.pageIndex) return false;
         // Deep-check cells only if both exist
