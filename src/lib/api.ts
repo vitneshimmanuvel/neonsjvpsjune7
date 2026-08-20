@@ -2041,6 +2041,7 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
   const oldCells = { ...entry.cells };
   entry.cells = { ...entry.cells, ...safeCells };
 
+  // Fast direct entry update
   const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -2064,16 +2065,23 @@ export async function updateEntry(registerId: number, entryId: number, cells: Re
   const details = changes
     ? `Updated row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} in "${reg.name}": ${changes}`
     : `Updated row #${entry.rowNumber}${identityTag ? ` ${identityTag}` : ''} in "${reg.name}"`;
-  await logAction(reg.businessId, 'Edit Row', details, { registerId, registerName: reg.name, entryId });
 
+  // Asynchronous activity logging (non-blocking for UI save speed)
+  logAction(reg.businessId, 'Edit Row', details, { registerId, registerName: reg.name, entryId }).catch(console.error);
+
+  // Sync linked columns concurrently
+  const syncPromises: Promise<any>[] = [];
   for (const [colIdStr, value] of Object.entries(cells)) {
     const col = reg.columns.find(c => c.id.toString() === colIdStr);
     if (col) {
       const links = getColumnLinks(col).filter(l => l.role === 'source');
       for (const link of links) {
-        await _syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value);
+        syncPromises.push(_syncLinkedColumn(link.registerId, link.columnId, entry.id, entry.rowNumber, value));
       }
     }
+  }
+  if (syncPromises.length > 0) {
+    await Promise.all(syncPromises);
   }
 
   return entry;
@@ -2144,7 +2152,7 @@ async function _syncAddRow(targetRegisterId: number, sourceEntryId: number) {
     reg.entries.push(newEntry);
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
-    await saveRegDocImmediate(reg, true);
+    firestoreRegisterCache.set(reg.id, reg);
   }).catch(e => console.error('Failed to sync add row:', e));
 }
 
@@ -2175,7 +2183,7 @@ async function _syncInsertRow(targetRegisterId: number, atIndex: number, sourceE
     reg.entries.splice(atIndex, 0, newEntry);
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
-    await saveRegDocImmediate(reg, true);
+    firestoreRegisterCache.set(reg.id, reg);
   }).catch(e => console.error('Failed to sync insert row:', e));
 }
 
@@ -2197,7 +2205,7 @@ async function _syncDeleteRow(targetRegisterId: number, sourceEntryId: number, r
     reg.entries.splice(entryIndex, 1);
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
-    await saveRegDocImmediate(reg, true);
+    firestoreRegisterCache.set(reg.id, reg);
   }).catch(e => console.error('Failed to sync delete row:', e));
 }
 
@@ -2224,7 +2232,7 @@ async function _syncBulkDeleteRows(targetRegisterId: number, sourceEntryIds: num
     reg.entries = reg.entries.filter(e => !idsToDelete.has(e.id));
     renumberRows(reg);
     reg.entryCount = reg.entries.length;
-    await saveRegDocImmediate(reg, true);
+    firestoreRegisterCache.set(reg.id, reg);
   }).catch(e => console.error('Failed to sync bulk delete rows:', e));
 }
 
@@ -2283,7 +2291,21 @@ async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: numbe
       if (!targetEntry.cells) targetEntry.cells = {};
       targetEntry.cells[targetColumnId.toString()] = value;
       targetReg.updatedAt = new Date().toISOString();
-      await saveRegDocImmediate(targetReg, true);
+      
+      // Update in-memory cache
+      firestoreRegisterCache.set(targetReg.id, targetReg);
+
+      // Fast single-entry targeted update (50ms) instead of re-uploading the entire 700-row table
+      await fetch(apiUrl(`/api/registers/${targetRegisterId}/entries/${targetEntry.id}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cells: targetEntry.cells,
+          cellStyles: targetEntry.cellStyles,
+          pageIndex: targetEntry.pageIndex,
+          rowNumber: targetEntry.rowNumber
+        })
+      });
     }
   }).catch(e => console.error('Failed to sync linked column:', e));
 }
