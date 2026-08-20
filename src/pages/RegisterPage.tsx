@@ -18,7 +18,7 @@ import {
   getPendingMutationsCount,
   updateEntryCellStyles, unlinkColumn, resyncLinkedColumns, getColumnLinks,
   formatDateToDDMMYYYY, validatePhoneNumber, canUserSelectBackDates,
-  listFolders,
+  listFolders, fetchRegisterLiveSync,
   type Entry, type CellStyle, type HistoryEntry, type Folder,
 } from '../lib/api';
 // xlsx, jsPDF, and jspdf-autotable are now dynamically imported via useExport hook
@@ -632,6 +632,100 @@ return () => document.removeEventListener('mousedown', handleOutsideClick);
     });
     return () => { unsubscribe(); };
   }, []);
+
+  // ── Real-Time Multi-User Synchronization ──
+  const lastLiveSyncTimeRef = useRef<number>(Date.now());
+  const isSyncingLiveRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (!registerId || isNaN(Number(registerId))) return;
+
+    // Reset sync anchor timestamp when opening/switching registers
+    lastLiveSyncTimeRef.current = Date.now();
+
+    const intervalId = setInterval(async () => {
+      // Skip if previous poll in flight, or if user is currently typing/debouncing local edits
+      if (isSyncingLiveRef.current) return;
+      if (Object.keys(debounceTimers.current).length > 0) return;
+
+      try {
+        isSyncingLiveRef.current = true;
+        const res = await fetchRegisterLiveSync(Number(registerId), lastLiveSyncTimeRef.current);
+        if (res.timestamp) {
+          lastLiveSyncTimeRef.current = res.timestamp;
+        }
+
+        if (res.changes && res.changes.length > 0) {
+          let hasStructureChange = false;
+
+          res.changes.forEach(change => {
+            if (change.type === 'cell_update') {
+              const cellUpdates = change.cells || (change.columnId ? { [change.columnId]: change.value || '' } : {});
+
+              setLocalEntries(prev => {
+                let matched = false;
+                const next = prev.map(e => {
+                  if ((change.entryId && e.id === change.entryId) || (change.rowNumber && e.rowNumber === change.rowNumber)) {
+                    matched = true;
+                    return { ...e, cells: { ...e.cells, ...cellUpdates } };
+                  }
+                  return e;
+                });
+                return matched ? next : prev;
+              });
+
+              // Patch React Query cache in real-time
+              queryClient.setQueryData(['register', registerId], (old: any) => {
+                if (!old || !old.entries) return old;
+                return {
+                  ...old,
+                  entries: old.entries.map((e: any) => {
+                    if ((change.entryId && e.id === change.entryId) || (change.rowNumber && e.rowNumber === change.rowNumber)) {
+                      return { ...e, cells: { ...e.cells, ...cellUpdates } };
+                    }
+                    return e;
+                  })
+                };
+              });
+            } else if (change.type === 'add_row' && change.entry) {
+              const newEntry = change.entry;
+              setLocalEntries(prev => {
+                if (prev.some(e => e.id === newEntry.id)) return prev;
+                return [...prev, newEntry];
+              });
+              queryClient.setQueryData(['register', registerId], (old: any) => {
+                if (!old || !old.entries) return old;
+                if (old.entries.some((e: any) => e.id === newEntry.id)) return old;
+                return { ...old, entries: [...old.entries, newEntry], entryCount: (old.entryCount || 0) + 1 };
+              });
+            } else if (change.type === 'delete_row' && change.entryId) {
+              setLocalEntries(prev => prev.filter(e => e.id !== change.entryId));
+              queryClient.setQueryData(['register', registerId], (old: any) => {
+                if (!old || !old.entries) return old;
+                return {
+                  ...old,
+                  entries: old.entries.filter((e: any) => e.id !== change.entryId),
+                  entryCount: Math.max(0, (old.entryCount || 1) - 1)
+                };
+              });
+            } else if (change.type === 'structure_update') {
+              hasStructureChange = true;
+            }
+          });
+
+          if (hasStructureChange) {
+            queryClient.invalidateQueries({ queryKey: ['register', registerId] });
+          }
+        }
+      } catch (e) {
+        // Silent catch for live poll
+      } finally {
+        isSyncingLiveRef.current = false;
+      }
+    }, 1500); // 1.5 second sub-second live sync interval
+
+    return () => clearInterval(intervalId);
+  }, [registerId, queryClient]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {

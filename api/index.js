@@ -152,6 +152,32 @@ function formatRegister(row) {
   };
 }
 
+// ─── REAL-TIME MULTI-USER SYNC BUFFER ──────────────────────────────────────────
+if (!globalThis._registerChanges) {
+  globalThis._registerChanges = new Map(); // registerId -> Array<ChangeEvent>
+}
+
+function recordRegisterChange(registerId, change) {
+  const regKey = String(registerId);
+  let list = globalThis._registerChanges.get(regKey);
+  if (!list) {
+    list = [];
+    globalThis._registerChanges.set(regKey, list);
+  }
+  const changeEvent = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    registerId: regKey,
+    timestamp: Date.now(),
+    ...change
+  };
+  list.push(changeEvent);
+  // Keep the latest 300 changes per register
+  if (list.length > 300) {
+    list.splice(0, list.length - 300);
+  }
+  return changeEvent;
+}
+
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -732,6 +758,11 @@ export default async function handler(req, res) {
           }
         }
 
+        recordRegisterChange(regId, {
+          type: 'structure_update',
+          clientSessionId: data.clientSessionId
+        });
+
         return sendJson(res, 200, { message: 'Register updated' });
       }
 
@@ -744,6 +775,27 @@ export default async function handler(req, res) {
         `, [deletedBy, deletedByEmail, deletedById ? String(deletedById) : null, regId]);
         return sendJson(res, 200, { message: 'Register soft-deleted' });
       }
+    }
+
+    // GET /api/registers/:id/live-sync (Real-time delta polling for multi-user sync)
+    const liveSyncMatch = pathname.match(/^\/api\/registers\/(\d+)\/live-sync$/);
+    if (liveSyncMatch && method === 'GET') {
+      const regId = String(liveSyncMatch[1]);
+      const since = parseInt(url.searchParams.get('since') || '0', 10);
+      const clientSessionId = url.searchParams.get('clientSessionId') || '';
+
+      const now = Date.now();
+      const list = globalThis._registerChanges.get(regId) || [];
+
+      // If since <= 0, return current anchor timestamp with empty changes
+      if (since <= 0) {
+        return sendJson(res, 200, { timestamp: now, changes: [] });
+      }
+
+      // Return changes since timestamp, excluding events triggered by the same client tab
+      const changes = list.filter(c => c.timestamp > since && (!clientSessionId || c.clientSessionId !== clientSessionId));
+
+      return sendJson(res, 200, { timestamp: now, changes });
     }
 
     // POST /api/registers/:id/entries (Add entry row)
@@ -770,6 +822,21 @@ export default async function handler(req, res) {
       // Increment entry_count in register
       await query('UPDATE registers SET entry_count = entry_count + 1, updated_at = NOW() WHERE id = $1', [regId]);
 
+      // Record real-time change event
+      recordRegisterChange(regId, {
+        type: 'add_row',
+        entry: {
+          id: entryId,
+          registerId: regId,
+          rowNumber: Number(entry.rowNumber || 1),
+          cells: entry.cells || {},
+          cellStyles: entry.cellStyles,
+          pageIndex: Number(entry.pageIndex || 0),
+          createdAt: parseDate(entry.createdAt) || new Date().toISOString()
+        },
+        clientSessionId: entry.clientSessionId
+      });
+
       return sendJson(res, 201, { message: 'Entry added', id: entryId });
     }
 
@@ -777,7 +844,7 @@ export default async function handler(req, res) {
     const syncCellMatch = pathname.match(/^\/api\/registers\/(\d+)\/entries\/sync-cell$/);
     if (syncCellMatch && method === 'POST') {
       const targetRegId = parseBigInt(syncCellMatch[1]);
-      const { columnId, sourceEntryId, rowNumber, value } = await getRequestBody(req);
+      const { columnId, sourceEntryId, rowNumber, value, clientSessionId } = await getRequestBody(req);
 
       const colKey = String(columnId);
       const valStr = JSON.stringify(value ?? '');
@@ -802,6 +869,16 @@ export default async function handler(req, res) {
         `, [colKey, valStr, targetRegId, JSON.stringify(String(sourceEntryId)), Number(rowNumber)]);
       }
 
+      // Record real-time change event for target register
+      recordRegisterChange(targetRegId, {
+        type: 'cell_update',
+        columnId: colKey,
+        value,
+        sourceEntryId: String(sourceEntryId),
+        rowNumber: Number(rowNumber || 0),
+        clientSessionId
+      });
+
       return sendJson(res, 200, { success: true, updated: resUpdate.rowCount > 0 });
     }
 
@@ -812,7 +889,7 @@ export default async function handler(req, res) {
       const entryId = parseBigInt(entryMatch[2]);
 
       if (method === 'PUT') {
-        const { cells, cellStyles, pageIndex, rowNumber } = await getRequestBody(req);
+        const { cells, cellStyles, pageIndex, rowNumber, clientSessionId } = await getRequestBody(req);
         await query(`
           UPDATE entries SET 
             cells = COALESCE(cells, '{}'::jsonb) || $1::jsonb, 
@@ -828,12 +905,31 @@ export default async function handler(req, res) {
           entryId,
           regId
         ]);
+
+        // Record real-time change event
+        recordRegisterChange(regId, {
+          type: 'cell_update',
+          entryId,
+          cells: cells || {},
+          rowNumber: rowNumber !== undefined ? Number(rowNumber) : undefined,
+          clientSessionId
+        });
+
         return sendJson(res, 200, { message: 'Entry updated' });
       }
 
       if (method === 'DELETE') {
+        const clientSessionId = url.searchParams.get('clientSessionId') || undefined;
         await query('DELETE FROM entries WHERE id = $1 AND register_id = $2', [entryId, regId]);
         await query('UPDATE registers SET entry_count = GREATEST(0, entry_count - 1), updated_at = NOW() WHERE id = $1', [regId]);
+
+        // Record real-time change event
+        recordRegisterChange(regId, {
+          type: 'delete_row',
+          entryId,
+          clientSessionId
+        });
+
         return sendJson(res, 200, { message: 'Entry deleted' });
       }
     }

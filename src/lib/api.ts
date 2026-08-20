@@ -4,6 +4,49 @@ import { TEMPLATES, type Template, type TemplateColumn } from './templates';
 import { apiUrl } from './apiBase';
 // Local filesystem completely unmounted from regular API.
 
+// ==================== REAL-TIME MULTI-USER SYNC ====================
+const CLIENT_SESSION_ID = typeof window !== 'undefined'
+  ? (window.sessionStorage?.getItem('rb_client_session_id') || (() => {
+      const id = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { window.sessionStorage?.setItem('rb_client_session_id', id); } catch (e) {}
+      return id;
+    })())
+  : 'server_session';
+
+export function getClientSessionId(): string {
+  return CLIENT_SESSION_ID;
+}
+
+export interface LiveSyncChange {
+  id: string;
+  registerId: string;
+  timestamp: number;
+  type: 'cell_update' | 'add_row' | 'delete_row' | 'structure_update';
+  entryId?: number;
+  cells?: Record<string, string>;
+  columnId?: string;
+  value?: string;
+  sourceEntryId?: string;
+  rowNumber?: number;
+  entry?: Entry;
+  columns?: Column[];
+  pages?: Page[];
+  clientSessionId?: string;
+}
+
+export async function fetchRegisterLiveSync(
+  registerId: number,
+  since: number
+): Promise<{ timestamp: number; changes: LiveSyncChange[] }> {
+  try {
+    const res = await fetch(apiUrl(`/api/registers/${registerId}/live-sync?since=${since}&clientSessionId=${encodeURIComponent(CLIENT_SESSION_ID)}`));
+    if (!res.ok) return { timestamp: Date.now(), changes: [] };
+    return res.json();
+  } catch (e) {
+    return { timestamp: Date.now(), changes: [] };
+  }
+}
+
 // ==================== AUTH ====================
 export interface User {
   id: number | string;
@@ -1907,7 +1950,7 @@ export async function addEntry(registerId: number, cells: Record<string, string>
     const res = await fetch(apiUrl(`/api/registers/${registerId}/entries`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
+      body: JSON.stringify({ ...entry, clientSessionId: CLIENT_SESSION_ID })
     });
     if (!res.ok) throw new Error('Failed to add entry');
 
@@ -2096,7 +2139,7 @@ export async function updateEntryDirect(
   const res = await fetch(apiUrl(`/api/registers/${registerId}/entries/${entryId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cells })
+    body: JSON.stringify({ cells, clientSessionId: CLIENT_SESSION_ID })
   });
   if (!res.ok) throw new Error('Failed to update entry');
 
@@ -2304,7 +2347,8 @@ async function _syncLinkedColumn(targetRegisterId: number, targetColumnId: numbe
         columnId: targetColumnId,
         sourceEntryId,
         rowNumber,
-        value
+        value,
+        clientSessionId: CLIENT_SESSION_ID
       })
     });
 
